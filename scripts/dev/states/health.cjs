@@ -542,7 +542,7 @@ module.exports = [
     waitFor: 'weight-targets-behind',
     // The sync's toast ("13 weigh-ins added …", 12 s with its Undo) has gone by the time the screen is captured.
     taps: [{ wait: 13000 }],
-    note: 'Weight with a fortnight of Garmin weigh-ins: "From Garmin Connect" on each row and the targets card, the targets still on 78.4 kg',
+    note: 'Weight with a fortnight of Garmin weigh-ins: "From Garmin Connect" on each row and the "Use it for my target" card, the target still on 78.4 kg',
   },
   {
     id: 'weight-synced-imperial',
@@ -573,7 +573,7 @@ module.exports = [
     waitFor: 'toast-action',
     absent: ['weight-targets-behind'],
     taps: [{ wait: 13000 }, 'weight-use-latest'],
-    note: '"Use it for targets" tapped: the toast "Targets now use … kg" with Undo, and the card gone',
+    note: '"Use it for my target" tapped: the toast "Your target now uses … kg" with Undo, and the card gone',
   },
   {
     id: 'weight-first-read-toast',

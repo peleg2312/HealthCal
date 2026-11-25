@@ -3,7 +3,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import type { Direction } from '@/lib/insights';
 import { useLargeText, useTheme } from '@/theme';
-import { CupKey, FadeUp, PressableScale, Text } from '@/ui';
+import { CupKey, FadeUp, PressableScale, Text, useGrownText } from '@/ui';
 
 import { spokenUnits } from './chartWords';
 import { TrendMark } from './parts';
@@ -72,6 +72,8 @@ export function ProgressTile({
   // and its unit stay inside it and its line may take a second line.
   const oneColumn = useLargeText();
   const line = narrow && captionShort && !oneColumn ? captionShort : caption;
+  // Grown text or a reader's own text spacing (`useGrownText`): the line wraps rather than be cut.
+  const grown = useGrownText();
   return (
     <FadeUp index={index + 1} style={{ width: oneColumn ? '100%' : '50%' }}>
     <PressableScale
@@ -104,7 +106,7 @@ export function ProgressTile({
       </View>
       {line ? (
         // One line: what the number counts. The comparison is the triangle, and in full one tap away.
-        <Text variant="caption" color="textSecondary" numberOfLines={oneColumn ? 3 : 1}>
+        <Text variant="caption" color="textSecondary" numberOfLines={oneColumn || grown ? 3 : 1}>
           {line}
         </Text>
       ) : null}

@@ -495,9 +495,10 @@ export function AnimatedList({ children, animateFirst = false }: { children: Rea
   return (
     <LayoutAnimationConfig skipEntering={!animateFirst} skipExiting>
       {/* A list for assistive technology on the web (WCAG 1.3.1), its rows `listitem`s (`AnimatedItem`, the food
-          screens' `FadeRow`); `display: contents` draws no box, so the rows lie in the parent's layout as before. */}
+          screens' `FadeRow`); `display: contents` draws no box, so the rows lie in the parent's layout as before.
+          An empty list (a meal with nothing logged) carries no list role, so no list of 0 items is announced. */}
       {Platform.OS === 'web' ? (
-        <View role="list" style={LIST_CONTENTS}>
+        <View role={hasRows(children) ? 'list' : undefined} style={LIST_CONTENTS}>
           {children}
         </View>
       ) : (
@@ -508,6 +509,11 @@ export function AnimatedList({ children, animateFirst = false }: { children: Rea
 }
 
 const LIST_CONTENTS = { display: 'contents' } as unknown as ViewStyle;
+
+/** Whether a list has a row to show (null, false and empty arrays draw nothing). */
+function hasRows(children: React.ReactNode): boolean {
+  return React.Children.toArray(children).length > 0;
+}
 
 /**
  * One row of an animated list: it fades and slides in when added (on the web

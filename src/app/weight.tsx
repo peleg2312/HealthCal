@@ -163,7 +163,7 @@ function WeightScreen() {
               </Text>
               <Button
                 testID="weight-use-latest"
-                title="Use it for targets"
+                title="Use it for my target"
                 variant="secondary"
                 size="sm"
                 full={false}
@@ -261,7 +261,7 @@ function WeightScreen() {
 }
 
 /**
- * "Your targets use 84.0 kg. Your latest weigh-in, from Garmin Connect on Nov 18, is 82.4 kg."
+ * "Your target uses 84.0 kg. Your latest weigh-in, from Garmin Connect on Nov 18, is 82.4 kg."
  * With body fat: "… is 82.4 kg with 18% body fat."
  */
 function targetsBehindText(
@@ -276,7 +276,8 @@ function targetsBehindText(
   const tenths = behind.bodyFatPct !== undefined && own !== null && Math.round(behind.bodyFatPct) === Math.round(own);
   const fat = behind.bodyFatPct !== undefined ? ` with ${bodyFatText(behind.bodyFatPct, tenths)} body fat` : '';
   const ownFat = behind.bodyFatPct !== undefined && own !== null ? ` and ${bodyFatText(own, tenths)} body fat` : '';
-  return `Your targets use ${fixedWeight(profile.weightKg, units)}${ownFat}. Your latest weigh-in, ${from} on ${formatShortDate(behind.latest.date)}, is ${fixedWeight(behind.kg, units)}${fat}.`;
+  // "Target" is the daily calorie number only, so it is named in the singular.
+  return `Your target uses ${fixedWeight(profile.weightKg, units)}${ownFat}. Your latest weigh-in, ${from} on ${formatShortDate(behind.latest.date)}, is ${fixedWeight(behind.kg, units)}${fat}.`;
 }
 
 function Legend({ swatch, label }: { swatch: React.ReactNode; label: string }) {

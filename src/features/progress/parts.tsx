@@ -5,7 +5,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { fonts, useLargeText, useTheme } from '@/theme';
 import type { Direction } from '@/lib/insights';
-import { Card, Chip, CupKey, PressableScale, Sheet, Text } from '@/ui';
+import { Card, Chip, CupKey, PressableScale, Sheet, Text, useGrownText } from '@/ui';
 
 import type { RangeDays } from './useProgressData';
 
@@ -236,6 +236,9 @@ export function SegmentSwitch<T extends string>({
   const narrow = useWindowDimensions().width < 360;
   // Above 115% text four labels no longer fit on one line: the tabs go two to a row, so none is cut.
   const twoRows = useLargeText() && options.length > 2;
+  // As soon as text grows at all, the app's size, the phone's or a reader's own text spacing (`useGrownText`),
+  // a label wraps rather than be cut; at the designed size and spacing it stays one line, as before.
+  const grown = useGrownText();
   return (
     <View accessibilityRole="tablist" style={{ flexDirection: 'row', flexWrap: twoRows ? 'wrap' : 'nowrap', borderBottomWidth: 1, borderBottomColor: colors.border }}>
       {options.map((o) => {
@@ -253,7 +256,7 @@ export function SegmentSwitch<T extends string>({
             {...({ 'aria-selected': active } as object)}
             accessibilityLabel={o.label}
             style={[twoRows ? { width: '50%' } : { flex: 1 }, { minWidth: 0, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: narrow ? 1 : 4 }]}>
-            <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={1} style={{ fontSize: narrow ? 13 : 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
+            <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={grown ? undefined : 1} align="center" style={{ fontSize: narrow ? 13 : 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
               {o.label}
             </Text>
             {active ? <View pointerEvents="none" style={{ position: 'absolute', left: '18%', right: '18%', bottom: -2, height: 3, borderRadius: 1, backgroundColor: colors.rim }} /> : null}

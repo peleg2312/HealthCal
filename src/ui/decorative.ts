@@ -23,7 +23,3 @@ export function decorative<P>(icon: React.ReactElement<P>): React.ReactElement<P
   return React.cloneElement(icon, DECORATIVE as unknown as Partial<P>);
 }
 
-/** `decorative` for any node a kit piece was given: an element is hidden, anything else is drawn as given. */
-export function hideIfElement(node: React.ReactNode): React.ReactNode {
-  return React.isValidElement(node) && typeof node.type !== 'string' ? decorative(node) : node;
-}

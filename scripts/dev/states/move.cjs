@@ -266,7 +266,7 @@ const water = [
 
 // ------------------------------------------------------------------ weight
 const weight = [
-  // Weigh-ins synced from Garmin Connect through the in-memory health store, with the "Use it for targets" card
+  // Weigh-ins synced from Garmin Connect through the in-memory health store, with the "Use it for my target" card
   // (defined once in health.cjs, so the crawl taps the same screen the evidence states show).
   require('./health.cjs').find((s) => s.id === 'weight-synced'),
   { id: 'weight-1m', route: '/weight', taps: ['weight-range-1m'], note: 'one month' },

@@ -372,7 +372,7 @@ export interface TargetsBehind {
 /**
  * The newest-dated live weigh-in, when it is a synced one whose weight differs
  * from the profile's by 0.05 kg or more, or whose body fat differs from the
- * profile's by 0.1 or more: what "Use it for targets" on /weight would apply.
+ * profile's by 0.1 or more: what "Use it for my target" on /weight would apply.
  * Null otherwise (no profile, no weigh-ins, the newest is the person's own, or
  * the targets already use it). A sync never writes the profile itself.
  */
@@ -408,7 +408,7 @@ export function bodyFatFollowsDelete(
 /**
  * Body fat the profile may fall back to: the newest of the person's own weigh-ins
  * that has one. A synced weigh-in (`isSyncedWeighIn`) does not count: it reaches
- * the profile only by the person's own save of it or "Use it for targets".
+ * the profile only by the person's own save of it or "Use it for my target".
  */
 export function ownLatestBodyFat(entries: readonly WeightEntry[]): number | undefined {
   return latestBodyFat(entries.filter((e) => !e.deleted && !isSyncedWeighIn(e)));
@@ -418,7 +418,7 @@ export function ownLatestBodyFat(entries: readonly WeightEntry[]): number | unde
  * What deleting `entry` changes in the profile (`live`: the live weigh-ins before
  * the delete). The weight moves only when the entry was the newest-dated weigh-in
  * and the profile's weight came from it; it then goes to the newest remaining
- * weigh-in of the person's own (a synced one waits for "Use it for targets"), or
+ * weigh-in of the person's own (a synced one waits for "Use it for my target"), or
  * stays when there is none. Body fat follows `bodyFatFollowsDelete`, falling back
  * to `ownLatestBodyFat` or none. Deleting an older weigh-in, or one whose figures
  * the person has typed over in Goals or on /body, changes nothing. A key present

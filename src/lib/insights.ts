@@ -608,13 +608,15 @@ function proteinInsight({ summary: s, goal }: InsightContext): Insight | null {
     };
   }
   if (p.avg >= p.target * 0.95) {
-    const why = goal === 'lose' ? ', which helps keep muscle while you lose weight' : goal === 'gain' ? ', which supports building muscle' : '';
+    // The figures are Progress's Protein tile ("146 g, a day · goal 152 g"), so the step says why it matters
+    // rather than the figures again; the body keeps them.
+    const why = goal === 'lose' ? 'That helps keep muscle while you lose weight.' : goal === 'gain' ? 'That supports building muscle.' : 'Keep the same routine.';
     return {
       id: 'protein-on-target',
       tone: 'positive',
       title: 'Protein at its goal',
-      step: `${gText(p.avg)} a day against ${gText(p.target)}.`,
-      body: `Protein averaged ${gText(p.avg)} against a ${gText(p.target)} goal${why}.`,
+      step: why,
+      body: `Protein averaged ${gText(p.avg)} against a ${gText(p.target)} goal.`,
       score: 40,
     };
   }
@@ -708,7 +710,8 @@ function activityInsight({ summary: s }: InsightContext): Insight | null {
       id: 'activity-on-track',
       tone: 'positive',
       title: 'Above the activity guideline',
-      step: `${weekly} active minutes a week, on average.`,
+      // The minutes are Progress's Activity tile, so the step does not say them again; the body keeps them.
+      step: 'The same mix of sessions keeps it there.',
       body: `You averaged ${weekly} active minutes a week (${sessions} in this range), toward the ${WEEKLY_ACTIVE_MINUTES} minutes a week guideline. Hard minutes count double.`,
       score: 38,
     };

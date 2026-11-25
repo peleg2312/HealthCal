@@ -4,7 +4,7 @@
  * it, so calorie and water targets follow; deleting one moves the profile only
  * when its figures came from that weigh-in (`profileAfterDelete`). A weigh-in a
  * health store wrote reaches the profile only by the person's own save of it or
- * "Use it for targets", never by deleting another one.
+ * "Use it for my target", never by deleting another one.
  */
 import { rememberDeletedNight, rememberDeletedWeighIn } from '@/features/health-sync/deletions';
 import { formatDuration } from '@/lib/dates';
@@ -81,7 +81,7 @@ export function deleteWeightRecord(entry: WeightEntry) {
 }
 
 /**
- * "Use it for targets" on /weight: point the profile at a synced weigh-in, by
+ * "Use it for my target" on /weight: point the profile at a synced weigh-in, by
  * the person's own tap (a sync never writes the profile). Sets the weight, and
  * the body fat when the weigh-in has one; Undo puts the earlier figures back.
  * (Not named use…: it is called from a press handler, not a hook.)
@@ -94,8 +94,8 @@ export function applyWeighInToTargets(entry: Pick<WeightEntry, 'kg' | 'bodyFatPc
   haptic.success();
   // Name the body fat too when the tap changed it, so the toast says everything the tap set.
   const fat = typeof entry.bodyFatPct === 'number' && !sameFat(entry.bodyFatPct, s.profile.bodyFatPct) ? ` and ${bodyFatText(entry.bodyFatPct)} body fat` : '';
-  // One decimal, as the weigh-in it names is shown ("Targets now use 82.0 kg").
-  toast(`Targets now use ${weightText(entry.kg, s.profile.units)}${fat}`, {
+  // One decimal, as the weigh-in it names is shown ("Your target now uses 82.0 kg").
+  toast(`Your target now uses ${weightText(entry.kg, s.profile.units)}${fat}`, {
     label: 'Undo',
     tint: 'weight',
     onPress: () => {

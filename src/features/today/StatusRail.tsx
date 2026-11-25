@@ -186,7 +186,7 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
           color={colors.water}
           goalKind="reach"
           memoryKey={`rail-water-${day.date}`}
-          onReached={() => reached(isToday ? 'Water goal reached for today. Anything more is a bonus.' : 'Water goal reached for the day.')}
+          onReached={() => reached(isToday ? 'Water goal reached for today.' : 'Water goal reached for the day.')}
           style={{ marginTop: 10 }}
         />
       </View>

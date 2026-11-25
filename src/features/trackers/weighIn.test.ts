@@ -110,7 +110,7 @@ describe('what deleting a weigh-in changes in the profile', () => {
     expect(profileAfterDelete({ weightKg: 79 }, mine, [...all, mine])).toEqual({});
     // A synced newest the person used for targets: back to their own newest, not to the other synced one.
     expect(profileAfterDelete({ weightKg: 82.0 }, nov18, all)).toEqual({ weightKg: 84 });
-    // Nothing of their own left: the profile stays, and "Use it for targets" offers the synced one.
+    // Nothing of their own left: the profile stays, and "Use it for my target" offers the synced one.
     expect(profileAfterDelete({ weightKg: 82.0 }, nov18, [nov17, nov18])).toEqual({});
     // Before this round's records: hand weigh-ins only, as it always was.
     expect(profileAfterDelete({ weightKg: 81 }, mine, [oct, nov10, mine])).toEqual({ weightKg: 84 });
