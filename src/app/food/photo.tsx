@@ -43,7 +43,7 @@ import { AiGlyph, AiMark } from '@/features/ai/mark';
 import { PhotoHero } from '@/features/ai/PhotoHero';
 import { SampleNotice } from '@/features/ai/SampleNotice';
 import { photoText, readWeight } from '@/features/ai/weight';
-import { DESCRIPTION_MAX, estimateReadyLine, macroStatSpoken, photoLeaveQuestion, prefilledDescription } from '@/features/ai/words';
+import { DESCRIPTION_MAX, estimateReadyLine, itemKcalSpoken, macroStatSpoken, photoLeaveQuestion, prefilledDescription } from '@/features/ai/words';
 import { SaveMealRow } from '@/features/ai/SaveMealRow';
 import { MealPicker } from '@/features/food/components';
 import { checkoutShown, PLAN_ROUTE, planVisible, refreshPlanAfterLimit, usePlan } from '@/features/plan';
@@ -61,7 +61,7 @@ import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import { cup, useLargeText, useTheme } from '@/theme';
 import type { AiFoodResult, Food, MealType } from '@/types';
-import { AnimatedNumber, Button, Card, Chip, CupKey, decorative, Divider, FadeUp, goBack, haptic, Header, MacroBar, PressableScale, Screen, Segmented, Text, TextField, toast, useLeaveGuard } from '@/ui';
+import { AnimatedNumber, Button, Card, Chip, CupKey, decorative, DECORATIVE, Divider, FadeUp, goBack, haptic, Header, MacroBar, PressableScale, Screen, Segmented, Text, TextField, toast, useLeaveGuard } from '@/ui';
 
 type InputMode = 'photo' | 'text';
 type Step = 'capture' | 'analysing' | 'review' | 'error';
@@ -725,9 +725,11 @@ export default function PhotoScreen() {
                       from={countFrom}
                       format={approx}
                       memoryKey={`ai-total-${arrival.at}`}
+                      // An estimate heard as one, with its unit in full; the drawn unit beside it is not read again.
+                      accessibilityLabel={itemKcalSpoken(sum.kcal)}
                       style={{ fontSize: 46, lineHeight: 50, letterSpacing: -1.4 }}
                     />
-                    <Text variant="unit" style={{ fontSize: 15 }}>
+                    <Text variant="unit" style={{ fontSize: 15 }} {...DECORATIVE}>
                       kcal
                     </Text>
                   </View>

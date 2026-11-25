@@ -4,7 +4,7 @@ import { View } from 'react-native';
 
 import { cup, useTheme } from '@/theme';
 import type { AiFoodItem } from '@/types';
-import { AnimatedNumber, Chip, Text } from '@/ui';
+import { AnimatedNumber, Chip, DECORATIVE, Text } from '@/ui';
 
 import { itemKcalSpoken } from './words';
 
@@ -55,9 +55,11 @@ export function PhotoHero({
             from={from}
             format={(n) => `~${Math.round(n)}`}
             memoryKey={`ai-total-${arrival}`}
+            // An estimate heard as one, with its unit in full; the drawn unit beside it is not read again.
+            accessibilityLabel={itemKcalSpoken(kcal)}
             style={{ fontSize: 46, lineHeight: 50, letterSpacing: -1.4 }}
           />
-          <Text variant="unit" style={{ fontSize: 15 }}>
+          <Text variant="unit" style={{ fontSize: 15 }} {...DECORATIVE}>
             kcal
           </Text>
           <Text variant="label" color="textSecondary" testID="ai-total-range" style={{ marginLeft: spacing.xs }}>
@@ -71,9 +73,9 @@ export function PhotoHero({
               <Chip
                 key={key}
                 testID={`ai-hero-item-${i}`}
-                // An estimate never shows an exact number: "~248 kcal" drawn, "about 248 kilocalories" heard.
+                // An estimate never shows an exact number: "~248 kcal", drawn and in the chip's name (label in name).
                 label={`${shortName(item.name)} · ~${Math.round(item.kcal)} kcal`}
-                accessibilityLabel={`${shortName(item.name)}, ${itemKcalSpoken(item.kcal)}`}
+                accessibilityLabel={`${shortName(item.name)}, ~${Math.round(item.kcal)} kcal`}
                 onPress={() => onItemPress(key)}
               />
             ))}
