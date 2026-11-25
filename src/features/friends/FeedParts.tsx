@@ -8,7 +8,6 @@ import { ChevronRight, Copy, HandHeart, Lock, UserPlus } from 'lucide-react-nati
 import React from 'react';
 import { Platform, ScrollView, View } from 'react-native';
 
-import { RowEmoji } from '@/features/food/components';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { cupFor, fonts, useLargeText, useTheme } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
@@ -125,8 +124,13 @@ export function FeedWorkoutCard({ item, today, units, onCheer, testID }: { item:
             <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
               {isolateRtl(item.displayName)}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <RowEmoji emoji={item.emoji || '·'} />
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+              {item.emoji ? (
+                // A content mark: the activity's emoji, small and silent (its name follows in words).
+                <View {...DECORATIVE}>
+                  <Text style={{ fontSize: 15, lineHeight: 22 }}>{item.emoji}</Text>
+                </View>
+              ) : null}
               <Text variant="body" style={{ flexShrink: 1 }}>
                 {workoutTitle(w, units)}
               </Text>

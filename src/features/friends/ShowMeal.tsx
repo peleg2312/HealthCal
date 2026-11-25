@@ -12,17 +12,17 @@ import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { withoutMarks } from '@/lib/bidi';
-import { refreshFriends, useFriends } from '@/services/friends';
+import { cleanSharedMealItems, refreshFriends, showMeal, stopMeal, useFriends } from '@/services/friends';
 import { useToday } from '@/store/clock';
 import { fonts, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
 import { Button, Chip, ChipWrap, decorative, Divider, haptic, ListRow, Text, toast, Toggle } from '@/ui';
 
-import { cleanSharedMealItems, mealsOverview, showMeal, stopMeal } from './api';
 import { idFor } from './components';
 import type { MySharedMeal } from './contract';
 import { MealPreviewCard } from './MealCard';
 import { buildSharedMeal } from './meals';
+import { mealsOverview } from './overview';
 import {
   MENU_SHOW,
   MENU_SHOW_LINE,

@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { BUILTIN_FOODS } from '@/data/foods';
 import type { FoodEntry } from '@/types';
 
-import { buildSharedMeal, entryPortion, MAX_SHARED_ITEMS, mealRef, mealRefOfCheer, ownMealsByRef, sameItems } from './meals';
+import { mealOfCheer, sharedMealRef as mealRef } from '@/services/friendsWire';
+
+import { buildSharedMeal, entryPortion, MAX_SHARED_ITEMS, ownMealsByRef, sameItems } from './meals';
 
 const TODAY = '2026-11-25';
 const KEY = '5f1d0c6e2b7a49c8a1e3d4f5061728394a5b6c7d8e9f00112233445566778899';
@@ -113,9 +115,9 @@ describe('naming a cheer for one of my meals', () => {
 
   it('maps a meal cheer back to the day and meal', () => {
     const ref = mealRef(KEY, '2026-11-23', 'dinner');
-    expect(mealRefOfCheer(`meal:${ref}`)).toBe(ref);
-    expect(mealRefOfCheer('day:2026-11-23')).toBeNull();
-    expect(mealRefOfCheer('meal:XYZ')).toBeNull();
+    expect(mealOfCheer(`meal:${ref}`)).toBe(ref);
+    expect(mealOfCheer('day:2026-11-23')).toBeNull();
+    expect(mealOfCheer('meal:XYZ')).toBeNull();
     expect(ownMealsByRef(KEY, TODAY).get(ref)).toEqual({ day: '2026-11-23', meal: 'dinner' });
     expect(ownMealsByRef(null, TODAY).size).toBe(0);
   });

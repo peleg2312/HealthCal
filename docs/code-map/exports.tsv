@@ -1186,24 +1186,13 @@ src/features/friends/MealCard.tsx	FeedMealCard	component
 src/features/friends/MealCard.tsx	MealCardBody	component
 src/features/friends/MealCard.tsx	MealPreviewCard	component
 src/features/friends/MealCard.tsx	SharedFoodRow	component
+src/features/friends/MealCard.tsx	mealFoodsLine	function
 src/features/friends/MealCard.tsx	mealSpoken	function
 src/features/friends/MealCard.tsx	sharedName	function
 src/features/friends/MealCard.tsx	sharedSourceWords	function
 src/features/friends/SetupForm.tsx	SetupForm	component
 src/features/friends/ShowMeal.tsx	ShowToFriendsRow	component
 src/features/friends/ShowMeal.tsx	useShowMealStep	function
-src/features/friends/api.ts	MealsFriend	interface
-src/features/friends/api.ts	MealsMe	interface
-src/features/friends/api.ts	MealsOverview	interface
-src/features/friends/api.ts	cheerMeal	const
-src/features/friends/api.ts	cleanSharedMealItems	const
-src/features/friends/api.ts	mealsOverview	function
-src/features/friends/api.ts	setFriendMealPrefs	const
-src/features/friends/api.ts	setMealAudience	const
-src/features/friends/api.ts	setMealSettings	const
-src/features/friends/api.ts	showMeal	const
-src/features/friends/api.ts	stopAllMeals	const
-src/features/friends/api.ts	stopMeal	const
 src/features/friends/attention.ts	FRIENDS_SEEN_KEY	const
 src/features/friends/attention.ts	RECENT_CHEER_MS	const
 src/features/friends/attention.ts	friendsAttention	function
@@ -1267,10 +1256,11 @@ src/features/friends/meals.ts	SHOWN_DAYS	const
 src/features/friends/meals.ts	buildSharedMeal	function
 src/features/friends/meals.ts	entryPortion	function
 src/features/friends/meals.ts	mealEntries	function
-src/features/friends/meals.ts	mealRef	function
-src/features/friends/meals.ts	mealRefOfCheer	function
 src/features/friends/meals.ts	ownMealsByRef	function
 src/features/friends/meals.ts	sameItems	function
+src/features/friends/overview.ts	MealsMe	interface
+src/features/friends/overview.ts	MealsOverview	interface
+src/features/friends/overview.ts	mealsOverview	function
 src/features/friends/pendingInvite.ts	PENDING_INVITE_KEY	const
 src/features/friends/pendingInvite.ts	PENDING_INVITE_MAX_AGE_MS	const
 src/features/friends/pendingInvite.ts	PendingInvite	type
@@ -3696,7 +3686,12 @@ src/services/foodSearch.ts	stem	function
 src/services/foodSearch.ts	tokenize	function
 src/services/foodSearch.ts	withinOneEdit	function
 src/services/friends.ts	CheerReceived	interface
+src/services/friends.ts	DEFAULT_MEAL_SETTINGS	re-export	src/services/friendsWire.ts:DEFAULT_MEAL_SETTINGS
+src/services/friends.ts	FeedItem	re-export	src/types/index.ts:FeedItem
+src/services/friends.ts	FeedMeal	re-export	src/types/index.ts:FeedMeal
+src/services/friends.ts	FeedWorkout	re-export	src/types/index.ts:FeedWorkout
 src/services/friends.ts	Friend	interface
+src/services/friends.ts	FriendPerson	re-export	src/types/index.ts:FriendPerson
 src/services/friends.ts	FriendRequest	interface
 src/services/friends.ts	FriendSummary	re-export	src/features/friends/summary.ts:FriendSummary
 src/services/friends.ts	FriendWorkout	re-export	src/features/friends/summary.ts:FriendWorkout
@@ -3704,20 +3699,36 @@ src/services/friends.ts	FriendsFailure	type
 src/services/friends.ts	FriendsOverview	interface
 src/services/friends.ts	FriendsResult	type
 src/services/friends.ts	FriendsStatus	type
+src/services/friends.ts	MealSettings	re-export	src/types/index.ts:MealSettings
+src/services/friends.ts	MealShowStatus	type
+src/services/friends.ts	MySharedMeal	re-export	src/types/index.ts:MySharedMeal
 src/services/friends.ts	RequestOutcome	type
+src/services/friends.ts	SharedMeal	re-export	src/types/index.ts:SharedMeal
+src/services/friends.ts	SharedMealItem	re-export	src/types/index.ts:SharedMealItem
 src/services/friends.ts	SocialMe	interface
 src/services/friends.ts	SocialSharing	re-export	src/features/friends/summary.ts:SocialSharing
 src/services/friends.ts	cheerFriend	function
+src/services/friends.ts	cheerMeal	function
+src/services/friends.ts	cleanSharedMealItems	re-export	src/services/friendsWire.ts:cleanSharedMealItems
 src/services/friends.ts	leaveSocial	function
+src/services/friends.ts	mealItemsSignature	re-export	src/services/friendsWire.ts:mealItemsSignature
+src/services/friends.ts	publishMeals	function
 src/services/friends.ts	publishSummary	function
 src/services/friends.ts	refreshFriends	function
 src/services/friends.ts	removeFriend	function
 src/services/friends.ts	requestFriend	function
 src/services/friends.ts	respondToRequest	function
+src/services/friends.ts	setFriendMealPrefs	function
+src/services/friends.ts	setMealAudience	function
+src/services/friends.ts	setMealSettings	function
 src/services/friends.ts	setupSocial	function
+src/services/friends.ts	showMeal	function
 src/services/friends.ts	startFriends	function
+src/services/friends.ts	stopAllMeals	function
+src/services/friends.ts	stopMeal	function
 src/services/friends.ts	toOverview	function
 src/services/friends.ts	undoDecline	function
+src/services/friends.ts	updateMeal	function
 src/services/friends.ts	useFriends	const
 src/services/friendsWire.ts	DEFAULT_MEAL_SETTINGS	const
 src/services/friendsWire.ts	MAX_SHARED_FOODS	const

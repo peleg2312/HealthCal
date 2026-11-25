@@ -3,12 +3,12 @@ import { Utensils } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
-import { cheerMeal, mealsOverview, setFriendMealPrefs } from '@/features/friends/api';
+import { mealsOverview } from '@/features/friends/overview';
 import { CheerButton, Loading, WeekCups, WorkoutRow } from '@/features/friends/components';
 import { feedKey, localFeed, mealsOf } from '@/features/friends/feed';
 import { itemRole, listRole } from '@/features/friends/FeedParts';
 import { FriendMealSheet, type OpenMeal } from '@/features/friends/FriendMealSheet';
-import { sharedName } from '@/features/friends/MealCard';
+import { mealFoodsLine } from '@/features/friends/MealCard';
 import { dayRef } from '@/features/friends/summary';
 import { friendWeek, isCurrentWeek, sharesAnything } from '@/features/friends/week';
 import {
@@ -27,7 +27,7 @@ import {
 import { Figure } from '@/features/trackers/components';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { formatShortDate, toISODate } from '@/lib/dates';
-import { cheerFriend, refreshFriends, removeFriend, useFriends } from '@/services/friends';
+import { cheerFriend, cheerMeal, refreshFriends, removeFriend, setFriendMealPrefs, useFriends } from '@/services/friends';
 import { useToday } from '@/store/clock';
 import { useProfile } from '@/store/selectors';
 import { fonts, useTheme } from '@/theme';
@@ -149,7 +149,7 @@ export default function FriendScreen() {
                     testID={`friend-meal-${i}`}
                     style={{ paddingHorizontal: spacing.lg }}
                     title={myMealTitle(m.meal, m.day, today)}
-                    subtitle={m.items.map((it, j) => (j === 0 ? sharedName(it) : sharedName(it).toLowerCase())).join(', ')}
+                    subtitle={mealFoodsLine(m.items)}
                     left={<Utensils size={20} color={colors.text} />}
                     onPress={() => setOpenMeal({ meal: { owner: m, meal: m, cheered: m.cheered }, adding: false })}
                   />
@@ -176,7 +176,9 @@ export default function FriendScreen() {
             <Text variant="body" style={{ flex: 1 }}>
               {`Cheer ${isolateRtl(name)}’s day`}
             </Text>
-            <CheerButton testID="friends-cheer-day" cheered={friend.cheered.includes(dayCheer)} label={`${withoutMarks(name)}’s day`} onPress={() => void cheer(dayCheer)} />
+            <View>
+              <CheerButton testID="friends-cheer-day" cheered={friend.cheered.includes(dayCheer)} label={`${withoutMarks(name)}’s day`} onPress={() => void cheer(dayCheer)} />
+            </View>
           </View>
         </Card>
       </View>

@@ -3,7 +3,7 @@ import { EyeOff, Lock, Users } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
-import { mealsOverview, setMealAudience, setMealSettings, showMeal, stopAllMeals, stopMeal } from '@/features/friends/api';
+import { mealsOverview } from '@/features/friends/overview';
 import { idFor, Loading, NameField, SharingRow } from '@/features/friends/components';
 import type { MealSettings, MySharedMeal } from '@/features/friends/contract';
 import { MEAL_TYPES } from '@/features/friends/meals';
@@ -44,9 +44,9 @@ import {
   YOUR_WEEK,
 } from '@/features/friends/words';
 import { withoutMarks } from '@/lib/bidi';
-import { leaveSocial, refreshFriends, setupSocial, useFriends, type SocialSharing } from '@/services/friends';
+import { leaveSocial, refreshFriends, setMealAudience, setMealSettings, setupSocial, showMeal, stopAllMeals, stopMeal, useFriends, type SocialSharing } from '@/services/friends';
 import { useNow, useToday } from '@/store/clock';
-import { useTheme } from '@/theme';
+import { useLargeText, useTheme } from '@/theme';
 import type { MealType } from '@/types';
 import { Button, Card, Chip, ChipWrap, ConfirmSheet, decorative, Divider, EmptyState, goBack, haptic, Header, ListRow, Screen, SectionTitle, Sheet, Text, toast } from '@/ui';
 
@@ -55,6 +55,7 @@ const WEEK_NAMES: Record<keyof SocialSharing, string> = { minutes: 'your active 
 /** Friends settings and privacy: the name friends see, your week, your meals, what is showing now, what you see, and turning friends off. */
 export default function FriendsSettingsScreen() {
   const { colors, spacing } = useTheme();
+  const large = useLargeText();
   const status = useFriends((s) => s.status);
   const overview = useFriends((s) => s.overview);
   const today = useToday();
@@ -88,7 +89,11 @@ export default function FriendsSettingsScreen() {
           <Loading />
         ) : (
           <Card testID="friends-settings-off">
-            <EmptyState title="Friends are off" message="Turn friends on to choose what they see." action="Open Friends" onAction={() => goBack('/friends')} />
+            {status === 'unavailable' || status === 'signed-out' ? (
+              <EmptyState title="Friends need an account" message="With an account, choose here what friends see." action="Open Friends" onAction={() => goBack('/friends')} />
+            ) : (
+              <EmptyState title="Friends are off" message="Turn friends on to choose what they see." action="Open Friends" onAction={() => goBack('/friends')} />
+            )}
           </Card>
         )}
       </Screen>
@@ -215,11 +220,18 @@ export default function FriendsSettingsScreen() {
                     {autoLine(me.mealSettings.auto)}
                   </Text>
                 </View>
-                <ChipWrap>
-                  {MEAL_TYPES.map((m) => (
-                    <Chip key={m} testID={`friends-settings-auto-${m}`} label={mealChip(m)} selected={me.mealSettings.auto.includes(m)} onPress={() => toggleAuto(m)} />
+                {/* Two by two, each chip half the row (one a row with large text), so no chip is left alone on a line. */}
+                <View style={{ gap: spacing.sm }}>
+                  {(large ? MEAL_TYPES.map((m) => [m]) : [MEAL_TYPES.slice(0, 2), MEAL_TYPES.slice(2)]).map((row) => (
+                    <View key={row[0]} style={{ flexDirection: 'row', gap: spacing.sm }}>
+                      {row.map((m) => (
+                        <View key={m} style={{ flex: 1 }}>
+                          <Chip testID={`friends-settings-auto-${m}`} label={mealChip(m)} selected={me.mealSettings.auto.includes(m)} onPress={() => toggleAuto(m)} style={{ justifyContent: 'center' }} />
+                        </View>
+                      ))}
+                    </View>
                   ))}
-                </ChipWrap>
+                </View>
               </View>
             </Card>
           </View>
@@ -231,14 +243,14 @@ export default function FriendsSettingsScreen() {
                 myMeals.map((m, i) => (
                   <React.Fragment key={m.ref}>
                     {i > 0 ? <Divider /> : null}
-                    <View testID={`friends-showing-${m.ref.slice(0, 8)}`} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.sm, minHeight: 64, paddingVertical: spacing.sm }}>
-                      <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
+                    <View testID={`friends-showing-${m.ref.slice(0, 8)}`} style={{ flexDirection: large ? 'column' : 'row', alignItems: large ? 'stretch' : 'center', gap: spacing.md, minHeight: 64, paddingVertical: spacing.sm }}>
+                      <View style={{ flex: large ? undefined : 1, minWidth: 0 }}>
                         <Text variant="bodyStrong">{myMealTitle(m.meal, m.day, today)}</Text>
                         <Text variant="caption" color="textSecondary">
                           {myMealLine(namesOf(m), m.cheers, daysLeft(m.expiresAt, now.getTime()))}
                         </Text>
                       </View>
-                      <View style={{ marginLeft: 'auto' }}>
+                      <View style={{ alignSelf: large ? 'flex-end' : 'center' }}>
                         <Button testID={`friends-showing-stop-${m.ref.slice(0, 8)}`} title={STOP} variant="secondary" size="sm" full={false} accessibilityLabel={`Stop showing ${withoutMarks(myMealTitle(m.meal, m.day, today))}`} onPress={() => void stopOne(m)} />
                       </View>
                     </View>

@@ -10,7 +10,8 @@ import { MEAL_LABEL } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
 import type { ISODate, MealType } from '@/types';
 
-import { mealRefOfCheer } from './meals';
+import { mealOfCheer } from '@/services/friendsWire';
+
 import { cheerTarget, dayLabel } from './week';
 
 export const SCREEN_TITLE = 'Friends';
@@ -244,7 +245,7 @@ export function friendSourceLabel(source: string, name: string, reference: strin
  * day ("your day yesterday"). `meals` maps a shown meal's reference to its day and meal.
  */
 export function cheerWhat(ref: string, own: { workouts: Map<string, { name: string }>; meals: ReadonlyMap<string, { day: ISODate; meal: MealType }> }, today: ISODate): string {
-  const meal = mealRefOfCheer(ref);
+  const meal = mealOfCheer(ref);
   if (meal) return mealCheerTarget(own.meals.get(meal), today);
   return cheerTarget(ref, own.workouts, today);
 }

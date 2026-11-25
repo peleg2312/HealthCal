@@ -9,7 +9,7 @@ import { formatDistance } from '@/lib/units';
 import type { CheerReceived, Friend, FriendRequest, FriendWorkout, SocialSharing } from '@/services/friends';
 import { fonts, useTheme } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
-import { Avatar, Button, Card, Divider, figure, IconButton, MiniCup, PressableScale, Text, TextField, Toggle } from '@/ui';
+import { Avatar, Button, Card, Divider, figure, IconButton, MiniCup, Text, TextField, Toggle } from '@/ui';
 
 import { formatCode, normalizeCode } from './summary';
 import { dayLabel, personMark, sharingSentence, type FriendDay } from './week';

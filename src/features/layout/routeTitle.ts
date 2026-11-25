@@ -76,6 +76,8 @@ const PAGES: Record<string, string | ((params: Params) => string)> = {
   '/consistency': 'Consistency',
   '/friends': 'Friends',
   '/friends/add': 'Add a friend',
+  '/friends/friend': 'Friend',
+  '/friends/settings': 'Friends settings',
   '/_sitemap': 'Sitemap',
 };
 

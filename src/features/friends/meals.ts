@@ -13,7 +13,7 @@
 import { isWaterDrinkEntry } from '@/features/drinks/via';
 import { portionLabel, sourceKindOf } from '@/features/food/helpers';
 import { addDays } from '@/lib/dates';
-import { sha256Hex } from '@/lib/sha256';
+import { sharedMealRef } from '@/services/friendsWire';
 import type { FoodEntry, ISODate, MealType } from '@/types';
 
 import type { SharedFoodSource, SharedMealItem } from './contract';
@@ -87,29 +87,15 @@ export function buildSharedMeal(input: { entries: readonly FoodEntry[]; day: ISO
 }
 
 /**
- * How the server refers to one shown meal: the first 32 hex characters of SHA-256 over the owner's secret
- * share key, the day and the meal (the server makes it; the phone works it out only to name a cheer).
- */
-export function mealRef(shareKey: string, day: ISODate, meal: MealType): string {
-  return sha256Hex(`${shareKey}:meal:${day}:${meal}`).slice(0, 32);
-}
-
-/** "meal:<ref>" -> ref, else null. */
-export function mealRefOfCheer(cheerRef: string): string | null {
-  const m = /^meal:([0-9a-f]{32})$/.exec(cheerRef);
-  return m ? m[1] : null;
-}
-
-/**
- * The user's own meals of the last weeks by the reference friends see, to name a cheer ("your lunch") after
- * the meal left the feed. Tomorrow back `days` days, every meal type. Empty without a share key.
+ * The user's own meals of the last weeks by the reference friends see (`sharedMealRef`, as the server makes
+ * it), to name a cheer ("your lunch") after the meal is no longer shown. Tomorrow back `days` days, every meal type. Empty without a share key.
  */
 export function ownMealsByRef(shareKey: string | null | undefined, today: ISODate, days = 15): Map<string, { day: ISODate; meal: MealType }> {
   const out = new Map<string, { day: ISODate; meal: MealType }>();
   if (!shareKey) return out;
   for (let i = -1; i < days; i++) {
     const day = addDays(today, -i);
-    for (const meal of MEAL_TYPES) out.set(mealRef(shareKey, day, meal), { day, meal });
+    for (const meal of MEAL_TYPES) out.set(sharedMealRef(shareKey, day, meal), { day, meal });
   }
   return out;
 }

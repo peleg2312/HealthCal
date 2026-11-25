@@ -12,6 +12,7 @@ import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
 import { RowEmoji } from '@/features/food/components';
 import { displayFoodName } from '@/features/food/displayName';
 import { sourceInfo } from '@/features/food/helpers';
+import { ideaFoodsPhrase } from '@/features/today/ideas';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { fonts, useLargeText, useTheme } from '@/theme';
 import type { ISODate, MealType } from '@/types';
@@ -24,6 +25,11 @@ import { ADD_TO_DIARY, friendSourceLabel, itemCaption, mealMeta } from './words'
 /** A food's name as drawn: a bundled name's database capitals in lower case, any other as written. */
 export function sharedName(item: Pick<SharedMealItem, 'name' | 'source'>): string {
   return displayFoodName({ name: item.name, source: item.source === 'builtin' || item.source === 'typical' ? 'builtin' : 'custom' });
+}
+
+/** A shown meal's foods in one line, by their heads: "Israeli salad, chicken breast and tahini dressing". */
+export function mealFoodsLine(items: readonly Pick<SharedMealItem, 'name' | 'source'>[]): string {
+  return ideaFoodsPhrase(items.map((i) => ({ name: i.name, source: i.source === 'builtin' || i.source === 'typical' ? ('builtin' as const) : ('custom' as const) })));
 }
 
 /** Where a shared food's numbers come from, in words: "Reference data", "Maya's own food", "AI estimate". */

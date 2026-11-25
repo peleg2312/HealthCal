@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, RefreshControl, View } from 'react-native';
 
 import { CheersList, IncomingRequests, InviteCard, Loading, OutgoingRequests } from '@/features/friends/components';
-import { cheerMeal, mealsOverview } from '@/features/friends/api';
 import { markFriendsSeen } from '@/features/friends/attention';
 import type { FeedItem } from '@/features/friends/contract';
 import { feedKey, friendsWithNew, localFeed } from '@/features/friends/feed';
@@ -14,6 +13,7 @@ import { FriendMealSheet, type OpenMeal } from '@/features/friends/FriendMealShe
 import { inviteFromParams, invitePath } from '@/features/friends/link';
 import { FeedMealCard } from '@/features/friends/MealCard';
 import { ownMealsByRef } from '@/features/friends/meals';
+import { mealsOverview } from '@/features/friends/overview';
 import { SetupForm } from '@/features/friends/SetupForm';
 import { copyText, shareInvite } from '@/features/friends/share';
 import { formatCode, ownWorkoutsByRef, WORKOUT_WINDOW_DAYS } from '@/features/friends/summary';
@@ -34,7 +34,7 @@ import {
 } from '@/features/friends/words';
 import { timeAgo } from '@/features/settings/format';
 import { addDays } from '@/lib/dates';
-import { cheerFriend, refreshFriends, removeFriend, respondToRequest, undoDecline, useFriends, type FriendRequest } from '@/services/friends';
+import { cheerFriend, cheerMeal, refreshFriends, removeFriend, respondToRequest, undoDecline, useFriends, type FriendRequest } from '@/services/friends';
 import { useNow, useToday } from '@/store/clock';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -236,13 +236,15 @@ export default function FriendsScreen() {
           <SectionTitle title={RECENT} action={RECENT_SPAN} />
           {shown.length ? (
             <View {...listRole} testID="friends-feed" style={{ gap: spacing.lg }}>
-              {shown.map((item) => {
+              {shown.map((item, i) => {
                 const key = feedKey(item);
+                // Stable test ids by place: the n-th meal and the n-th workout of the feed.
+                const nth = shown.slice(0, i).filter((x) => x.kind === item.kind).length;
                 return (
                   <View key={key} {...itemRole}>
                     {item.kind === 'meal' ? (
                       <FeedMealCard
-                        testID={`friends-feed-meal-${item.ref.slice(0, 8)}`}
+                        testID={`friends-feed-meal-${nth}`}
                         name={item.displayName}
                         avatar={item.avatar}
                         meal={item.meal}
@@ -256,7 +258,7 @@ export default function FriendsScreen() {
                         onCheer={() => void cheerItem(item)}
                       />
                     ) : (
-                      <FeedWorkoutCard testID={`friends-feed-workout-${item.ref.slice(0, 8)}`} item={item} today={today} units={units} onCheer={() => void cheerItem(item)} />
+                      <FeedWorkoutCard testID={`friends-feed-workout-${nth}`} item={item} today={today} units={units} onCheer={() => void cheerItem(item)} />
                     )}
                   </View>
                 );

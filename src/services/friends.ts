@@ -199,9 +199,14 @@ export async function setupSocial(input: { displayName: string; avatar: string; 
   if (error) return failure(error.message);
   const me = toOverview({ me: data }).me;
   if (!me) return failure('The server did not return your card.');
-  useFriends.setState((s) => ({ status: 'ready', overview: { ...(s.overview ?? EMPTY_OVERVIEW), me: { ...s.overview?.me, ...me } } }));
+  const before = useFriends.getState().overview?.me;
+  // The card's answer does not carry the meal settings: keep the ones held until the next reload.
+  const merged: SocialMe = before ? { ...me, mealSettings: before.mealSettings, mealsAllowed: before.mealsAllowed, audience: before.audience } : me;
+  useFriends.setState((s) => ({ status: 'ready', overview: { ...(s.overview ?? EMPTY_OVERVIEW), me: merged } }));
   // What friends see changes with the switches, so send the week again.
   await publishSummary({ force: true });
+  // A new card: load what comes with it (whether meals are allowed, the default meal settings).
+  if (!before) await refreshFriends();
   return { ok: true, value: me };
 }
 
@@ -570,4 +575,25 @@ export function startFriends(): void {
       useFriends.setState({ status: 'signed-out', overview: null, error: null });
     }
   });
+}
+
+// scripts/dev/e2e-backend.cjs drives the friends calls on two devices against the stand-in backend
+// with these, so its checks do not depend on how the screens are laid out. Test builds only.
+if (typeof __DEV__ !== 'undefined' && (__DEV__ || process.env.EXPO_PUBLIC_E2E === '1')) {
+  (globalThis as { __healthcalFriendsApi?: unknown }).__healthcalFriendsApi = {
+    buildSharedMeal,
+    cheerMeal,
+    leaveSocial,
+    publishMeals,
+    refreshFriends,
+    removeFriend,
+    requestFriend,
+    respondToRequest,
+    setFriendMealPrefs,
+    setMealSettings,
+    setupSocial,
+    showMeal,
+    stopAllMeals,
+    stopMeal,
+  };
 }

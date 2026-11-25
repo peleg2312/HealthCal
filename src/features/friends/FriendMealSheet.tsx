@@ -90,6 +90,7 @@ function ViewRow({ row, owner, showKcal, testID }: { row: SharedMeal['items'][nu
 /** One food in the add step: a tick box row for a bundled food, or a dashed box and "Find" for anything else. */
 function AddRow({ row, owner, ticked, onToggle, onFind, testID }: { row: CopyRow; owner: string; ticked: boolean; onToggle: () => void; onFind: () => void; testID: string }) {
   const { colors, spacing } = useTheme();
+  const large = useLargeText();
   const name = sharedName(row.item);
   if (row.kind === 'copy') {
     const caption = `${portionLabel(row.line.servingLabel, row.line.quantity)} · ${Math.round(row.kcal)} kcal`;
@@ -121,13 +122,13 @@ function AddRow({ row, owner, ticked, onToggle, onFind, testID }: { row: CopyRow
     );
   }
   return (
-    <View testID={testID} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.sm, minHeight: 56, paddingVertical: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
+    <View testID={testID} style={{ flexDirection: large ? 'column' : 'row', alignItems: large ? 'stretch' : 'center', gap: spacing.md, minHeight: 56, paddingVertical: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: large ? undefined : 1, minWidth: 0 }}>
         <View {...(Platform.OS === 'web' ? ({ 'aria-hidden': true } as object) : { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' as const })}>
           <TickBox checked={false} locked />
         </View>
         <RowEmoji emoji={row.item.emoji} />
-        <View style={{ flexShrink: 1, minWidth: 0, gap: 2 }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text variant="bodyStrong" style={{ fontFamily: fonts.semibold }}>
             {isolateRtl(name)}
           </Text>
@@ -139,7 +140,7 @@ function AddRow({ row, owner, ticked, onToggle, onFind, testID }: { row: CopyRow
           </View>
         </View>
       </View>
-      <View style={{ marginLeft: 'auto' }}>
+      <View style={{ alignSelf: large ? 'flex-end' : 'center' }}>
         <Button testID={`${testID}-find`} title={FIND} variant="secondary" size="sm" full={false} accessibilityLabel={`${FIND} ${withoutMarks(name)} in food search`} icon={<Search size={18} color={colors.text} />} onPress={onFind} />
       </View>
     </View>

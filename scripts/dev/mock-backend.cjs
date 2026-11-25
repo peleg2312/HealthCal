@@ -23,7 +23,7 @@ const crypto = require('node:crypto');
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => a.slice(2).split('=')));
 const PORT = Number(flags.port || 54321);
 
-const state = { users: new Map(), records: [], profiles: new Map(), aiRequests: [], aiUsage: new Map(), coachRequests: [], coachUsage: new Map(), recoveries: [], oauthCodes: [], google: { on: true, signupDisabled: false }, social: new Map(), socialLimits: new Map(), friendships: [], declines: [], cheers: [], clock: Date.now() };
+const state = { users: new Map(), records: [], profiles: new Map(), aiRequests: [], aiUsage: new Map(), coachRequests: [], coachUsage: new Map(), recoveries: [], oauthCodes: [], google: { on: true, signupDisabled: false }, social: new Map(), socialLimits: new Map(), friendships: [], declines: [], cheers: [], clock: Date.now(), meals: new Map(), mealAudience: new Map(), friendPrefs: new Map(), mealStops: new Map(), clockOffsetMs: 0 };
 const tick = () => new Date((state.clock += 5)).toISOString();
 
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -167,11 +167,141 @@ const limitsOf = (uid) => {
   if (!state.socialLimits.has(uid)) state.socialLimits.set(uid, { lookup_misses: 0, lookup_window: 0, setups: 0, setups_window: 0 });
   return state.socialLimits.get(uid);
 };
-/** Turn friends off: card, friendships and cheers go; declines and limits stay. */
+// ------------------------------------------------------------- meals shown to friends
+// The same rules as supabase/migrations/20261201000000_friends_meals.sql (tested by
+// supabase/tests/friends_meals.sql; src/services/friendsMock.test.ts walks the same cases
+// here). Meals read the stand-in's own clock, which POST /__clock moves forward, so a test
+// can watch a meal leave after 7 days.
+const MEAL_DAY_MS = 86400000;
+const nowMs = () => Date.now() + state.clockOffsetMs;
+const mealDay = (offsetDays) => new Date(nowMs() + offsetDays * MEAL_DAY_MS).toISOString().slice(0, 10);
+const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
+const MEAL_SOURCES = ['builtin', 'usda', 'openfoodfacts', 'custom', 'ai', 'quick', 'typical'];
+const DEFAULT_MEAL_SETTINGS = { auto: [], kcal: false, see: true };
+const mealKey = (owner, ref) => `${owner}:${ref}`;
+const pairKey = (a, b) => `${a}:${b}`;
+const mealRefOf = (shareKey, day, meal) => crypto.createHash('sha256').update(`${shareKey}:meal:${day}:${meal}`).digest('hex').slice(0, 32);
+// social_clean_text: control characters become a space, cut to max characters, spaces trimmed.
+const cleanText = (v, max) => {
+  if (typeof v !== 'string') return undefined;
+  const t = Array.from(v.replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ')).slice(0, max).join('').replace(/^ +| +$/g, '');
+  return t === '' ? undefined : t;
+};
+const roundTo = (x, places) => {
+  const text = String(Math.abs(x));
+  const scaled = text.includes('e') ? Math.round(Math.abs(x) * 10 ** places) : Math.round(Number(`${text}e${places}`));
+  const out = text.includes('e') ? scaled / 10 ** places : Number(`${scaled}e-${places}`);
+  return x < 0 ? -out : out;
+};
+const finite = (v) => typeof v === 'number' && Number.isFinite(v);
+const kcalOf = (v) => Math.min(Math.max(roundTo(v, 0), 0), 20000) || 0;
+/** social_clean_meal: at most 15 foods, only the allowed keys, calories only when shown. */
+function cleanMeal(items, showKcal) {
+  const out = [];
+  for (const e of Array.isArray(items) ? items : []) {
+    if (out.length >= 15) break;
+    if (!e || typeof e !== 'object' || Array.isArray(e)) continue;
+    const name = cleanText(e.name, 60);
+    if (!name || typeof e.source !== 'string' || !MEAL_SOURCES.includes(e.source)) continue;
+    const item = { name, emoji: cleanText(e.emoji, 8) ?? '', portion: cleanText(e.portion, 40) ?? '', source: e.source };
+    if (['builtin', 'typical', 'usda'].includes(e.source) && typeof e.foodId === 'string' && /^b_[a-z0-9_]{1,40}$/.test(e.foodId)) item.foodId = e.foodId;
+    if (typeof e.barcode === 'string' && /^[0-9]{6,14}$/.test(e.barcode)) item.barcode = e.barcode;
+    const serving = cleanText(e.serving, 40);
+    if (serving) item.serving = serving;
+    if (finite(e.quantity) && e.quantity > 0) item.quantity = Math.min(roundTo(e.quantity, 2), 1000);
+    if (finite(e.grams) && e.grams > 0) item.grams = Math.min(roundTo(e.grams, 1), 10000);
+    if (showKcal) {
+      if (finite(e.kcal)) item.kcal = kcalOf(e.kcal);
+      if (finite(e.kcalLow) && finite(e.kcalHigh) && e.kcalLow <= e.kcalHigh) {
+        item.kcalLow = kcalOf(e.kcalLow);
+        item.kcalHigh = kcalOf(e.kcalHigh);
+      }
+    }
+    out.push(item);
+  }
+  return out;
+}
+function cleanMealSettings(p, base) {
+  const pick = (k, fallback) => (typeof p?.[k] === 'boolean' ? p[k] : typeof base?.[k] === 'boolean' ? base[k] : fallback);
+  const auto = Array.isArray(p?.auto) ? p.auto : Array.isArray(base?.auto) ? base.auto : [];
+  return { auto: MEAL_TYPES.filter((m) => auto.includes(m)), kcal: pick('kcal', false), see: pick('see', true) };
+}
+/** 18 or over on the stand-in's today, by the birth date in the synced profile; anything else is under 18. */
+function isAdult(uid) {
+  const b = state.profiles.get(uid)?.data?.birthDate;
+  const today = mealDay(0);
+  if (!isDay(b) || b >= today) return false;
+  const [by, bm, bd] = b.split('-').map(Number);
+  const [ty, tm, td] = today.split('-').map(Number);
+  return ty - by - (tm < bm || (tm === bm && td < bd) ? 1 : 0) >= 18;
+}
+const sharesMealsWith = (owner, viewer) => state.friendPrefs.get(pairKey(owner, viewer))?.share_meals !== false;
+const seesMealsOf = (viewer, owner) => state.friendPrefs.get(pairKey(viewer, owner))?.see_meals !== false;
+const liveMeal = (m) => m && Date.parse(m.expires_at) > nowMs();
+/** social_visible_meals: the one rule for what a viewer may see. */
+function visibleMeals(viewer) {
+  const card = state.social.get(viewer);
+  if (!card || card.meal_settings?.see === false || !isAdult(viewer)) return [];
+  return [...state.meals.values()].filter(
+    (m) => liveMeal(m) && m.viewers.has(viewer) && state.social.get(m.owner) && areFriends(viewer, m.owner) && seesMealsOf(viewer, m.owner) && sharesMealsWith(m.owner, viewer) && isAdult(m.owner),
+  );
+}
+function deleteMeal(owner, ref) {
+  state.meals.delete(mealKey(owner, ref));
+  state.cheers = state.cheers.filter((c) => !(c.to_user === owner && c.ref === `meal:${ref}`));
+}
+/** social_purge_meals: expired meals leave with their cheers; old stop marks go. */
+function purgeMeals() {
+  for (const m of [...state.meals.values()]) if (!liveMeal(m)) deleteMeal(m.owner, m.ref);
+  for (const [k, at] of state.mealStops) if (nowMs() - at > 10 * MEAL_DAY_MS) state.mealStops.delete(k);
+}
+/** social_drop_unseen_meals: a meal nobody may see any more stops. */
+function dropUnseenMeals(owners) {
+  for (const m of [...state.meals.values()]) if (owners.includes(m.owner) && m.viewers.size === 0) deleteMeal(m.owner, m.ref);
+}
+/** social_count_meal_write: 300 writes and 20 new showings a day; false counts nothing. */
+function countMealWrite(uid, isNew) {
+  const lim = limitsOf(uid);
+  if (!lim.meal_writes_window || nowMs() - lim.meal_writes_window > MEAL_DAY_MS) Object.assign(lim, { meal_writes: 0, meal_writes_window: nowMs() });
+  if (!lim.meal_shows_window || nowMs() - lim.meal_shows_window > MEAL_DAY_MS) Object.assign(lim, { meal_shows: 0, meal_shows_window: nowMs() });
+  if ((lim.meal_writes || 0) >= 300 || (isNew && (lim.meal_shows || 0) >= 20)) return false;
+  lim.meal_writes = (lim.meal_writes || 0) + 1;
+  if (isNew) lim.meal_shows = (lim.meal_shows || 0) + 1;
+  return true;
+}
+const liveMealCount = (uid) => [...state.meals.values()].filter((m) => m.owner === uid && liveMeal(m)).length;
+function insertMeal(owner, ref, day, meal, items, showKcal) {
+  deleteMeal(owner, ref);
+  const at = nowMs();
+  const row = { owner, ref, day, meal, items, show_kcal: showKcal, shown_at: new Date(at).toISOString(), updated_at: new Date(at).toISOString(), expires_at: new Date(at + 7 * MEAL_DAY_MS).toISOString(), viewers: new Set() };
+  state.meals.set(mealKey(owner, ref), row);
+  state.mealStops.delete(mealKey(owner, ref));
+  return row;
+}
+const mealItemsValid = (items) => Array.isArray(items) && Buffer.byteLength(JSON.stringify(items)) <= 16384;
+/** Removes everything meals hold between two people (friend_remove). */
+function forgetMealsBetween(a, b) {
+  for (const m of state.meals.values()) if ((m.owner === a && m.viewers.has(b)) || (m.owner === b && m.viewers.has(a))) m.viewers.delete(m.owner === a ? b : a);
+  state.mealAudience.get(a)?.delete(b);
+  state.mealAudience.get(b)?.delete(a);
+  state.friendPrefs.delete(pairKey(a, b));
+  state.friendPrefs.delete(pairKey(b, a));
+  dropUnseenMeals([a, b]);
+}
+
+/** Turn friends off: card, friendships and cheers go, and every meal shown and meal setting; declines and limits stay. */
 function leaveSocial(uid) {
   state.cheers = state.cheers.filter((c) => c.from_user !== uid && c.to_user !== uid);
   state.friendships = state.friendships.filter((f) => f.requester !== uid && f.addressee !== uid);
   state.social.delete(uid);
+  for (const m of [...state.meals.values()]) if (m.owner === uid) state.meals.delete(mealKey(m.owner, m.ref));
+  const owners = [];
+  for (const m of state.meals.values()) if (m.viewers.delete(uid)) owners.push(m.owner);
+  state.mealAudience.delete(uid);
+  for (const set of state.mealAudience.values()) set.delete(uid);
+  for (const k of [...state.friendPrefs.keys()]) if (k.split(':').includes(uid)) state.friendPrefs.delete(k);
+  for (const k of [...state.mealStops.keys()]) if (k.startsWith(`${uid}:`)) state.mealStops.delete(k);
+  dropUnseenMeals(owners);
 }
 /** Deleting the account removes everything, declines and limits included. */
 function forgetSocial(uid) {
@@ -275,16 +405,20 @@ function friendsRpc(route, me, body) {
         (f) => !((f.requester === me && f.addressee === other) || (f.requester === other && f.addressee === me && f.status === 'accepted')),
       );
       state.cheers = state.cheers.filter((c) => !((c.from_user === me && c.to_user === other) || (c.from_user === other && c.to_user === me)));
+      // From this moment neither sees the other's meals.
+      if (other && other !== me) forgetMealsBetween(me, other);
       return null;
     }
     case 'POST /rest/v1/rpc/send_cheer': {
       const ref = String(body.p_ref || '').trim();
-      if (!isCheerRef(ref)) return 'invalid';
+      if (!isCheerRef(ref) && !/^meal:[0-9a-f]{32}$/.test(ref)) return 'invalid';
       if (!areFriends(me, body.p_to)) return 'not_friends';
-      // A real day of the last two weeks, or a workout the friend publishes and shares now.
+      // A real day of the last two weeks, a workout the friend publishes and shares now, or a meal they show the caller now.
       if (ref.startsWith('day:')) {
         const day = ref.slice(4);
         if (!isDay(day) || day < utcDay(-15) || day > utcDay(1)) return 'invalid';
+      } else if (ref.startsWith('meal:')) {
+        if (!visibleMeals(me).some((m) => m.owner === body.p_to && m.ref === ref.slice(5))) return 'invalid';
       } else {
         const p = state.social.get(body.p_to);
         if (!(visibleSummary(p?.summary, p?.sharing).workouts ?? []).some((w) => w.id === ref)) return 'invalid';
@@ -293,11 +427,65 @@ function friendsRpc(route, me, body) {
       return 'ok';
     }
     case 'POST /rest/v1/rpc/friends_overview': {
+      purgeMeals();
+      dropUnseenMeals([me]);
       const mine = state.social.get(me);
       const person = (id) => state.social.get(id);
+      const cheeredByMe = (owner, ref) => state.cheers.some((c) => c.from_user === me && c.to_user === owner && c.ref === ref);
+      const friendIds = state.friendships.filter((f) => f.status === 'accepted' && (f.requester === me || f.addressee === me)).map((f) => (f.requester === me ? f.addressee : f.requester));
+      const mealItems = visibleMeals(me)
+        .filter((m) => person(m.owner))
+        .map((m) => ({ day: m.day, rank: 0, shown: Date.parse(m.shown_at), seq: 0, name: person(m.owner).display_name.toLowerCase(), ref: m.ref, item: { kind: 'meal', ref: m.ref, user_id: m.owner, display_name: person(m.owner).display_name, avatar: person(m.owner).avatar, day: m.day, meal: m.meal, items: m.items, show_kcal: m.show_kcal, cheered: cheeredByMe(m.owner, `meal:${m.ref}`) } }));
+      const workoutItems = friendIds
+        .map((id) => person(id))
+        .filter(Boolean)
+        .flatMap((p) =>
+          (visibleSummary(p.summary, p.sharing).workouts || [])
+            .map((w, i) => ({ w, i }))
+            .filter(({ w }) => isWorkoutRef(w.id) && typeof w.minutes === 'number' && isDay(w.date) && w.date >= mealDay(-7))
+            .map(({ w, i }) => {
+              const item = { kind: 'workout', ref: w.id, user_id: p.user_id, display_name: p.display_name, avatar: p.avatar, day: w.date, name: w.name || 'Workout', emoji: w.emoji || '', minutes: w.minutes, cheered: cheeredByMe(p.user_id, w.id) };
+              if (typeof w.distanceKm === 'number') item.distance_km = w.distanceKm;
+              return { day: w.date, rank: 1, shown: -Infinity, seq: i + 1, name: p.display_name.toLowerCase(), ref: w.id, item };
+            }),
+        );
+      const feed = [...mealItems, ...workoutItems]
+        .sort((a, b) => b.day.localeCompare(a.day) || a.rank - b.rank || b.shown - a.shown || a.seq - b.seq || a.name.localeCompare(b.name) || a.ref.localeCompare(b.ref))
+        .slice(0, 100)
+        .map((x) => x.item);
+      const myMeals = [...state.meals.values()]
+        .filter((m) => m.owner === me && liveMeal(m))
+        .sort((a, b) => Date.parse(b.shown_at) - Date.parse(a.shown_at) || a.ref.localeCompare(b.ref))
+        .map((m) => ({
+          ref: m.ref,
+          day: m.day,
+          meal: m.meal,
+          items: m.items,
+          show_kcal: m.show_kcal,
+          shown_at: m.shown_at,
+          expires_at: m.expires_at,
+          viewers: [...m.viewers]
+            .filter((v) => areFriends(me, v) && person(v))
+            .map((v) => card(person(v)))
+            .sort((a, b) => a.display_name.toLowerCase().localeCompare(b.display_name.toLowerCase())),
+          cheers: state.cheers.filter((c) => c.to_user === me && c.ref === `meal:${m.ref}` && areFriends(me, c.from_user)).length,
+        }));
       return {
         // share_key only in the caller's own card.
-        me: mine ? { code: mine.code, display_name: mine.display_name, avatar: mine.avatar, sharing: mine.sharing, share_key: mine.share_key } : null,
+        me: mine
+          ? {
+              code: mine.code,
+              display_name: mine.display_name,
+              avatar: mine.avatar,
+              sharing: mine.sharing,
+              share_key: mine.share_key,
+              meal_settings: cleanMealSettings(mine.meal_settings, {}),
+              meals_allowed: isAdult(me),
+              audience: [...(state.mealAudience.get(me) || [])].filter((v) => areFriends(me, v) && sharesMealsWith(me, v)).sort(),
+            }
+          : null,
+        feed,
+        my_meals: myMeals,
         friends: state.friendships
           .filter((f) => f.status === 'accepted' && (f.requester === me || f.addressee === me))
           .map((f) => ({ f, p: person(f.requester === me ? f.addressee : f.requester) }))
@@ -308,6 +496,8 @@ function friendsRpc(route, me, body) {
             summary: visibleSummary(p.summary, p.sharing),
             summary_updated_at: p.summary_updated_at,
             cheered: state.cheers.filter((c) => c.from_user === me && c.to_user === p.user_id).map((c) => c.ref),
+            share_meals: sharesMealsWith(me, p.user_id),
+            see_meals: seesMealsOf(me, p.user_id),
           }))
           .sort((a, b) => a.display_name.toLowerCase().localeCompare(b.display_name.toLowerCase())),
         incoming: state.friendships
@@ -324,6 +514,122 @@ function friendsRpc(route, me, body) {
     case 'POST /rest/v1/rpc/social_leave':
       leaveSocial(me);
       return null;
+    case 'POST /rest/v1/rpc/meal_show': {
+      const mine = state.social.get(me);
+      if (!mine) return { status: 'no_card' };
+      if (!isAdult(me)) return { status: 'under_18' };
+      const day = body.p_day;
+      const meal = String(body.p_meal ?? '').trim().toLowerCase();
+      if (!isDay(day) || !MEAL_TYPES.includes(meal) || !mealItemsValid(body.p_items)) return { status: 'invalid' };
+      if (day < mealDay(-7) || day > mealDay(2)) return { status: 'invalid' };
+      const showKcal = body.p_show_kcal === true;
+      const items = cleanMeal(body.p_items, showKcal);
+      if (!items.length) return { status: 'empty' };
+      const viewers = [...new Set((Array.isArray(body.p_viewers) ? body.p_viewers : []).filter((v) => typeof v === 'string' && v && v !== me))];
+      if (!viewers.length) return { status: 'no_viewers' };
+      if (viewers.length > 200) return { status: 'invalid' };
+      if (viewers.some((v) => !areFriends(me, v) || !sharesMealsWith(me, v))) return { status: 'not_friends' };
+      purgeMeals();
+      const ref = mealRefOf(mine.share_key, day, meal);
+      let row = state.meals.get(mealKey(me, ref));
+      const fresh = !liveMeal(row);
+      if (fresh && liveMealCount(me) >= 40) return { status: 'limit' };
+      if (!countMealWrite(me, fresh)) return { status: 'limit' };
+      if (fresh) row = insertMeal(me, ref, day, meal, items, showKcal);
+      else Object.assign(row, { items, show_kcal: showKcal, updated_at: new Date(nowMs()).toISOString() });
+      row.viewers = new Set(viewers);
+      state.mealAudience.set(me, new Set(viewers));
+      return { status: 'ok', ref, expires_at: row.expires_at };
+    }
+    case 'POST /rest/v1/rpc/meal_show_auto': {
+      const mine = state.social.get(me);
+      if (!mine) return { status: 'no_card' };
+      if (!isAdult(me)) return { status: 'under_18' };
+      const day = body.p_day;
+      const meal = String(body.p_meal ?? '').trim().toLowerCase();
+      if (!isDay(day) || !MEAL_TYPES.includes(meal) || !mealItemsValid(body.p_items)) return { status: 'invalid' };
+      if (day < mealDay(-1) || day > mealDay(1)) return { status: 'invalid' };
+      const settings = cleanMealSettings(mine.meal_settings, {});
+      if (!settings.auto.includes(meal)) return { status: 'not_auto' };
+      purgeMeals();
+      const ref = mealRefOf(mine.share_key, day, meal);
+      if (state.mealStops.has(mealKey(me, ref))) return { status: 'stopped' };
+      if (liveMeal(state.meals.get(mealKey(me, ref)))) return { status: 'exists', ref };
+      const items = cleanMeal(body.p_items, settings.kcal);
+      if (!items.length) return { status: 'empty' };
+      const viewers = [...(state.mealAudience.get(me) || [])].filter((v) => areFriends(me, v) && sharesMealsWith(me, v));
+      if (!viewers.length) return { status: 'no_viewers' };
+      if (liveMealCount(me) >= 40 || !countMealWrite(me, true)) return { status: 'limit' };
+      const row = insertMeal(me, ref, day, meal, items, settings.kcal);
+      row.viewers = new Set(viewers);
+      return { status: 'ok', ref, expires_at: row.expires_at };
+    }
+    case 'POST /rest/v1/rpc/meal_update': {
+      if (!state.social.get(me)) return 'no_card';
+      if (!isAdult(me)) return 'under_18';
+      const ref = String(body.p_ref ?? '').trim();
+      if (!/^[0-9a-f]{32}$/.test(ref) || !mealItemsValid(body.p_items)) return 'invalid';
+      const row = state.meals.get(mealKey(me, ref));
+      if (!liveMeal(row)) return 'gone';
+      const items = cleanMeal(body.p_items, row.show_kcal);
+      if (!items.length) {
+        deleteMeal(me, ref);
+        return 'stopped';
+      }
+      if (JSON.stringify(items) === JSON.stringify(row.items)) return 'ok';
+      if (!countMealWrite(me, false)) return 'limit';
+      Object.assign(row, { items, updated_at: new Date(nowMs()).toISOString() });
+      return 'ok';
+    }
+    case 'POST /rest/v1/rpc/meal_stop': {
+      const ref = String(body.p_ref ?? '').trim();
+      const row = state.meals.get(mealKey(me, ref));
+      if (!/^[0-9a-f]{32}$/.test(ref) || !row) return 'not_found';
+      const live = liveMeal(row);
+      deleteMeal(me, ref);
+      if (!live) return 'not_found';
+      state.mealStops.set(mealKey(me, ref), nowMs());
+      return 'stopped';
+    }
+    case 'POST /rest/v1/rpc/meal_stop_all': {
+      let n = 0;
+      for (const m of [...state.meals.values()]) {
+        if (m.owner !== me) continue;
+        if (liveMeal(m)) {
+          n += 1;
+          state.mealStops.set(mealKey(me, m.ref), nowMs());
+        }
+        deleteMeal(me, m.ref);
+      }
+      return n;
+    }
+    case 'POST /rest/v1/rpc/meal_settings_set': {
+      const mine = state.social.get(me);
+      if (!mine) return null;
+      const patch = body.p_settings && typeof body.p_settings === 'object' && !Array.isArray(body.p_settings) ? body.p_settings : {};
+      mine.meal_settings = cleanMealSettings(patch, mine.meal_settings || DEFAULT_MEAL_SETTINGS);
+      return mine.meal_settings;
+    }
+    case 'POST /rest/v1/rpc/meal_audience_set': {
+      if (!state.social.get(me)) return null;
+      const ids = (Array.isArray(body.p_viewers) ? body.p_viewers : []).slice(0, 400).filter((v) => typeof v === 'string' && v !== me && areFriends(me, v) && sharesMealsWith(me, v));
+      state.mealAudience.set(me, new Set(ids));
+      return [...new Set(ids)].sort();
+    }
+    case 'POST /rest/v1/rpc/friend_prefs_set': {
+      const other = body.p_friend;
+      if (!other || other === me || !areFriends(me, other)) return 'not_friends';
+      const cur = state.friendPrefs.get(pairKey(me, other)) || { share_meals: true, see_meals: true };
+      if (typeof body.p_share_meals === 'boolean') cur.share_meals = body.p_share_meals;
+      if (typeof body.p_see_meals === 'boolean') cur.see_meals = body.p_see_meals;
+      state.friendPrefs.set(pairKey(me, other), cur);
+      if (body.p_share_meals === false) {
+        for (const m of state.meals.values()) if (m.owner === me) m.viewers.delete(other);
+        state.mealAudience.get(me)?.delete(other);
+        dropUnseenMeals([me]);
+      }
+      return 'ok';
+    }
     default:
       return undefined;
   }
@@ -660,6 +966,11 @@ const api = http.createServer(async (req, res) => {
       friendships: state.friendships,
       declines: state.declines,
       cheers: state.cheers,
+      // Meals shown to friends (viewers as lists), the remembered audiences, the per-friend switches and the stand-in's clock.
+      sharedMeals: [...state.meals.values()].map((m) => ({ ...m, viewers: [...m.viewers] })),
+      mealAudience: Object.fromEntries([...state.mealAudience].map(([k, v]) => [k, [...v]])),
+      friendPrefs: Object.fromEntries(state.friendPrefs),
+      clockOffsetMs: state.clockOffsetMs,
       // Plans: the switches, each account's entitlement row (by email), the webhooks received, and the AI reports.
       billing: {
         plansOn: state.billing.plansOn,
@@ -744,6 +1055,13 @@ const api = http.createServer(async (req, res) => {
     const code = crypto.randomUUID();
     state.oauthCodes.push({ code, email, challenge: q.get('code_challenge') || null, redirectTo: target });
     return back({ code });
+  }
+  // Test hook: move the stand-in's meal clock forward ({ advanceMs }) or back to now ({ reset: true }),
+  // so a test can watch a shown meal leave after 7 days. Only meals read this clock.
+  if (route === 'POST /__clock') {
+    if (body.reset) state.clockOffsetMs = 0;
+    if (typeof body.advanceMs === 'number' && Number.isFinite(body.advanceMs)) state.clockOffsetMs += body.advanceMs;
+    return send(res, 200, { offsetMs: state.clockOffsetMs, now: new Date(nowMs()).toISOString() });
   }
   // Test hook: Google on or off, and new accounts paused.
   if (route === 'POST /__google') {

@@ -26,7 +26,7 @@ const ROUTES = [
   '/water', '/weight', '/body', '/sleep', '/fasting',
   '/profile', '/settings/goals', '/settings/reminders', '/settings/account', '/settings/data', '/settings/about', '/settings/health-sync', '/settings/plan', '/legal/terms', '/legal/privacy',
   '/morning', '/morning?first=1', '/coach', '/coach?ask=training', '/coach?ask=ideas',
-  '/recap', '/recap/month', '/recap/month?month=2026-10', '/recap/year', '/consistency', '/friends', '/friends/add?invite=ABCD2345', '/friends/add?code=ABCD2345', '/no-such-page',
+  '/recap', '/recap/month', '/recap/month?month=2026-10', '/recap/year', '/consistency', '/friends', '/friends/add?invite=ABCD2345', '/friends/add?code=ABCD2345', '/friends/friend?id=nobody', '/friends/settings', '/no-such-page',
 ];
 
 /** Without a profile only these may stay where they are; everything else must end on /welcome. */
