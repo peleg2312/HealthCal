@@ -382,12 +382,34 @@ const friendsSignedIn = [
   { id: 'friends-requests', route: '/auth?mode=signin', taps: friends('move.asked@example.com'), waitFor: 'friends-incoming', note: 'two requests waiting, one with a long name' },
   { id: 'friends-full', route: '/auth?mode=signin', taps: friends(FULL), waitFor: 'friends-cheers', note: 'four friends, requests both ways, cheers' },
   { id: 'friends-full-imperial', route: '/auth?mode=signin', imperial: true, taps: friends(FULL), waitFor: 'friends-cheers', note: 'the same in miles' },
-  { id: 'friends-friend-sheet', route: '/auth?mode=signin', taps: [...friends(FULL), '^friends-card-'], sheet: true, note: 'a friend opened: their week' },
-  { id: 'friends-settings-sheet', route: '/auth?mode=signin', taps: [...friends(FULL), 'friends-settings-open'], sheet: true, note: 'friends settings' },
-  { id: 'friends-remove-confirm', route: '/auth?mode=signin', taps: [...friends(FULL), '^friends-card-', 'friends-remove'], sheet: true, note: 'remove this friend?' },
+  { id: 'friends-friend-page', route: '/auth?mode=signin', taps: [...friends(FULL), '^friends-person-'], waitFor: 'friend-screen', note: 'a friend opened: their page, their week and workouts' },
+  { id: 'friends-settings-page', route: '/auth?mode=signin', taps: [...friends(FULL), 'friends-settings-open'], waitFor: 'friends-settings-week', note: 'friends settings and privacy' },
+  { id: 'friends-remove-confirm', route: '/auth?mode=signin', taps: [...friends(FULL), '^friends-person-', 'friends-remove'], sheet: true, note: 'remove this friend?' },
   { id: 'friends-leave-confirm', route: '/auth?mode=signin', taps: [...friends(FULL), 'friends-settings-open', 'friends-leave'], sheet: true, note: 'turn friends off?' },
   { id: 'friends-add', route: '/auth?mode=signin', taps: [...friends(FULL), 'friends-add-open'], waitFor: 'friends-add-input', note: 'add a friend by code' },
   { id: 'friends-add-wrong', route: '/auth?mode=signin', taps: [...friends(FULL), 'friends-add-open', { type: 'friends-add-input', text: 'ZZZZ-ZZZZ' }, 'friends-add-send', { wait: 1200 }], waitFor: 'friends-add-outcome-not-found', note: 'a code nobody has' },
+];
+
+// ------------------------------------------------------------------ friends with meals (a build with a backend)
+// Only with --backend, after `API=<the stand-in> node scripts/dev/states/friends-meals.mjs` has put the
+// accounts on it (ordinary names: Dana with three friends, shown meals both ways, cheers; Noa, 16; Ari with
+// one friend and nothing in the feed). Run one theme at a time on a freshly seeded backend, as above.
+const DANA = 'meals.dana@example.com';
+const friendsMeals = [
+  { id: 'friends-feed', route: '/auth?mode=signin', taps: friends(DANA), waitFor: 'friends-feed', note: 'the feed: requests, people, cheers in one line, shown meals and workouts, what friends see of you' },
+  { id: 'friends-feed-imperial', route: '/auth?mode=signin', imperial: true, taps: friends(DANA), waitFor: 'friends-feed', note: 'the feed in miles' },
+  { id: 'friends-cheers-sheet', route: '/auth?mode=signin', taps: [...friends(DANA), 'friends-cheers-open'], sheet: true, note: 'every cheer: a meal cheer named "your breakfast"' },
+  { id: 'friends-meal-sheet', route: '/auth?mode=signin', taps: [...friends(DANA), 'friends-feed-meal-0-open'], sheet: true, note: 'a friend’s meal: foods, portions, sources in words, calories with "~" for an estimate' },
+  { id: 'friends-meal-sheet-no-kcal', route: '/auth?mode=signin', taps: [...friends(DANA), 'friends-feed-meal-1-open'], sheet: true, note: 'a friend’s meal without calories, one own food' },
+  { id: 'friends-meal-add', route: '/auth?mode=signin', taps: [...friends(DANA), 'friends-feed-meal-1-add'], sheet: true, note: 'add to my diary: meal, day, bundled foods ticked with this phone’s numbers, Find for the own food' },
+  { id: 'friends-friend-meals', route: '/auth?mode=signin', taps: [...friends(DANA), '^friends-person-'], waitFor: 'friend-screen', note: 'a friend’s page with the meals they show, workouts and Between you' },
+  { id: 'friends-settings-meals', route: '/auth?mode=signin', taps: [...friends(DANA), 'friends-settings-open'], waitFor: 'friends-settings-meals', note: 'settings: your week, your meals, showing now, what you see' },
+  { id: 'friends-audience-sheet', route: '/auth?mode=signin', taps: [...friends(DANA), 'friends-settings-open', 'friends-settings-audience'], sheet: true, note: 'who sees your meals' },
+  { id: 'friends-show-menu', route: '/auth?mode=signin', taps: [...signIn(DANA), 'tab-diary', { wait: 1200 }, 'meal-menu-lunch'], sheet: true, note: 'the diary’s meal menu with Show to friends' },
+  { id: 'friends-show-sheet', route: '/auth?mode=signin', taps: [...signIn(DANA), 'tab-diary', { wait: 1200 }, 'meal-menu-lunch', 'meal-menu-show'], sheet: true, note: 'show lunch: the exact card, who sees it (remembered), calories off, what is never shown' },
+  { id: 'friends-teen', route: '/auth?mode=signin', taps: friends('meals.teen@example.com'), waitFor: 'friends-feed', note: 'under 18: workouts and cheers only' },
+  { id: 'friends-teen-settings', route: '/auth?mode=signin', taps: [...friends('meals.teen@example.com'), 'friends-settings-open'], waitFor: 'friends-settings-under-18', note: 'under 18: no meal settings' },
+  { id: 'friends-feed-empty', route: '/auth?mode=signin', taps: friends('meals.none@example.com'), waitFor: 'friends-feed-empty', note: 'a friend, nothing shown yet' },
 ];
 
 // ------------------------------------------------------------------ online drinks (a build with a backend)
@@ -408,5 +430,5 @@ const drinksOnline = [
 module.exports = [
   ...train, ...pick, ...log, ...imports, ...strength, ...water, ...weight, ...body, ...sleep, ...fasting, ...friendsLocal,
   // Only with --backend: every run passes --url now, and builds from with-build.cjs have no accounts.
-  ...(process.argv.includes('--backend') ? [...drinksOnline, ...friendsSignedIn] : []),
+  ...(process.argv.includes('--backend') ? [...drinksOnline, ...friendsSignedIn, ...friendsMeals] : []),
 ];

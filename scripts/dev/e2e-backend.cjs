@@ -350,6 +350,135 @@ async function device(browser, seedJson) {
   srv = await server();
   check('once the connection is back the entry is uploaded', srv.records.some((r) => r.id === pendingWater[0]) && Object.keys((await C.state()).dirty.water).length === 0);
 
+  // ------------------------------------------------------------- friends: meals shown
+  // (src/services/friends.ts, supabase/migrations/20261201000000_friends_meals.sql)
+  // Two people on two new devices. One shows a meal to the other, who sees it and cheers it; an edit
+  // reaches the friend; stopping takes it away; it leaves by itself after 7 days (the stand-in's clock
+  // moved forward); removing the friend stops it. Driven through the app's own friends calls
+  // (window.__healthcalFriendsApi, test builds only), so it does not depend on the Friends screens.
+  {
+    const api = (d, fn, ...args) =>
+      d.page.evaluate(async ([f, a]) => JSON.parse(JSON.stringify((await window.__healthcalFriendsApi[f](...a)) ?? null)), [fn, args]);
+    const overviewOf = async (d) => {
+      await api(d, 'refreshFriends');
+      return d.page.evaluate(() => JSON.parse(JSON.stringify(window.__healthcalFriends.getState().overview)));
+    };
+    const mealsIn = (o) => (o?.feed || []).filter((x) => x.kind === 'meal');
+    const clock = (body) => fetch(`${API}/__clock`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
+    const ALLOWED = ['name', 'emoji', 'portion', 'source', 'foodId', 'barcode', 'serving', 'quantity', 'grams', 'kcal', 'kcalLow', 'kcalHigh'];
+    const signUp = async (email) => {
+      const d = await device(browser, JSON.stringify(buildSeed()));
+      await d.go('/auth?mode=signup');
+      await d.fill('auth-email-input', email);
+      await d.fill('auth-password-input', PASSWORD);
+      await d.tap('auth-submit');
+      const ok = await d.untilPath('/');
+      await d.page.waitForTimeout(2500);
+      return { d, ok, id: (await server()).users.find((u) => u.email === email.toLowerCase())?.id };
+    };
+    const maya = await signUp(`maya+${Date.now()}@example.com`);
+    const noa = await signUp(`noa+${Date.now()}@example.com`);
+    check('meals: two more people sign up on two devices', maya.ok && noa.ok && !!maya.id && !!noa.id);
+    const M = maya.d;
+    const N = noa.d;
+    await api(M, 'setupSocial', { displayName: 'Maya', avatar: '', sharing: { workouts: true, streak: true, minutes: true } });
+    await api(N, 'setupSocial', { displayName: 'Noa', avatar: '', sharing: { workouts: true, streak: true, minutes: true } });
+    const mayaCode = (await overviewOf(M))?.me?.code;
+    const asked = await api(N, 'requestFriend', mayaCode);
+    const answered = await api(M, 'respondToRequest', noa.id, true);
+    const mayaView = await overviewOf(M);
+    check('meals: the two are friends, and both may show meals (18 or over by their profiles)', asked?.ok && answered?.ok && mayaView?.friends?.some((f) => f.userId === noa.id) && mayaView?.me?.mealsAllowed === true);
+
+    // Maya shows today's first meal that has food, built from her diary by the app's one door for food.
+    const pick = await M.page.evaluate(() => {
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const entries = Object.values(window.__healthcal.getState().foodEntries).filter((e) => !e.deleted && e.date === today && e.via !== 'water' && e.quantity > 0);
+      const meal = ['breakfast', 'lunch', 'dinner', 'snack'].find((m) => entries.some((e) => e.meal === m));
+      const mine = entries.filter((e) => e.meal === meal);
+      return { today, meal, count: Math.min(mine.length, 15), ids: mine.map((e) => e.id) };
+    });
+    const showDiaryMeal = () =>
+      M.page.evaluate(
+        async ([today, meal, viewer]) => {
+          const f = window.__healthcalFriendsApi;
+          const items = f.buildSharedMeal({ entries: Object.values(window.__healthcal.getState().foodEntries), day: today, meal, showKcal: false });
+          return JSON.parse(JSON.stringify(await f.showMeal({ day: today, meal, items, showKcal: false, viewers: [viewer] })));
+        },
+        [pick.today, pick.meal, noa.id],
+      );
+    const shown = await showDiaryMeal();
+    const ref = shown?.value?.ref;
+    srv = await server();
+    const row = srv.sharedMeals.find((m) => m.owner === maya.id);
+    const rowText = JSON.stringify(row || {});
+    check(
+      'meals: showing a meal stores only the foods with what friends may see, for the friend picked',
+      shown?.ok && /^[0-9a-f]{32}$/.test(ref || '') && row?.viewers?.join() === noa.id && row.items.length === pick.count && row.items.every((i) => Object.keys(i).every((k) => ALLOWED.includes(k)) && !('kcal' in i)),
+      `${pick.meal}, ${row?.items?.length} foods`,
+    );
+    check(
+      'meals: no record id, time, macros or total leaves the phone',
+      !!row && !pick.ids.some((id) => rowText.includes(id)) && !/loggedAt|nutrients|protein|budget|updatedAt|"date"/.test(rowText),
+    );
+    let noaView = await overviewOf(N);
+    let seen = mealsIn(noaView);
+    check('meals: the friend sees it in the feed, named by its owner', seen.length === 1 && seen[0].ref === ref && seen[0].displayName === 'Maya' && seen[0].meal === pick.meal && seen[0].items.length === pick.count && !('shownAt' in seen[0]) && !('viewers' in seen[0]));
+
+    const cheered = await api(N, 'cheerMeal', maya.id, ref);
+    srv = await server();
+    noaView = await overviewOf(N);
+    const mayaAfterCheer = await overviewOf(M);
+    check(
+      'meals: the friend cheers it; the owner sees one cheer on the meal and in the cheers list',
+      cheered?.ok && srv.cheers.some((c) => c.from_user === noa.id && c.to_user === maya.id && c.ref === `meal:${ref}`) && mealsIn(noaView)[0]?.cheered === true && mayaAfterCheer?.myMeals?.[0]?.cheers === 1 && mayaAfterCheer.cheers.some((c) => c.ref === `meal:${ref}`),
+    );
+
+    // An edit in the diary reaches the friend after the next publish.
+    await M.page.evaluate(
+      ([today, meal]) =>
+        window.__healthcal.getState().upsert('foodEntries', {
+          date: today, meal, name: 'Banana, raw', emoji: '🍌', foodId: 'b_banana', source: 'builtin', verified: true,
+          servingLabel: '1 medium', quantity: 1, grams: 118, nutrients: { kcal: 105, protein: 1.3, carbs: 27, fat: 0.4 }, loggedAt: new Date().toISOString(),
+        }),
+      [pick.today, pick.meal],
+    );
+    await api(M, 'publishMeals');
+    seen = mealsIn(await overviewOf(N));
+    check('meals: an edit in the diary reaches the friend', seen[0]?.items?.some((i) => i.name === 'Banana, raw') === true || pick.count >= 15, `${seen[0]?.items?.length} foods`);
+
+    const stopped = await api(M, 'stopMeal', ref);
+    srv = await server();
+    check('meals: stopping takes it away at once, with its cheer', stopped?.ok && mealsIn(await overviewOf(N)).length === 0 && !srv.sharedMeals.some((m) => m.owner === maya.id) && !srv.cheers.some((c) => c.ref === `meal:${ref}`));
+
+    // Shown again, then 7 days pass on the stand-in's clock.
+    const again = await showDiaryMeal();
+    const seenAgain = mealsIn(await overviewOf(N)).length === 1;
+    await clock({ advanceMs: 7 * 86400000 + 60000 });
+    let afterWeek;
+    try {
+      afterWeek = mealsIn(await overviewOf(N)).length;
+      srv = await server();
+    } finally {
+      await clock({ reset: true });
+    }
+    check('meals: a shown meal leaves by itself after 7 days, from the server too', again?.ok && seenAgain && afterWeek === 0 && !srv.sharedMeals.some((m) => m.owner === maya.id));
+
+    // Removing the friend stops it at once.
+    await showDiaryMeal();
+    const seenBefore = mealsIn(await overviewOf(N)).length === 1;
+    const removed = await api(N, 'removeFriend', maya.id);
+    srv = await server();
+    const mayaAfter = await overviewOf(M);
+    check('meals: removing the friend stops the meal at once on both sides', seenBefore && removed?.ok && mealsIn(await overviewOf(N)).length === 0 && !srv.sharedMeals.some((m) => m.owner === maya.id) && (mayaAfter?.myMeals || []).length === 0);
+
+    await api(M, 'leaveSocial');
+    await api(N, 'leaveSocial');
+    check('meals: no runtime errors on either device', M.errors.length === 0 && N.errors.length === 0, [...M.errors, ...N.errors].join(' | ').slice(0, 200));
+    await M.page.context().close();
+    await N.page.context().close();
+  }
+
   // ------------------------------------------------------------- friends
   // A second person (Sam) on another device. Both turn friends on, Sam adds Alex by code, Alex accepts.
   const EMAIL2 = `sam+${Date.now()}@example.com`;

@@ -117,14 +117,14 @@ export function FeedWorkoutCard({ item, today, units, onCheer, testID }: { item:
   const w = { id: item.ref, name: item.name, emoji: item.emoji, minutes: item.minutes, date: item.day, ...(item.distanceKm ? { distanceKm: item.distanceKm } : null) };
   return (
     <Card padding={spacing.lg} testID={testID}>
-      <View style={{ flexDirection: large ? 'column' : 'row', alignItems: large ? 'stretch' : 'center', gap: spacing.md }}>
+      <View style={{ flexDirection: large ? 'column' : 'row', alignItems: large ? 'stretch' : 'center', gap: spacing.sm }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: large ? undefined : 1, minWidth: 0 }}>
           <PersonMark name={item.displayName} avatar={item.avatar} size={40} />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
               {isolateRtl(item.displayName)}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}>
               {item.emoji ? (
                 // A content mark: the activity's emoji, small and silent (its name follows in words).
                 <View {...DECORATIVE}>
