@@ -25,7 +25,7 @@ import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
 import { SaveCurrentMealRow, SavedMealRow, useVisitOrder } from '@/features/food/SavedMealRow';
 import { loadSearchTab, openingTab, rememberSearchTab, SEARCH_CHIPS, usualEmpty, useSearchTab, type SearchTab } from '@/features/food/searchTab';
 import { resolveFood, usualFoods } from '@/features/food/usuals';
-import { isolateRtl } from '@/lib/bidi';
+import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { formatDayLabel } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
 import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
@@ -554,7 +554,9 @@ export default function FoodSearchScreen() {
                 testID="search-amount-remove"
                 variant="secondary"
                 full={false}
-                title="Remove"
+                // One action, one name: a diary entry is deleted ("Delete <food>", as its trash can in the diary says).
+                title="Delete"
+                accessibilityLabel={`Delete ${withoutMarks(displayFoodName(amountEntry))}`}
                 onPress={() => {
                   setAmountEntryId(null);
                   deleteEntry(amountEntry);
