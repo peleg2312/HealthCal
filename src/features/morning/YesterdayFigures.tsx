@@ -25,17 +25,20 @@ export interface FiguresDay {
   approx: boolean;
 }
 
-/** What a screen reader says for the calorie figure. */
-function calorieLabel(d: FiguresDay): string {
+/**
+ * The calorie figure's name: what it shows, as drawn and in its order (WCAG 2.5.3, label in name: "Eaten, 95% of
+ * 2,190 kcal"), then the verdict the cell leaves to its trough. `share` is the share of the budget drawn instead of
+ * the calories (null when the calories are drawn).
+ */
+function calorieLabel(d: FiguresDay, share: number | null): string {
   if (!d.foodLogged) return 'Eaten, not logged';
-  const about = d.approx ? 'about ' : '';
-  const kcal = formatNumber(d.kcal);
-  if (d.budget <= 0) return `Eaten, ${about}${kcal} kilocalories`;
-  const head = `Eaten, ${about}${kcal} of ${formatNumber(d.budget)} kilocalories`;
-  if (!d.complete) return `${head}, partly logged`;
+  const shown = `${d.approx ? '~' : ''}${formatNumber(share ?? d.kcal)}${share !== null ? '%' : ''}`;
+  if (d.budget <= 0) return `Eaten, ${shown} kcal`;
+  if (!d.complete) return `Eaten, ${shown} partly logged`;
+  const head = `Eaten, ${shown} of ${formatNumber(d.budget)} kcal`;
   if (d.kcal <= d.budget) return `${head}, within the day's budget`;
   // Above is anything over the budget (`budgetMark`), said with its amount, never "within 10%".
-  return `${head}, ${formatNumber(d.kcal - d.budget)} kilocalories above the day's budget`;
+  return `${head}, ${formatNumber(d.kcal - d.budget)} kcal above the day's budget`;
 }
 
 /**
@@ -88,7 +91,7 @@ export function YesterdayFigures({ day, sleepHours, units, kcalShown }: { day: F
 
   return (
     <View testID="morning-cups" style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.xl, rowGap: spacing.xl }}>
-      <PressableScale testID="morning-cal" accessibilityRole="link" accessibilityLabel={calorieLabel(day)} accessibilityHint="Opens the diary for that day" scaleTo={0.97} onPress={() => leaveMorningTo(`/diary?date=${day.date}`)} style={tile}>
+      <PressableScale testID="morning-cal" accessibilityRole="link" accessibilityLabel={calorieLabel(day, share)} accessibilityHint="Opens the diary for that day" scaleTo={0.97} onPress={() => leaveMorningTo(`/diary?date=${day.date}`)} style={tile}>
         {head(colors.calories, 'Eaten', day.foodLogged ? 'filled' : 'dashed')}
         {share !== null ? (
           // The calories are over the week's large cup: here, the share of the day's budget, read with the caption ("95% of 2,170 kcal").
@@ -162,7 +165,7 @@ export function YesterdayFigures({ day, sleepHours, units, kcalShown }: { day: F
           <Trough value={sleepHours} max={SLEEP_RANGE[0]} goalKind="reach" color={colors.sleep} height={10} delay={delay(3)} memoryKey={key('sleep')} />
         </View>
       ) : (
-        <PressableScale testID="morning-sleep-add" accessibilityRole="button" accessibilityLabel="Sleep last night, not logged. Add it" scaleTo={0.97} onPress={() => router.replace('/sleep?log=1' as never)} style={tile}>
+        <PressableScale testID="morning-sleep-add" accessibilityRole="button" accessibilityLabel="Sleep, Add last night, not logged" scaleTo={0.97} onPress={() => router.replace('/sleep?log=1' as never)} style={tile}>
           {head(colors.sleep, 'Sleep', 'dashed')}
           <Text variant="numL" color="primaryInk" style={numStyle} numberOfLines={1}>
             Add

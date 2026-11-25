@@ -142,7 +142,8 @@ export function LegalScreen({ doc }: { doc: LegalDocument }) {
                     feedback="select"
                     hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                     accessibilityRole="link"
-                    accessibilityLabel={`Go to ${s.heading}`}
+                    // The chip's words as drawn (label in name), then the heading it goes to where its words are a short form.
+                    accessibilityLabel={jumpLabel(s) === s.heading ? `Go to ${s.heading}` : `Go to ${jumpLabel(s)}: ${s.heading}`}
                     style={{ height: 32, maxWidth: '100%', paddingHorizontal: 12, justifyContent: 'center', borderRadius: radius.chip, borderWidth: 1, borderColor: colors.borderStrong }}>
                     <Text variant="label" numberOfLines={1} style={{ fontSize: 13.5, flexShrink: 1 }}>
                       {jumpLabel(s)}
