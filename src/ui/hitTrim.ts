@@ -8,7 +8,11 @@
  * is cut, side by side, where it would reach into another control's drawn box (`trimSlop`, pure and tested), and
  * the cut is set on the element (`data-hit-trim` and four custom properties) after the page lays out, again after
  * every render of a kit control, a resize, and once a scroll settles. A slop that reaches no other control is
- * untouched, so nothing changes where nothing was taken. Natively the platform's own hit testing decides.
+ * untouched, so nothing changes where nothing was taken. A text field's own button (`TextField`'s `right`, such as
+ * food search's clear X) counts only where the field's text goes, not its padding (`fieldTextBox`): the input ends
+ * where the button begins, and the input's side room before it holds no text, so the button keeps its 44 px reach
+ * there and a tap on the text, or anywhere past that reach, is still the field's. Natively the platform's own hit
+ * testing decides.
  */
 
 export type Box = { top: number; right: number; bottom: number; left: number };
@@ -52,6 +56,21 @@ export function trimSlop(own: Box, slop: Slop, others: Box[]): Slop {
   return out;
 }
 
+/**
+ * The part of a text input that a control inside the same field cup leaves alone: where its text goes. Its side
+ * padding is room between the text and the field's icon or button, so that button's reach may take it; above and
+ * below the text the box is kept, since a tap there still means the field. A padding that leaves no room for
+ * text is ignored (the whole box is kept).
+ */
+export function fieldTextBox(box: Box, padding: { left: number; right: number }): Box {
+  const left = box.left + Math.max(0, padding.left || 0);
+  const right = box.right - Math.max(0, padding.right || 0);
+  return right - left >= 1 ? { ...box, left, right } : box;
+}
+
+/** The field cup (`FOCUS_CUP`, ./Pressable) an element is drawn in, if any. */
+const fieldCupOf = (el: Element) => el.closest('[data-focus-cup]');
+
 const CONTROLS = '[role="button"],[role="tab"],[role="radio"],[role="switch"],[role="checkbox"],[role="link"],[role="spinbutton"],[role="slider"],button,a[href],input,textarea,select';
 
 const tracked = new Set<HTMLElement>();
@@ -89,7 +108,15 @@ function run() {
     // The slop past the drawn edge (the rule's offsets are from the padding edge, so they hold the border too).
     const slop = { top: Math.max(0, t - border.top), right: Math.max(0, ri - border.right), bottom: Math.max(0, b - border.bottom), left: Math.max(0, l - border.left) };
     const own = { top: r.top, right: r.right, bottom: r.bottom, left: r.left };
-    const others = boxes.filter((o) => o.el !== el && !el.contains(o.el) && !o.el.contains(el)).map((o) => o.box);
+    // A text input in the same field cup as this control (the field's own button) counts only where its text goes.
+    const cup = fieldCupOf(el);
+    const others = boxes
+      .filter((o) => o.el !== el && !el.contains(o.el) && !o.el.contains(el))
+      .map((o) => {
+        if (!cup || !(o.el instanceof HTMLInputElement || o.el instanceof HTMLTextAreaElement) || fieldCupOf(o.el) !== cup) return o.box;
+        const ps = getComputedStyle(o.el);
+        return fieldTextBox(o.box, { left: parseFloat(ps.paddingLeft) || 0, right: parseFloat(ps.paddingRight) || 0 });
+      });
     const cut = trimSlop(own, slop, others);
     if (sameSlop(cut, slop)) {
       el.removeAttribute('data-hit-trim');

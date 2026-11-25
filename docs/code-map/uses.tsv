@@ -2908,6 +2908,7 @@ src/ui/decorative.ts	DECORATIVE	25	src/app/food/photo.tsx	src/app/friends/add.ts
 src/ui/decorative.ts	decorative	16	src/app/activity/log.tsx	src/app/auth.tsx	src/app/food/photo.tsx	src/app/food/scan.tsx	src/app/food/search.tsx	src/app/settings/reminders.tsx	src/app/welcome.tsx	src/features/activity/RoutineCards.tsx	src/features/ai/AiDataLine.tsx	src/features/ai/SampleNotice.tsx	src/features/import/ui/ReviewHeader.tsx	src/features/import/ui/StartView.tsx	src/features/onboarding/PlanReveal.tsx	src/features/plan/MembershipCard.tsx	src/features/progress/EarlyState.tsx	src/features/updates/AboutVersion.tsx
 src/ui/decorative.ts	figure	36	src/app/(tabs)/index.tsx	src/app/activity/log.tsx	src/app/activity/strength.tsx	src/app/auth.tsx	src/app/coach.tsx	src/app/consistency.tsx	src/app/recap.tsx	src/app/settings/account.tsx	src/app/sleep.tsx	src/app/water.tsx	src/app/welcome.tsx	src/features/activity/LoadMark.tsx	src/features/activity/WeekCard.tsx	src/features/ai/AnalysingView.tsx	src/features/coach/IdeasCard.tsx	src/features/food/DiaryParts.tsx	src/features/food/SavedMealParts.tsx	src/features/friends/components.tsx	src/features/health-sync/ui/ReviewCard.tsx	src/features/health-sync/ui/StepsLine.tsx	src/features/import/ui/ReviewHeader.tsx	src/features/legal/LegalScreen.tsx	src/features/morning/QuoteBlock.tsx	src/features/morning/ReviewList.tsx	src/features/morning/WeekBlock.tsx	src/features/morning/YesterdayFigures.tsx	src/features/onboarding/PlanReveal.tsx	src/features/plan/AllowanceTable.tsx	src/features/plan/PeriodTiles.tsx	src/features/progress/ConsistencyCard.tsx	src/features/progress/MilestonesCard.tsx	src/features/streak/MilestoneSheet.tsx	src/features/today/NowCard.tsx	src/ui/Toast.tsx	src/ui/Vessel.tsx	src/ui/figure.test.ts
 src/ui/haptics.ts	haptic	31	src/app/activity/strength.tsx	src/app/auth.tsx	src/app/body.tsx	src/app/coach.tsx	src/app/food/custom.tsx	src/app/food/detail.tsx	src/app/food/meal-edit.tsx	src/app/food/meal-pick.tsx	src/app/food/photo.tsx	src/app/food/quick.tsx	src/app/food/scan.tsx	src/app/onboarding.tsx	src/app/settings/health-sync.tsx	src/app/water.tsx	src/features/activity/session.ts	src/features/auth/useGoogleSignIn.ts	src/features/coach/ReportSheet.tsx	src/features/drinks/DrinkPickSheet.tsx	src/features/food/actions.ts	src/features/food/favoriteActions.ts	src/features/food/log.ts	src/features/import/ui/session.ts	src/features/onboarding/PlanReveal.tsx	src/features/plan/MembershipCard.tsx	src/features/share/ShareSheet.tsx	src/features/today/StatusRail.tsx	src/features/today/useDaySwipe.tsx	src/features/trackers/actions.ts	src/services/notifications.ts	src/ui/Charts.tsx	src/ui/Pressable.tsx
+src/ui/hitTrim.ts	fieldTextBox	1	src/ui/hitTrim.test.ts
 src/ui/hitTrim.ts	scheduleHitTrim	1	src/ui/Pressable.tsx
 src/ui/hitTrim.ts	trackHitArea	1	src/ui/Pressable.tsx
 src/ui/hitTrim.ts	trimSlop	1	src/ui/hitTrim.test.ts
@@ -2915,6 +2916,7 @@ src/ui/keyboardInset.ts	ControlBox	1	src/ui/Toast.tsx
 src/ui/keyboardInset.ts	KEYBOARD_MIN	1	src/ui/keyboardInset.test.ts
 src/ui/keyboardInset.ts	TOAST_CLEAR	1	src/ui/Toast.tsx
 src/ui/keyboardInset.ts	TOAST_GAP	2	src/ui/Toast.tsx	src/ui/keyboardInset.test.ts
+src/ui/keyboardInset.ts	TOAST_HIGH_LOOKS	1	src/ui/keyboardInset.test.ts
 src/ui/keyboardInset.ts	WindowBox	1	src/ui/Toast.tsx
 src/ui/keyboardInset.ts	keyboardCover	3	src/ui/Screen.tsx	src/ui/Sheet.tsx	src/ui/keyboardInset.test.ts
 src/ui/keyboardInset.ts	revealDelta	3	src/ui/Screen.tsx	src/ui/Sheet.tsx	src/ui/keyboardInset.test.ts
@@ -2922,6 +2924,8 @@ src/ui/keyboardInset.ts	scrollGivesUp	2	src/ui/Screen.tsx	src/ui/keyboardInset.t
 src/ui/keyboardInset.ts	toastBand	2	src/ui/Toast.tsx	src/ui/keyboardInset.test.ts
 src/ui/keyboardInset.ts	toastBottom	2	src/ui/Toast.tsx	src/ui/keyboardInset.test.ts
 src/ui/keyboardInset.ts	toastBottomAmong	1	src/ui/keyboardInset.test.ts
+src/ui/keyboardInset.ts	toastHighSettled	2	src/ui/Toast.tsx	src/ui/keyboardInset.test.ts
+src/ui/keyboardInset.ts	toastOutOfReach	2	src/ui/Toast.tsx	src/ui/keyboardInset.test.ts
 src/ui/keyboardInset.ts	toastPlaceAmong	2	src/ui/Toast.tsx	src/ui/keyboardInset.test.ts
 src/ui/keyboardInset.ts	toastReachTop	2	src/ui/Toast.tsx	src/ui/keyboardInset.test.ts
 src/ui/keyboardInset.ts	toastSpot	2	src/ui/Toast.tsx	src/ui/keyboardInset.test.ts

@@ -8,7 +8,7 @@ import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, isReducedMotion, MAX_CONTENT_WIDTH, motion, useLargeText, useTheme, type ThemeColors } from '@/theme';
 
 import { figure } from './decorative';
-import { type ControlBox, TOAST_CLEAR, TOAST_GAP, toastBand, toastBottom, toastPlaceAmong, toastReachTop, toastSpot, type WindowBox } from './keyboardInset';
+import { type ControlBox, TOAST_CLEAR, TOAST_GAP, toastBand, toastBottom, toastHighSettled, toastOutOfReach, toastPlaceAmong, toastReachTop, toastSpot, type WindowBox } from './keyboardInset';
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
 import { controlsIn } from './toastControls';
@@ -470,6 +470,8 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       const late = setTimeout(() => setSpot({ key: placeKey, bottom: null }), PLACE_LATE_MS);
       return () => clearTimeout(late);
     }
+    // Whether the last look's place is out of thumb reach (`toastOutOfReach`): provisional until it settles, below.
+    let high = false;
     // Phones: the focused screen's kit controls, measured in the window, and the same rule as the web.
     const placeOnPhone = async (): Promise<number | null | 'none'> => {
       if (!scopeId) return null;
@@ -477,7 +479,10 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       if (!host || !box) return null;
       const rects = await Promise.all(controlsIn(scopeId).map((n) => measureRect(n)));
       // With no clear band in thumb reach, any clear band below the status bar, rather than over a control.
-      return toastPlaceAmong({ windowBottom: host.y + host.h + bottomNow.current, resting, toast: box, controls: rects.filter((r): r is WindowBox => !!r), above: insets.top });
+      const windowBottom = host.y + host.h + bottomNow.current;
+      const at = toastPlaceAmong({ windowBottom, resting, toast: box, controls: rects.filter((r): r is WindowBox => !!r), above: insets.top });
+      if (typeof at === 'number') high = toastOutOfReach(windowBottom - at - Math.round(box.height), windowBottom, Math.round(box.height));
+      return at;
     };
     // The place, as a bottom offset (null: where it always rests), 'none' when no band on the screen is clear (the
     // screen then makes one), or 'wait' while the screen it belongs to is not laid out yet (a screen coming back
@@ -506,7 +511,9 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
         const head = scope.querySelector('[data-testid="screen-header"], [data-testid="tab-header"]')?.getBoundingClientRect();
         const above = Math.max(box.top, head ? head.bottom + TOAST_CLEAR : 0, insets.top);
         const top = toastSpot({ lowest: H - resting - h, highest: toastReachTop(H, h), height: h, left: r.left, right: r.right, controls: controlBoxes(scope, host), above });
-        return top === null ? 'none' : H - top - h;
+        if (top === null) return 'none';
+        high = toastOutOfReach(top, H, h);
+        return H - top - h;
       }
       // In a sheet: just above its top edge while that is within thumb reach; else the lowest clear band in it.
       let sheet: Element | null = null;
@@ -524,14 +531,30 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
     let tries = 0;
     let looked = false;
     let stopped = false;
+    // Before the toast is first drawn, a place out of thumb reach is provisional: a screen still arriving (a diary
+    // mounted fresh after a direct link) shows the band under its header clear before its week strip is drawn, then
+    // no band clear once it is. The toast stays hidden and looks again until two looks in a row agree on that place
+    // or a look finds another (`toastHighSettled`), so it appears once, where it stays.
+    let drawnOnce = false;
+    let looks = 0;
+    let highAt: number | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const run = () => {
+      high = false;
       void Promise.resolve(place()).then((at) => {
         if (stopped) return;
         if (at === 'wait' && tries++ < 12) {
           timer = setTimeout(run, 80);
           return;
         }
+        looks += 1;
+        if (!drawnOnce && typeof at === 'number' && high && !toastHighSettled(at, highAt, looks)) {
+          highAt = at;
+          looked = true;
+          timer = setTimeout(run, PLACE_AGAIN_MS);
+          return;
+        }
+        drawnOnce = true;
         if (at === 'none' && scopeId && toastH > 0) {
           // No band on the screen is clear of controls: the screen makes one where the toast rests (its scroll area
           // ends 8 px above it, `toastBand`), and the toast is drawn there once the screen has given way (two frames).
@@ -542,7 +565,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
             setSpot({ key: placeKey, bottom: null });
             if (!looked) {
               looked = true;
-              timer = setTimeout(run, 450);
+              timer = setTimeout(run, PLACE_AGAIN_MS);
             }
           }, 34);
           return;
@@ -551,7 +574,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
         // One more look once the screen has settled (a list that was still arriving, a screen fading in).
         if (!looked) {
           looked = true;
-          timer = setTimeout(run, 450);
+          timer = setTimeout(run, PLACE_AGAIN_MS);
         }
       });
     };
@@ -735,6 +758,8 @@ function measureRect(node: unknown): Promise<WindowBox | null> {
 
 /** How long a toast may wait for its place before it shows where it always rests. */
 const PLACE_LATE_MS = 400;
+/** When a toast looks at its place again: once after it is drawn (the screen settling), and while a high place is provisional. */
+const PLACE_AGAIN_MS = 450;
 
 /** A promise's answer, or `fallback` when it has not come within `ms` (a measurement a phone never answers). */
 function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {

@@ -1027,6 +1027,9 @@ function toastScan() {
   if (!t) return [];
   const tr = t.getBoundingClientRect();
   if (tr.width < 1 || tr.height < 1) return [];
+  // A toast not drawn yet is not judged: its host is at opacity 0 while the kit works out its place (Toast.tsx,
+  // `hidden`), at the default place it never shows in. checkVisibility reads the ancestors' opacity too.
+  if (t.checkVisibility && !t.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return [];
   const msg = t.textContent.trim().slice(0, 40);
   const out = [];
   if (tr.top < -0.5) out.push(`toast "${msg}" ${Math.round(-tr.top)}px above the screen`);

@@ -71,7 +71,7 @@ describe('widgetModel', () => {
     expect(f.water.line).toBe('1.23 of 3.3 L');
     expect(f.water.caption).toBe('Water');
     expect(f.water.reached).toBe(false);
-    expect(f.glass).toEqual({ ml: 250, label: '+ 250 ml', spoken: 'Add 250 millilitres of water' });
+    expect(f.glass).toEqual({ ml: 250, label: '+ 250 ml', spoken: 'Add 250 ml of water' });
     expect(f.added).toBeNull();
     expect(f.kcal.spoken).toBe('941 kilocalories left. 1,219 eaten of a 2,160 kilocalorie budget. Open Today');
     expect(f.water.spoken).toBe('Water, 1.23 of 3.3 litres. Open Water');
@@ -122,7 +122,7 @@ describe('widgetModel', () => {
     useStore.getState().setSettings({ waterPresets: [237, 355, 473, 710] });
     const f = day();
     expect(f.glass.label).toBe('+ 12 fl oz');
-    expect(f.glass.spoken).toBe('Add 12 fluid ounces of water');
+    expect(f.glass.spoken).toBe('Add 12 fl oz of water');
     expect(f.water.line).toBe('0 of 112 fl oz');
   });
 
@@ -130,7 +130,7 @@ describe('widgetModel', () => {
     const g = drink(250);
     const recent = { id: g.id, ml: 250, date: DAY, at: 0 };
     const f = widgetModel(useStore.getState(), DAY, recent);
-    expect(f.kind === 'day' && f.added).toEqual({ id: g.id, caption: '250 ml added', undoSpoken: 'Undo 250 millilitres of water' });
+    expect(f.kind === 'day' && f.added).toEqual({ id: g.id, caption: '250 ml added', undoSpoken: 'Undo 250 ml of water' });
     const other = widgetModel(useStore.getState(), DAY, { ...recent, date: '2026-11-24' });
     expect(other.kind === 'day' && other.added).toBeNull();
   });

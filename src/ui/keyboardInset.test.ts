@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { KEYBOARD_MIN, keyboardCover, revealDelta, scrollGivesUp, TOAST_GAP, toastBand, toastBottom, toastBottomAmong, toastPlaceAmong, toastReachTop, toastSpot } from './keyboardInset';
+import { KEYBOARD_MIN, keyboardCover, revealDelta, scrollGivesUp, TOAST_GAP, TOAST_HIGH_LOOKS, toastBand, toastBottom, toastBottomAmong, toastHighSettled, toastOutOfReach, toastPlaceAmong, toastReachTop, toastSpot } from './keyboardInset';
 
 describe('keyboardCover', () => {
   it('is what the keyboard takes from the bottom of the page', () => {
@@ -209,5 +209,26 @@ describe('when no band is clear, the screen makes one (toastPlaceAmong, toastBan
       .map((r) => ({ ...r, height: Math.min(r.y + r.height, end) - r.y }))
       .filter((r) => r.height > 0);
     expect(toastPlaceAmong({ windowBottom: 740, resting: 84, toast, controls: seen })).toBeNull();
+  });
+});
+
+describe('a high place is provisional before the toast is first drawn (toastOutOfReach, toastHighSettled)', () => {
+  it('tells a band under the header from one in thumb reach', () => {
+    // 360 x 740, a 60 px toast: thumb reach starts at a top of 266.
+    expect(toastOutOfReach(76, 740, 60)).toBe(true);
+    expect(toastOutOfReach(toastReachTop(740, 60), 740, 60)).toBe(false);
+    // Where it always rests on a tab (12 px above an 84 px tab bar): in reach.
+    expect(toastOutOfReach(740 - 84 - 12 - 60, 740, 60)).toBe(false);
+  });
+
+  it('draws a high place only once two looks in a row agree on it, or the looks are used up', () => {
+    // The diary after a direct link: the first look finds the band under the header clear (the strip not drawn yet).
+    expect(toastHighSettled(604, null, 1)).toBe(false);
+    // The page still arriving: a second high place that differs is not drawn either.
+    expect(toastHighSettled(560, 604, 2)).toBe(false);
+    // A settled page: the same high place twice (a tall toast at large text with no band in reach clear).
+    expect(toastHighSettled(604, 604, 2)).toBe(true);
+    // Never hidden for good.
+    expect(toastHighSettled(520, 560, TOAST_HIGH_LOOKS)).toBe(true);
   });
 });

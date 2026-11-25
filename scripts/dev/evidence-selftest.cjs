@@ -63,9 +63,10 @@ const SCROLLED_SHEET = ({ scrolled = false, toastTop = null } = {}) => `
  * sheet, a pinned footer and the tab bar, so it called this clean). With `band` the scroll area ends 8 px above
  * the toast, as the kit's screen does when no band is clear (`toastBand`): the row leaves the scroll area's view
  * and nothing that shows is under the toast. With `covered` a second screen is pushed over the first (a pushed
- * screen over a tab that stays mounted): only the screen under the toast is judged.
+ * screen over a tab that stays mounted): only the screen under the toast is judged. With `placing` the toast's host
+ * is at opacity 0, as the kit's is while it works out the toast's place: a toast not drawn yet covers nothing.
  */
-const SCREEN_TOAST = ({ band = false, covered = false } = {}) => `
+const SCREEN_TOAST = ({ band = false, covered = false, placing = false } = {}) => `
 <body style="margin:0;font:15px/20px sans-serif;background:#fff;color:#111">
   <div id="screen-1" style="position:fixed;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column">
     <div style="${band ? 'height:572px' : 'flex:1 1 auto;min-height:0'};overflow-y:auto">
@@ -75,7 +76,7 @@ const SCREEN_TOAST = ({ band = false, covered = false } = {}) => `
     </div>
   </div>
   ${covered ? '<div id="screen-2" style="position:fixed;left:0;right:0;top:0;bottom:0;background:#fff"><p>Water</p></div>' : ''}
-  <div data-testid="toast" style="position:fixed;left:20px;right:20px;top:580px;height:44px;background:#111;color:#fff">Almonds removed from lunch <span role="button">Undo</span></div>
+  <div style="position:fixed;left:0;right:0;top:0;height:0${placing ? ';opacity:0' : ''}"><div data-testid="toast" style="position:fixed;left:20px;right:20px;top:580px;height:44px;background:#111;color:#fff">Almonds removed from lunch <span role="button">Undo</span></div></div>
 </body>`;
 
 /**
@@ -136,6 +137,8 @@ const cases = [
   { name: "toast over the focused screen's own control", html: SCREEN_TOAST(), run: 'toast', expect: 'covers meal-add-lunch' },
   { name: 'toast over a row its scroll area no longer shows is fine (the band the screen makes)', html: SCREEN_TOAST({ band: true }), run: 'toast', expect: '' },
   { name: 'a screen covered by the focused one is not judged under the toast', html: SCREEN_TOAST({ covered: true }), run: 'toast', expect: '' },
+  // The same toast over the same control while the kit is still placing it (its host at opacity 0): not drawn, not judged.
+  { name: 'a toast not drawn yet (its host at opacity 0 while it is placed) is not judged', html: SCREEN_TOAST({ placing: true }), run: 'toast', expect: '' },
   { name: 'the page behind a sheet is not judged', html: sheetPage(), run: 'layoutSheet', expect: '' },
   { name: 'the page alone is judged', html: sheetPage().replace(/<div style="position:fixed;left:0;right:0;bottom:0[\s\S]*$/, '</body>'), run: 'layoutPage', expect: 'over' },
   {

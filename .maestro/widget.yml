@@ -38,6 +38,8 @@ name: Home-screen widget
       id: profile-widget-add
     direction: DOWN
     timeout: 20000
+    # Centred, so the tap never lands on the gesture bar at the bottom edge.
+    centerElement: true
 - tapOn:
     id: profile-widget-add
 - waitForAnimationToEnd:
@@ -51,25 +53,25 @@ name: Home-screen widget
     timeout: 3000
 - pressKey: Home
 - extendedWaitUntil:
-    visible: 'Add 250 millilitres of water'
+    visible: 'Add 250 ml of water'
     timeout: 30000
 - takeScreenshot: 81-widget-placed
 
 # Warm: the app's process is alive in the background.
-- tapOn: 'Add 250 millilitres of water'
+- tapOn: 'Add 250 ml of water'
 - extendedWaitUntil:
-    visible: 'Undo 250 millilitres of water'
+    visible: 'Undo 250 ml of water'
     timeout: 20000
     optional: true
 # The launcher took the first tap to measure the widget: tap once more (a second tap on the same
 # picture never logs a second glass, so this cannot add two).
 - runFlow:
     when:
-      notVisible: 'Undo 250 millilitres of water'
+      notVisible: 'Undo 250 ml of water'
     commands:
-      - tapOn: 'Add 250 millilitres of water'
+      - tapOn: 'Add 250 ml of water'
       - extendedWaitUntil:
-          visible: 'Undo 250 millilitres of water'
+          visible: 'Undo 250 ml of water'
           timeout: 20000
 - takeScreenshot: 82-widget-glass-warm
 
@@ -87,17 +89,17 @@ name: Home-screen widget
 - pressKey: Home
 
 # Undo on the widget takes that glass back.
-- tapOn: 'Undo 250 millilitres of water'
+- tapOn: 'Undo 250 ml of water'
 - extendedWaitUntil:
-    notVisible: 'Undo 250 millilitres of water'
+    notVisible: 'Undo 250 ml of water'
     timeout: 20000
 - takeScreenshot: 84-widget-undone
 
 # Cold: the system ends the app's process; the glass starts the app's JavaScript without a screen.
 - killApp
-- tapOn: 'Add 250 millilitres of water'
+- tapOn: 'Add 250 ml of water'
 - extendedWaitUntil:
-    visible: 'Undo 250 millilitres of water'
+    visible: 'Undo 250 ml of water'
     timeout: 45000
 - takeScreenshot: 85-widget-glass-cold
 

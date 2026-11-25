@@ -47,9 +47,9 @@ export function glassLabel(ml: number, units: UnitSystem): string {
   return `+ ${formatVolume(ml, units)}`;
 }
 
-/** The glass as heard: "Add 250 millilitres of water". */
+/** The glass as heard: "Add 250 ml of water" (its drawn words, so voice control finds it by what it shows). */
 export function glassSpoken(ml: number, units: UnitSystem): string {
-  return `Add ${spokenUnits(formatVolume(ml, units))} of water`;
+  return `Add ${formatVolume(ml, units)} of water`;
 }
 
 /** The water caption for a few minutes after a glass from the widget: "250 ml added". */
@@ -59,9 +59,9 @@ export function addedCaption(ml: number, units: UnitSystem): string {
 
 export const UNDO_WORD = 'Undo';
 
-/** The Undo as heard: "Undo 250 millilitres of water". */
+/** The Undo as heard: "Undo 250 ml of water". */
 export function undoSpoken(ml: number, units: UnitSystem): string {
-  return `Undo ${spokenUnits(formatVolume(ml, units))} of water`;
+  return `Undo ${formatVolume(ml, units)} of water`;
 }
 
 /** The whole widget as a screen reader hears it on entering it. */

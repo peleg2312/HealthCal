@@ -134,6 +134,29 @@ export function toastReachTop(windowHeight: number, height: number): number {
   return Math.ceil(windowHeight * TOAST_REACH_FROM - height / 2);
 }
 
+/**
+ * Whether a toast placed with its top at `top` lies out of thumb reach: the band higher up that `toastSpot` takes
+ * (`above`) only when no band in reach is clear. Such a place is provisional: a screen whose content is still
+ * arriving (the diary mounted fresh after Add on an AI review opened by a direct link) shows that band clear before
+ * its week strip is drawn, and the lowest band clear once it is. So the toast stays hidden and looks again until two
+ * looks in a row agree on the high place or a look finds another (`toastHighSettled`), and it appears once, there.
+ */
+export function toastOutOfReach(top: number, windowHeight: number, height: number): boolean {
+  return top < toastReachTop(windowHeight, height);
+}
+
+/** How many looks a toast takes at most before it shows in a high place no two looks agreed on. */
+export const TOAST_HIGH_LOOKS = 3;
+
+/**
+ * Whether a high place (`toastOutOfReach`) found by look number `looks` (1 for the first) may be drawn: when the look
+ * before it found the same place (`previous`, the bottom offset that look found when it was high too, else null), or
+ * when the looks are used up. Otherwise the toast stays hidden and looks again.
+ */
+export function toastHighSettled(at: number, previous: number | null, looks: number): boolean {
+  return previous === at || looks >= TOAST_HIGH_LOOKS;
+}
+
 /** A box as a phone measures it (`measureInWindow`): its left and top edge in the window, and its size. */
 export interface WindowBox {
   x: number;

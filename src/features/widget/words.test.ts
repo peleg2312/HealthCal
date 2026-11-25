@@ -15,7 +15,7 @@ function everyString(): { drawn: string[]; spoken: string[] } {
   for (const units of ['metric', 'imperial'] as const) {
     for (const ml of [150, 237, 250, 355, 500, 1000]) {
       drawn.push(W.glassLabel(ml, units), W.addedCaption(ml, units));
-      spoken.push(W.glassSpoken(ml, units), W.undoSpoken(ml, units));
+      // The glass and its Undo are controls: their names hold their drawn words (WCAG 2.5.3), checked below.
     }
   }
   for (const [remaining, eaten, budget, added] of [
@@ -47,8 +47,8 @@ describe('the widget words', () => {
     expect(W.kcalSpoken(-130, 2290, 2160, 0)).toBe("130 kilocalories above the day's budget. 2,290 eaten of a 2,160 kilocalorie budget. Open Today");
     expect(W.glassLabel(250, 'metric')).toBe('+ 250 ml');
     expect(W.glassLabel(355, 'imperial')).toBe('+ 12 fl oz');
-    expect(W.glassSpoken(250, 'metric')).toBe('Add 250 millilitres of water');
-    expect(W.undoSpoken(355, 'imperial')).toBe('Undo 12 fluid ounces of water');
+    expect(W.glassSpoken(250, 'metric')).toBe('Add 250 ml of water');
+    expect(W.undoSpoken(355, 'imperial')).toBe('Undo 12 fl oz of water');
     expect(W.addedCaption(250, 'metric')).toBe('250 ml added');
     expect(W.waterSpoken('1.48 of 3.3 L', false)).toBe('Water, 1.48 of 3.3 litres. Open Water');
     expect(W.rootSpoken('2026-11-25', W.kcalSpoken(941, 1219, 2160, 0), W.waterSpoken('1.48 of 3.3 L', true))).toBe(
@@ -68,5 +68,14 @@ describe('the widget words', () => {
 
   it('spoken labels say their units in full', () => {
     for (const s of everyString().spoken) expect(s, s).not.toMatch(SHORT_UNITS);
+  });
+  it('name the glass and its Undo by the words they show (label in name)', () => {
+    for (const units of ['metric', 'imperial'] as const) {
+      for (const ml of [150, 237, 250, 355, 500, 1000]) {
+        const drawn = W.glassLabel(ml, units).replace(/^\+ /, '');
+        expect(W.glassSpoken(ml, units)).toContain(drawn);
+        expect(W.undoSpoken(ml, units)).toContain(drawn);
+      }
+    }
   });
 });

@@ -3711,6 +3711,7 @@ src/ui/decorative.ts	figure	function
 src/ui/haptics.ts	haptic	const
 src/ui/hitTrim.ts	Box	type
 src/ui/hitTrim.ts	Slop	type
+src/ui/hitTrim.ts	fieldTextBox	function
 src/ui/hitTrim.ts	scheduleHitTrim	function
 src/ui/hitTrim.ts	trackHitArea	function
 src/ui/hitTrim.ts	trimSlop	function
@@ -3769,6 +3770,7 @@ src/ui/keyboardInset.ts	KEYBOARD_MIN	const
 src/ui/keyboardInset.ts	REVEAL_MARGIN	const
 src/ui/keyboardInset.ts	TOAST_CLEAR	const
 src/ui/keyboardInset.ts	TOAST_GAP	const
+src/ui/keyboardInset.ts	TOAST_HIGH_LOOKS	const
 src/ui/keyboardInset.ts	TOAST_REACH_FROM	const
 src/ui/keyboardInset.ts	WindowBox	interface
 src/ui/keyboardInset.ts	keyboardCover	function
@@ -3777,6 +3779,8 @@ src/ui/keyboardInset.ts	scrollGivesUp	function
 src/ui/keyboardInset.ts	toastBand	function
 src/ui/keyboardInset.ts	toastBottom	function
 src/ui/keyboardInset.ts	toastBottomAmong	function
+src/ui/keyboardInset.ts	toastHighSettled	function
+src/ui/keyboardInset.ts	toastOutOfReach	function
 src/ui/keyboardInset.ts	toastPlaceAmong	function
 src/ui/keyboardInset.ts	toastReachTop	function
 src/ui/keyboardInset.ts	toastSpot	function
