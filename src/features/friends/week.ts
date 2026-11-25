@@ -160,9 +160,9 @@ export function outcomeMessage(outcome: string, name?: string): { title: string;
   }
 }
 
-/** The sentence under the invite code: what friends see, and what they never see. */
+/** The sentence under the invite code: what friends see, a meal only when shown, and what they never see. */
 export function sharingSentence(sharing: { workouts: boolean; streak: boolean; minutes: boolean }): string {
   const parts = [sharing.minutes ? 'minutes and sessions' : null, sharing.streak ? 'streak' : null, sharing.workouts ? 'workouts' : null].filter(Boolean) as string[];
-  const seen = parts.length === 0 ? 'only your name' : parts.length === 1 ? `your ${parts[0]}` : `your ${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
-  return `Friends see ${seen}. Never calories, weight or food.`;
+  const seen = parts.length === 0 ? 'your name' : parts.length === 1 ? `your ${parts[0]}` : `your ${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+  return `Friends see ${seen}, and a meal when you show one. Never your weight or your day’s total.`;
 }

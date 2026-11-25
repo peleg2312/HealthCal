@@ -9,6 +9,7 @@ import { Trash2 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 
+import { balancedLines } from '@/features/food/chipLines';
 import { RowEmoji } from '@/features/food/components';
 import { displayFoodName } from '@/features/food/displayName';
 import { approxKcal, approxKcalSpoken, hasEstimate } from '@/features/food/favoriteWords';
@@ -78,35 +79,41 @@ export default function JournalScreen() {
         days.map((day) => (
           <View key={day.date} testID={`journal-day-${day.date}`} style={{ gap: spacing.sm }}>
             <SectionTitle title={dayTitle(day.date)} testID={`journal-day-title-${day.date}`} />
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAP }} {...LIST}>
-              {day.photos.map((p) => {
-                const list = entriesOf(p, entries);
-                const estimate = hasEstimate(list);
-                const total = kcalOf(list);
-                const names = list.map((e) => displayFoodName(e));
-                const index = n++;
-                return (
-                  <View key={p.id} style={{ width: tile }} {...LIST_ITEM}>
-                    <PressableScale
-                      testID={`journal-photo-${index}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${photoTileLabel(p, dayTitle(p.date), names)}, ${approxKcalSpoken(total, estimate)}. Open`}
-                      onPress={() => setOpenId(p.id)}
-                      scaleTo={0.97}
-                      style={{ gap: 6 }}>
-                      <MealPhotoImage id={p.id} style={{ width: tile, height: tile, ...cup(radius.tile, 5), borderWidth: 1, borderColor: colors.border }} />
-                      <View>
-                        <Text variant="label" numberOfLines={big ? undefined : 1}>
-                          {photoMealLabel(p)}
-                        </Text>
-                        <Text variant="caption" color="textSecondary" numberOfLines={big ? undefined : 1}>
-                          {`${approxKcal(total, estimate)} kcal`}
-                        </Text>
+            <View style={{ gap: GAP }} {...LIST}>
+              {/* Rows of the same tile width, balanced so no photo is left alone on a last row (4 are 2 and 2). */}
+              {balancedLines(day.photos.map(() => tile), content, GAP).map((row, r) => (
+                <View key={r} style={{ flexDirection: 'row', gap: GAP }}>
+                  {row.map((i) => {
+                    const p = day.photos[i];
+                    const list = entriesOf(p, entries);
+                    const estimate = hasEstimate(list);
+                    const total = kcalOf(list);
+                    const names = list.map((e) => displayFoodName(e));
+                    const index = n++;
+                    return (
+                      <View key={p.id} style={{ width: tile }} {...LIST_ITEM}>
+                        <PressableScale
+                          testID={`journal-photo-${index}`}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${photoTileLabel(p, dayTitle(p.date), names)}, ${approxKcalSpoken(total, estimate)}. Open`}
+                          onPress={() => setOpenId(p.id)}
+                          scaleTo={0.97}
+                          style={{ gap: 6 }}>
+                          <MealPhotoImage id={p.id} style={{ width: tile, height: tile, ...cup(radius.tile, 5), borderWidth: 1, borderColor: colors.border }} />
+                          <View>
+                            <Text variant="label" numberOfLines={big ? undefined : 1}>
+                              {photoMealLabel(p)}
+                            </Text>
+                            <Text variant="caption" color="textSecondary" numberOfLines={big ? undefined : 1}>
+                              {`${approxKcal(total, estimate)} kcal`}
+                            </Text>
+                          </View>
+                        </PressableScale>
                       </View>
-                    </PressableScale>
-                  </View>
-                );
-              })}
+                    );
+                  })}
+                </View>
+              ))}
             </View>
           </View>
         ))
@@ -142,25 +149,23 @@ export default function JournalScreen() {
         title={open ? `${photoMealLabel(open)} · ${dayTitle(open.date)}` : undefined}
         footer={
           open ? (
-            <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
+            <View style={{ gap: 10 }}>
+              <Button
+                testID="journal-open-day"
+                title={JOURNAL_WORDS.openDay}
+                onPress={() => {
+                  setOpenId(null);
+                  router.push(`/diary?date=${open.date}&meal=${open.meal}` as never);
+                }}
+              />
               <Button
                 testID="journal-delete"
                 variant="secondary"
                 title={JOURNAL_WORDS.deleteOne}
                 icon={<Trash2 size={18} color={colors.text} />}
-                style={{ flexGrow: 1, flexBasis: 140 }}
                 onPress={() => {
                   setOpenId(null);
                   deletePhoto(open.id);
-                }}
-              />
-              <Button
-                testID="journal-open-day"
-                title={JOURNAL_WORDS.openDay}
-                style={{ flexGrow: 1, flexBasis: 140 }}
-                onPress={() => {
-                  setOpenId(null);
-                  router.push(`/diary?date=${open.date}&meal=${open.meal}` as never);
                 }}
               />
             </View>

@@ -10,6 +10,8 @@ import { columnCentre, gridGeometry, rowPrims, type GridGeometry } from './grid'
 import type { CupRow, PeriodKind } from './period';
 
 const WEEKDAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+/** A year's month names and a month's weekday letters: 11 px on a 14 px line at the designed size. */
+const LABEL_LINE = 14;
 /** Rows pour one after another, the last landing within the routine 600 ms. */
 const STAGGER: Record<PeriodKind, number> = { month: 24, year: 12 };
 
@@ -19,7 +21,7 @@ const STAGGER: Record<PeriodKind, number> = { month: 24, year: 12 };
  * level; amber caps and checks appear as the pour lands. `memoryKey` keeps it poured for the session, and under
  * reduced motion it is drawn at once (`usePour`).
  */
-function PourRow({ g, row, index, kind, memoryKey }: { g: GridGeometry; row: CupRow; index: number; kind: PeriodKind; memoryKey: string }) {
+function PourRow({ g, row, index, kind, memoryKey, line }: { g: GridGeometry; row: CupRow; index: number; kind: PeriodKind; memoryKey: string; line: number }) {
   const { colors } = useTheme();
   const pour = usePour(1, { duration: motion.duration.pourSmall, delay: index * STAGGER[kind], memoryKey: `${memoryKey}-${row.key}`, settle: 0 });
   // A row that mounts already poured (remembered) shows its marks at once too.
@@ -33,8 +35,9 @@ function PourRow({ g, row, index, kind, memoryKey }: { g: GridGeometry; row: Cup
   return (
     <View style={{ width: g.width, height: g.rowH }}>
       {g.labelW ? (
-        <View style={{ position: 'absolute', left: 0, top: g.top, width: g.labelW - 4, height: g.cupH, justifyContent: 'center' }}>
-          <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ fontSize: 11, lineHeight: 14 }}>
+        // Centred on the cups, as tall as its line (rows are never closer than it, `minPitch`).
+        <View style={{ position: 'absolute', left: 0, top: g.top + g.cupH / 2 - line / 2, width: g.labelW - 4, height: line, justifyContent: 'center' }}>
+          <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ fontSize: 11, lineHeight: LABEL_LINE }}>
             {row.label}
           </Text>
         </View>
@@ -68,7 +71,7 @@ export function CupGrid({ kind, rows, memoryKey, accessibilityLabel, testID }: {
   // A year's month names keep their room as text grows, so "Sep" is never cut.
   const growth = useTextGrowth();
   const grow = Math.min(2, Math.max(1, growth));
-  const g = gridGeometry(kind, rows.length, w, { labelW: Math.ceil(30 * grow), headerH: Math.ceil(18 * grow) });
+  const g = gridGeometry(kind, rows.length, w, { labelW: Math.ceil(30 * grow), headerH: Math.ceil(18 * grow), minPitch: Math.ceil(LABEL_LINE * grow) + 2 });
   return (
     <View
       testID={testID}
@@ -82,7 +85,7 @@ export function CupGrid({ kind, rows, memoryKey, accessibilityLabel, testID }: {
         {kind === 'month' ? (
           <View style={{ height: g.headerH, width: g.width }}>
             {WEEKDAY_LETTERS.map((l, i) => (
-              <Text key={i} variant="caption" color="textSecondary" align="center" style={{ position: 'absolute', top: 0, left: columnCentre(g, i) - g.slot / 2, width: g.slot, fontSize: 11, lineHeight: 14 }}>
+              <Text key={i} variant="caption" color="textSecondary" align="center" style={{ position: 'absolute', top: 0, left: columnCentre(g, i) - g.slot / 2, width: g.slot, fontSize: 11, lineHeight: LABEL_LINE }}>
                 {l}
               </Text>
             ))}
@@ -90,7 +93,7 @@ export function CupGrid({ kind, rows, memoryKey, accessibilityLabel, testID }: {
         ) : null}
         <View style={{ gap: g.rowGap }}>
           {rows.map((row, i) => (
-            <PourRow key={row.key} g={g} row={row} index={i} kind={kind} memoryKey={memoryKey} />
+            <PourRow key={row.key} g={g} row={row} index={i} kind={kind} memoryKey={memoryKey} line={Math.ceil(LABEL_LINE * grow)} />
           ))}
         </View>
       </View>

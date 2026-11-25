@@ -199,12 +199,14 @@ describe('both documents', () => {
         ],
       },
       yours: {
-        says: [/export everything you log or delete it at any time/, /the coach chat stays on this phone/],
+        says: [/export everything you log or delete it at any time/, /the coach chat and meal photos stay on this phone/],
         held: [
           ['short', /export everything you log or delete it at any time/],
           ['export', /exports everything you logged as a file you keep/],
           ['export', /removes your account and everything stored with it/],
           ['coach', /The chat itself is kept on this phone and is not in the export/],
+          ['ai-estimate', /a small copy of the photo is kept on this phone .* never uploaded, synced or put in the export/],
+          ['export', /The coach chat and meal photos stay on the phone and are not in the file/],
         ],
       },
     },

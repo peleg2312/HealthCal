@@ -153,24 +153,24 @@ function WeightScreen() {
             </View>
             {/* Press and hold (or drag) on the chart, or its arrow keys on the web: the figures above read that day. */}
             <View testID="weight-chart">
-            <LineChart
-              key={range}
-              accessibilityLabel={weightChartLabel(series.trend, range, end, units, target)}
-              line={chart.line}
-              dots={chart.dots}
-              ringDots
-              color={colors.weight}
-              goal={target ? weightValue(target, units) : undefined}
-              height={200}
-              xLabels={chart.labels}
-              formatY={(n) => (Number.isInteger(n) ? String(n) : n.toFixed(1))}
-              formatPoint={(p) => heldDayWords(dayAt(p.x)?.date ?? end, end)}
-              pointSpoken={(p) => {
-                const day = dayAt(p.x);
-                return day ? heldReadout(day, end, units).spoken : '';
-              }}
-              onActiveChange={setHeld}
-            />
+              <LineChart
+                key={range}
+                accessibilityLabel={weightChartLabel(series.trend, range, end, units, target)}
+                line={chart.line}
+                dots={chart.dots}
+                ringDots
+                color={colors.weight}
+                goal={target ? weightValue(target, units) : undefined}
+                height={200}
+                xLabels={chart.labels}
+                formatY={(n) => (Number.isInteger(n) ? String(n) : n.toFixed(1))}
+                formatPoint={(p) => heldDayWords(dayAt(p.x)?.date ?? end, end)}
+                pointSpoken={(p) => {
+                  const day = dayAt(p.x);
+                  return day ? heldReadout(day, end, units).spoken : '';
+                }}
+                onActiveChange={setHeld}
+              />
             </View>
             {/* The range, under the chart where the thumb is; the figures under it follow it. */}
             <RangeChips

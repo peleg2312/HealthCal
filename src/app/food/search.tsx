@@ -211,14 +211,19 @@ export default function FoodSearchScreen() {
     else node.setSelection?.(0, query.length);
   };
   const quickAdd = (food: Food) => {
+    const p = portionFor(food, lastMap);
+    logFood({ food, serving: p.serving, quantity: p.quantity, meal, date });
+  };
+  // A press handler's one-tap add, then the focus back in the field when `refocusAfterAdd` says so (read before the
+  // add: the "+" it was on leaves with it).
+  const addThenRefocus = (log: () => void) => {
     const back = refocusAfterAdd({
       typed: q.length > 0,
       fieldFocused: fieldFocus.current.focused,
-      blurredMsAgo: Date.now() - fieldFocus.current.blurredAt,
+      blurredMsAgo: msSince(fieldFocus.current.blurredAt),
       byKeyboard: pressedWithKeyboard(),
     });
-    const p = portionFor(food, lastMap);
-    logFood({ food, serving: p.serving, quantity: p.quantity, meal, date });
+    log();
     if (back) focusSearchWords();
   };
   const go = (path: string, extra: Record<string, string> = {}) => router.push(href(path, { meal, date, ...extra }) as never);
@@ -236,7 +241,7 @@ export default function FoodSearchScreen() {
         // A food added on this visit opens its entry (Edit entry), so changing or moving what was just logged is
         // the row, the meal and done; any other row opens a new food detail.
         onPress={() => (e ? router.push(href('/food/detail', { entryId: e.id, meal: e.meal, date: e.date }) as never) : open(food))}
-        onQuickAdd={() => quickAdd(food)}
+        onQuickAdd={() => addThenRefocus(() => quickAdd(food))}
         // Press and hold stars it (or unstars it), with a toast and Undo; the row does not open. The empty
         // Favourites tab's tip about it is then learnt (./holdHint).
         onLongPress={() => {
@@ -322,6 +327,9 @@ export default function FoodSearchScreen() {
   // stays in place as a tick, so a quick second tap neither logs it twice nor lands on Done above it.
   const top = q && local.length > 0 && localQ === q ? local[0].food : null;
   const oneTap = useOneTap();
+  const addTop = oneTap(() => {
+    if (top) quickAdd(top);
+  });
   const topAdded = top ? addedByFood.get(top.id) : undefined;
   const topPortion = top ? portionFor(top, lastMap) : null;
   const topBar =
@@ -333,7 +341,7 @@ export default function FoodSearchScreen() {
         // What it shows first, as drawn ("Add Chicken breast, 227 kcal"; WCAG 2.5.3, label in name), then the whole
         // name where the button shows its head, the portion, the source in words and the meal.
         spoken={`Add ${foodNameHead(displayFoodName(top))}, ${kcal(portionKcal(top, topPortion))} kcal: ${foodNameHead(displayFoodName(top)) === displayFoodName(top) ? '' : `${displayFoodName(top)}, `}${portionLabel(topPortion.serving.label, topPortion.quantity)}, ${sourceInfo(sourceKindOf(top)).label}, to ${MEAL_LABEL[meal].toLowerCase()}`}
-        onPress={oneTap(() => quickAdd(top))}
+        onPress={() => addThenRefocus(addTop)}
       />
     ) : null;
   // Once something is added: the running count and Done, above the best match's Add (so that one never moves).
@@ -653,6 +661,11 @@ export default function FoodSearchScreen() {
       </Sheet>
     </Screen>
   );
+}
+
+/** Milliseconds since `at` (a press handler's clock; never read while rendering). */
+function msSince(at: number): number {
+  return Date.now() - at;
 }
 
 /**

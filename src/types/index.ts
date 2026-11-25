@@ -461,3 +461,97 @@ export interface AiFoodResult {
   model: string;
   demo?: boolean;
 }
+
+// ------------------------------------------------- friends: meals shown
+// Not synced records: they live on the server behind functions
+// (supabase/migrations/20261201000000_friends_meals.sql) and are read through
+// @/services/friends. The wire format is cleaned by @/services/friendsWire.
+
+/** Where a shown food's numbers come from: the app's source kinds (`SourceKind` in @/features/food/helpers). */
+export type SharedFoodSource = FoodSource | 'typical';
+
+/**
+ * One food of a meal shown to friends, exactly as they receive it. Nothing else is ever
+ * part of it: no macros, notes, record ids, times, nor the day's total or budget.
+ */
+export interface SharedMealItem {
+  /** The food's name as logged (at most 60 characters); a friend's phone draws it with displayFoodName. */
+  name: string;
+  emoji?: string;
+  /** The portion as the sharer's phone wrote it, e.g. "1 breast · 172 g" (at most 40 characters). */
+  portion: string;
+  source: SharedFoodSource;
+  /** A bundled food's id (b_...), only for bundled sources, so a friend can log the same food. */
+  foodId?: string;
+  /** A scanned product's barcode (6 to 14 digits). */
+  barcode?: string;
+  /** The entry's serving label, quantity and grams, for "Add to my diary". */
+  serving?: string;
+  quantity?: number;
+  grams?: number;
+  /** Only when the sharer switched calories on for this meal: whole kcal, and an estimate's range. */
+  kcal?: number;
+  kcalLow?: number;
+  kcalHigh?: number;
+}
+
+/** A meal shown to friends: one meal of one day. `ref` is opaque (made by the server), never a record id. */
+export interface SharedMeal {
+  ref: string;
+  /** The day in the sharer's calendar. */
+  day: ISODate;
+  meal: MealType;
+  items: SharedMealItem[];
+  showKcal: boolean;
+}
+
+/** A friend as the Friends screens name them. */
+export interface FriendPerson {
+  userId: string;
+  displayName: string;
+  avatar: string;
+}
+
+/** One of the user's own meals showing now. */
+export interface MySharedMeal extends SharedMeal {
+  shownAt: ISODateTime;
+  /** It leaves by itself then: 7 days after it was first shown. */
+  expiresAt: ISODateTime;
+  /** The friends it is shown to (current friends only). */
+  viewers: FriendPerson[];
+  /** How many friends cheered it. */
+  cheers: number;
+}
+
+/** A friend's meal in the feed. Never who else sees it, who else cheered it, or when it was shown. */
+export interface FeedMeal extends SharedMeal, FriendPerson {
+  kind: 'meal';
+  /** Whether this user cheered it. */
+  cheered: boolean;
+}
+
+/** A friend's shared workout in the feed (the same data as their week summary). */
+export interface FeedWorkout extends FriendPerson {
+  kind: 'workout';
+  /** The workout's opaque reference, as cheers carry it. */
+  ref: string;
+  day: ISODate;
+  name: string;
+  emoji: string;
+  minutes: number;
+  distanceKm?: number;
+  cheered: boolean;
+}
+
+/** What friends chose to show this user, newest first. */
+export type FeedItem = FeedMeal | FeedWorkout;
+
+/** The user's meal settings, kept on the server with their friends card. */
+export interface MealSettings {
+  /** Meal types shown by themselves as they are logged ("Always show these meals"); none by default. */
+  auto: MealType[];
+  /** Calories shown with meals by default (off by default). */
+  kcal: boolean;
+  /** Friends' meals in my feed (on by default). */
+  see: boolean;
+}

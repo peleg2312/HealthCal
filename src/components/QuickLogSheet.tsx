@@ -435,15 +435,18 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   );
 
   // The four small ways in: an icon over one word, the AI's two with its tag. Each is a quarter of the row. With text grown
-  // the AI's tag sits beside its glyph rather than in the tile's corner (a grown tag would run into the glyph), and where
-  // the longest word, measured as drawn, is wider than a quarter less its padding and edges the tiles go two a row, each
-  // its icon beside its word, so the row grows by one short line only.
-  const waysTwoUp = grown && !fitsRoom(wayWordW, waysW ? (waysW - 3 * spacing.sm) / 4 - 2 * WAY_PAD - 2 : 0);
+  // the AI's tag sits beside its glyph rather than in the tile's corner (a grown tag would run into the glyph); where the
+  // longest word, measured as drawn, is wider than a quarter less its padding and edges, the four stand 4 apart with no
+  // side padding (`waysTight`), and where it is wider still the tiles go two a row, each its icon beside its word, so the
+  // row grows by one short line only.
+  const quarter = (gap: number, pad: number) => (waysW ? (waysW - 3 * gap) / 4 - 2 * pad - 2 : 0);
+  const waysTight = grown && !fitsRoom(wayWordW, quarter(spacing.sm, WAY_PAD));
+  const waysTwoUp = waysTight && !fitsRoom(wayWordW, quarter(spacing.xs, 0));
   const waysRow = (
     <View
       // Always observed: react-native-web watches a view's layout only when it mounts with a handler.
       onLayout={(e) => setWaysW(Math.floor(e.nativeEvent.layout.width))}
-      style={waysTwoUp ? { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm } : { flexDirection: 'row', gap: spacing.sm }}
+      style={waysTwoUp ? { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm } : { flexDirection: 'row', gap: waysTight ? spacing.xs : spacing.sm }}
       testID="quick-ways">
       {grown ? (
         <MeasureWidth onWidth={setWayWordW}>
@@ -480,7 +483,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
             // The drawn word first (label in name), then what the hint said before it was left off the screen.
             accessibilityLabel={QUICK_WAYS[id].spoken}
             scaleTo={0.96}
-            style={[tile, { flex: 1, minWidth: 0, minHeight: narrow ? 56 : 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: narrow ? 8 : 10, paddingBottom: narrow ? 6 : 8, paddingHorizontal: WAY_PAD }]}>
+            style={[tile, { flex: 1, minWidth: 0, minHeight: narrow ? 56 : 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: narrow ? 8 : 10, paddingBottom: narrow ? 6 : 8, paddingHorizontal: waysTight ? 0 : WAY_PAD }]}>
             {grown && ways[id].glyph ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 {wayIcon(id, narrow ? 20 : 22)}

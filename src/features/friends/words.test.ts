@@ -1,0 +1,76 @@
+/**
+ * No shame and no comparison (principle 4): every fixed string of the Friends screens about meals, the feed
+ * and privacy, and every line their functions build over a grid of inputs, passes the coach's banned list
+ * (src/features/coach/words.test.ts, the morning page's list), the food words that judge, and the words
+ * that rank or compare people; none has an exclamation mark, and each starts with a capital.
+ */
+import { describe, expect, it } from 'vitest';
+
+import type { MealType } from '@/types';
+
+import * as W from './words';
+
+// The coach's list, word for word (src/features/coach/words.test.ts).
+const BANNED =
+  /\b(bad|fail|failed|failure|cheat|cheated|should|guilty|lazy|great|amazing|well done|keep it up|too much|missed your|goal missed|over budget|make up|only|unfortunately|oops|sorry)\b/i;
+// Food words that judge, and words that rank people or set them side by side.
+const JUDGING = /\b(junk|clean eating|clean food|good food|healthy|unhealthy|naughty|sinful|guilt|treat yourself|indulg\w*|binge|diet)\b/i;
+const COMPARING = /\b(more than|less than|fewer than|than you|than your|better|worse|best|worst|rank\w*|leader\w*|top|ahead|behind|beat|beats|winner|win|wins|compare\w*|versus|vs)\b/i;
+
+const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+const TODAY = '2026-11-25';
+const NAMES = [[], ['Maya'], ['Maya', 'Sam'], ['Maya', 'Sam', 'Jo'], ['Maya', 'Sam', 'Jo', 'Li', 'Dana']];
+
+function strings(): string[] {
+  const out: string[] = [];
+  for (const v of Object.values(W)) if (typeof v === 'string') out.push(v);
+  for (const m of MEALS) {
+    out.push(W.mealChip(m), W.friendMealTitle('Maya', m), W.showTitle(m), W.stoppedToast(m), W.addFrom('Maya', m), W.addButton(0, m, 0), W.addButton(1, m, 75), W.addButton(3, m, 1240));
+    for (const day of [TODAY, '2026-11-24', '2026-11-22', '2026-11-12']) {
+      out.push(W.mealMeta(m, day, TODAY, 1), W.mealMeta(m, day, TODAY, 3), W.myMealTitle(m, day, TODAY));
+      // A cheer's target is the end of a sentence ("Maya: your lunch"), so it starts in lower case.
+      out.push(`Maya: ${W.mealCheerTarget({ day, meal: m }, TODAY)}`);
+    }
+    for (const n of NAMES) out.push(W.shownToast(m, n));
+  }
+  for (const n of NAMES) out.push(W.showButton(n), W.shownTo(n), W.audienceLine(n), W.myMealLine(n, 0, 6), W.myMealLine(n, 3, 1), W.aboutYouLine({ workouts: true, streak: true, minutes: true }, n.length, n, true));
+  out.push(W.aboutYouLine({ workouts: false, streak: false, minutes: false }, 0, [], false), W.aboutYouLine({ workouts: true, streak: false, minutes: false }, 0, [], true));
+  out.push(W.showLine(TODAY, TODAY, 3), W.cheersTitle(1), W.cheersTitle(4), `Maya: ${W.mealCheerTarget(undefined, TODAY)}`);
+  out.push(W.cheersSummary([{ displayName: 'Maya', ref: 'a' }, { displayName: 'Sam', ref: 'a' }, { displayName: 'Jo', ref: 'b' }], (c) => (c.ref === 'a' ? 'your lunch' : 'your run')));
+  for (const auto of [[], ['lunch'], ['breakfast', 'dinner'], MEALS] as MealType[][]) out.push(W.autoLine(auto));
+  out.push(W.friendsSince('Nov 2'), W.friendsSince(null), W.mealsTheyShow('Maya'), W.seesMyMealsTitle('Maya'), W.seesMyMealsLine('Maya'), W.theirMealsTitle('Maya'), W.removeNote('Maya'), W.addNote('Maya'));
+  out.push(W.itemCaption({ portion: '1 bowl', kcal: 310, source: 'builtin' }, true), W.itemCaption({ portion: '1 bowl', kcal: 310, kcalLow: 250, source: 'ai' }, true), W.itemCaption({ portion: '1 bowl', source: 'builtin' }, false));
+  out.push(W.friendSourceLabel('custom', 'Maya', 'Your food'), W.friendSourceLabel('builtin', 'Maya', 'Reference data'));
+  return out;
+}
+
+describe('the Friends words', () => {
+  it('pass the banned lists, with no exclamation mark, in sentence case', () => {
+    const all = strings();
+    expect(all.length).toBeGreaterThan(150);
+    const bad = all.filter((s) => !s || BANNED.test(s) || JUDGING.test(s) || COMPARING.test(s) || s.includes('!') || !/^[A-Z0-9~⁨]/.test(s));
+    expect(bad).toEqual([]);
+  });
+
+  it('say "show" for friends, never "share", which is the picture sent through the share sheet', () => {
+    expect(strings().filter((s) => /\bshar(e|es|ing)\b/i.test(s) && !/Never shared/.test(s))).toEqual([]);
+  });
+
+  it('never name a figure that could be compared: no total, no budget left or over', () => {
+    expect(strings().filter((s) => /\b(left|over|under|remaining)\b/i.test(s) && !/left out|18 and over/.test(s))).toEqual([]);
+  });
+
+  it('name people in words, with a short form past three', () => {
+    expect(W.namesLine(['Maya'])).toBe('Maya');
+    expect(W.showButton(['Maya', 'Sam'])).toContain('Maya');
+    expect(W.showButton(['a', 'b', 'c'])).toBe('Show to 3 friends');
+    expect(W.namesLine(['A', 'B', 'C', 'D', 'E'])).toMatch(/and 3 more$/);
+  });
+
+  it('count days left from the clock, never below zero', () => {
+    const now = Date.parse('2026-11-25T12:00:00Z');
+    expect(W.daysLeft('2026-11-29T12:00:00Z', now)).toBe(4);
+    expect(W.daysLeft('2026-11-25T13:00:00Z', now)).toBe(1);
+    expect(W.daysLeft('2026-11-20T12:00:00Z', now)).toBe(0);
+  });
+});

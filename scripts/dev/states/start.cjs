@@ -178,6 +178,32 @@ const weeks = [
   { id: 'consistency-edit-sheet', route: '/consistency', taps: ['consistency-rhythm-edit'], sheet: true, note: 'weekly rhythm goals' },
 ];
 
+// ------------------------------------------------------------------ months and years in cups (src/features/recap)
+// The seed's five weeks start in last month, so /recap/month (the last month that has ended) is a part-logged month.
+// The one-time line on Progress needs a clock on the 2nd of next month (or December 28) and its test-hook flag.
+const nextMonthDay = (day, hour = 10) => {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth() + 1, day, hour, 0).getTime();
+};
+const yearEnd = (() => {
+  const d = new Date();
+  return new Date(d.getFullYear(), 11, 28, 10, 0).getTime();
+})();
+const periods = [
+  { id: 'recap-month', route: '/recap/month', waitFor: 'recap-period-grid', note: 'the last month that has ended: part-logged (the demo starts in it)' },
+  { id: 'recap-month-now', route: '/recap/month?month={day}', day: 0, waitFor: 'recap-period-grid', note: 'this month so far (a day key is read as its month)' },
+  { id: 'recap-year', route: '/recap/year', waitFor: 'recap-period-grid', note: 'this year so far: two rows of cups' },
+  { id: 'recap-year-stress', route: '/recap/year', data: 'stress', imperial: true, waitFor: 'recap-period-grid', note: 'a whole year of cups (the 412-day streak), long food names, in lb and fl oz' },
+  { id: 'recap-month-stress', route: '/recap/month', data: 'stress', waitFor: 'recap-period-grid', note: 'a whole month logged, long names' },
+  { id: 'recap-month-empty', route: '/recap/month', data: 'empty', waitFor: 'recap-period-empty', note: 'nothing logged: the empty state and its action' },
+  { id: 'recap-month-help', route: '/recap/month', taps: ['recap-period-help'], sheet: true, note: 'how to read the cups' },
+  { id: 'recap-month-share', route: '/recap/month', taps: ['recap-period-share'], sheet: true, note: 'the month\'s share card' },
+  { id: 'recap-year-share', route: '/recap/year', data: 'stress', taps: ['recap-period-share', 'share-choice-kcal', 'share-choice-foods'], sheet: true, note: 'the year\'s share card with calorie figures and food names' },
+  { id: 'progress-periods', route: '/progress', taps: [{ wait: 600 }], waitFor: 'progress-periods', note: 'Progress\'s "Months and years in cups" card' },
+  { id: 'progress-period-offer', route: '/progress', now: nextMonthDay(2), flags: { __healthcalPeriodOffer: true }, waitFor: 'progress-period-offer', note: 'the one-time line on the 2nd of a month: "Your <month> in cups"' },
+  { id: 'progress-year-offer', route: '/progress', now: yearEnd, flags: { __healthcalPeriodOffer: true }, waitFor: 'progress-period-offer', note: 'the one-time line in the last days of December: "Your <year> in cups"' },
+];
+
 // ------------------------------------------------------------------ accounts (a build with a backend)
 // Only listed when the run is given --backend (a build made with EXPO_PUBLIC_SUPABASE_URL set and
 // scripts/dev/mock-backend.cjs serving it), so a run against a build without accounts (every
@@ -214,4 +240,4 @@ const backend = [
   { id: 'profile-signed-out', route: '/profile', data: 'stress', waitFor: 'profile-account', note: 'profile with the account row, signed out' },
 ];
 
-module.exports = [...firstRun, ...(crawling ? [] : pictures), ...onboarding, ...settings, ...progress, ...weeks, ...(process.argv.includes('--backend') ? backend : [])];
+module.exports = [...firstRun, ...(crawling ? [] : pictures), ...onboarding, ...settings, ...progress, ...weeks, ...periods, ...(process.argv.includes('--backend') ? backend : [])];

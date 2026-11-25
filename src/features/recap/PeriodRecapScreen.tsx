@@ -1,4 +1,4 @@
-import { Calendar, Info } from 'lucide-react-native';
+import { Info } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
@@ -8,7 +8,7 @@ import { go } from '@/features/progress/parts';
 import { SharePeriodButton } from '@/features/share';
 import { formatNumber, weightValue } from '@/lib/units';
 import { useLargeText, useTheme } from '@/theme';
-import { AnimatedNumber, Card, CupKey, decorative, DECORATIVE, Divider, EmptyState, FadeUp, figure, Header, IconButton, ListRow, Screen, Sheet, Sparkline, Text } from '@/ui';
+import { AnimatedNumber, Card, CupKey, DECORATIVE, Divider, EmptyState, FadeUp, figure, Header, IconButton, ListRow, MiniCup, Screen, Sheet, Sparkline, Text } from '@/ui';
 
 import { CupGrid } from './CupGrid';
 import { markPeriodDealt, OFFER_YEAR_FROM } from './offer';
@@ -21,6 +21,7 @@ import {
   emptyWords,
   gridLabel,
   helpParagraphs,
+  lastTwo,
   monthRowWords,
   periodName,
   periodSubtitle,
@@ -123,7 +124,7 @@ export function PeriodRecapScreen({ kind, param }: { kind: PeriodKind; param: un
               </Text>
               {d.verdict.note ? (
                 <Text variant="caption" color="textSecondary">
-                  {d.verdict.note}
+                  {lastTwo(d.verdict.note)}
                 </Text>
               ) : null}
             </View>
@@ -172,12 +173,15 @@ export function PeriodRecapScreen({ kind, param }: { kind: PeriodKind; param: un
                   return (
                     <View key={f.key} testID={`recap-period-food-${i}`} {...figure(`${name}, logged on ${f.days} days`)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                       {f.emoji ? <Text style={{ fontSize: 17, lineHeight: 22 }}>{f.emoji}</Text> : null}
-                      <Text variant={i === 0 ? 'bodyStrong' : 'body'} numberOfLines={2} style={{ flex: 1, minWidth: 0 }}>
-                        {name}
-                      </Text>
-                      <Text variant="label" color="textSecondary" style={{ flexShrink: 0 }}>
-                        {`${formatNumber(f.days)} days`}
-                      </Text>
+                      {/* With large text the count takes a line of its own under the name, so no word of a name is split. */}
+                      <View style={{ flex: 1, minWidth: 0, flexDirection: large ? 'column' : 'row', alignItems: large ? 'flex-start' : 'center', gap: large ? 0 : spacing.md }}>
+                        <Text variant={i === 0 ? 'bodyStrong' : 'body'} numberOfLines={large ? 3 : 2} style={large ? undefined : { flex: 1, minWidth: 0 }}>
+                          {name}
+                        </Text>
+                        <Text variant="label" color="textSecondary" style={{ flexShrink: 0 }}>
+                          {`${formatNumber(f.days)} days`}
+                        </Text>
+                      </View>
                     </View>
                   );
                 })}
@@ -210,27 +214,28 @@ export function PeriodRecapScreen({ kind, param }: { kind: PeriodKind; param: un
 function MoreInCups({ d }: { d: ReturnType<typeof usePeriodRecap> }) {
   const { colors, spacing } = useTheme();
   const { period: p, today } = d;
-  const icon = decorative(<Calendar size={18} color={colors.textSecondary} strokeWidth={1.9} />);
-  const rows: { key: string; title: string; caption: string; route: string; testID: string }[] = [];
+  const rows: { key: string; title: string; caption: string; route: string; testID: string; share: number }[] = [];
   if (p.kind === 'month') {
-    const year = p.key.slice(0, 4);
-    const yearLogged = d.otherMonths.filter((m) => m.month.startsWith(year)).reduce((s, m) => s + m.logged, d.tally.logged);
-    const yw = yearRowWords(year, yearLogged, today);
-    rows.push({ key: year, title: `Your ${yw.title}`, caption: yw.caption, route: `/recap/year?year=${year}`, testID: `recap-period-year-${year}` });
+    const year = d.years.find((y) => y.year === p.key.slice(0, 4));
+    if (year) {
+      const yw = yearRowWords(year.year, year.logged, today);
+      rows.push({ key: year.year, title: `Your ${yw.title}`, caption: yw.caption, route: `/recap/year?year=${year.year}`, testID: `recap-period-year-${year.year}`, share: year.elapsed ? year.logged / year.elapsed : 0 });
+    }
     for (const m of d.otherMonths) {
       const mw = monthRowWords(m.month, m.logged, m.elapsed, today);
-      rows.push({ key: m.month, title: mw.title, caption: mw.caption, route: `/recap/month?month=${m.month}`, testID: `recap-period-month-${m.month}` });
+      rows.push({ key: m.month, title: mw.title, caption: mw.caption, route: `/recap/month?month=${m.month}`, testID: `recap-period-month-${m.month}`, share: m.elapsed ? m.logged / m.elapsed : 0 });
     }
   } else {
     for (const m of d.months) {
       const mw = monthRowWords(m.month, m.logged, m.elapsed, today);
-      rows.push({ key: m.month, title: mw.title, caption: mw.caption, route: `/recap/month?month=${m.month}`, testID: `recap-period-month-${m.month}` });
+      rows.push({ key: m.month, title: mw.title, caption: mw.caption, route: `/recap/month?month=${m.month}`, testID: `recap-period-month-${m.month}`, share: m.elapsed ? m.logged / m.elapsed : 0 });
     }
-    for (const y of d.years.filter((y) => y !== p.key)) {
-      rows.push({ key: y, title: `Your ${y}`, caption: 'The year in cups', route: `/recap/year?year=${y}`, testID: `recap-period-year-${y}` });
+    for (const y of d.years.filter((y) => y.year !== p.key)) {
+      const yw = yearRowWords(y.year, y.logged, today);
+      rows.push({ key: y.year, title: `Your ${yw.title}`, caption: yw.caption, route: `/recap/year?year=${y.year}`, testID: `recap-period-year-${y.year}`, share: y.elapsed ? y.logged / y.elapsed : 0 });
     }
   }
-  if (!rows.length) return null;
+  if (!rows.length || !d.firstDate) return null;
   return (
     <FadeUp index={3}>
       <Card testID="recap-period-more" style={{ gap: spacing.xs }}>
@@ -240,7 +245,15 @@ function MoreInCups({ d }: { d: ReturnType<typeof usePeriodRecap> }) {
         {rows.map((r, i) => (
           <React.Fragment key={r.key}>
             {i ? <Divider /> : null}
-            <ListRow testID={r.testID} title={r.title} subtitle={r.caption} left={icon} chevron onPress={() => go(r.route)} />
+            <ListRow
+              testID={r.testID}
+              title={r.title}
+              subtitle={r.caption}
+              // A small cup filled to the share of its days with food logged: the recap's own picture, in little.
+              left={<MiniCup progress={r.share} color={colors.calories} width={18} height={22} animate={false} />}
+              chevron
+              onPress={() => go(r.route)}
+            />
           </React.Fragment>
         ))}
       </Card>

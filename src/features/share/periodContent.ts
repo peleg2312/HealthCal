@@ -73,13 +73,12 @@ export function periodCardContent(input: SharePeriodInput, choices: ShareChoices
   if (choices.kcal && input.avgKcal !== null) stats.push({ key: 'kcal', value: formatNumber(Math.round(input.avgKcal)), unit: 'kcal', label: 'a day on full days' });
   if (choices.water && input.water.totalMl > 0) {
     const v = totalVolume(input.water.totalMl, input.units);
-    const w = input.water;
     stats.push({
       key: 'water',
       value: v.value,
       unit: v.unit,
-      label: w.daysTracked ? `water, goal reached on ${w.daysReached} of ${w.daysTracked} ${plural(w.daysTracked, 'day')}` : 'water',
-      progress: w.daysTracked ? w.daysReached / w.daysTracked : undefined,
+      // The litres alone: a card's column is too narrow for the days the goal was reached, which the screen says.
+      label: 'of water',
     });
   }
   if (choices.activity && input.activity.activeMinutes > 0) {

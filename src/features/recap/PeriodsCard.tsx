@@ -1,4 +1,4 @@
-import { Calendar, X } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import { View } from 'react-native';
 
@@ -7,7 +7,7 @@ import { diffDays } from '@/lib/dates';
 import { useToday } from '@/store/clock';
 import { foodLoggedDates, useLive } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
-import { Badge, Card, CupKey, decorative, Divider, IconButton, ListRow, Text, toast } from '@/ui';
+import { Badge, Card, CupKey, Divider, IconButton, ListRow, MiniCup, Text, toast } from '@/ui';
 import type { ISODate } from '@/types';
 
 import { markPeriodDealt, offerAllowed, periodOffer, unmarkPeriodDealt, useDealtPeriods } from './offer';
@@ -32,13 +32,14 @@ function useOffer(today: ISODate, logged: ReadonlySet<ISODate>, firstDate: ISODa
   return periodOffer(today, logged, firstDate, offerAllowed() ? dealt : null);
 }
 
-/** "26 of 31 days logged" for a month, "214 days logged so far" for a year, counted from the logged days. */
-function caption(p: Period, logged: ReadonlySet<ISODate>, today: ISODate, firstDate: ISODate | null): string {
+/** "26 of 31 days logged" for a month, "214 days logged so far" for a year, counted from the logged days, and the share. */
+function counted(p: Period, logged: ReadonlySet<ISODate>, today: ISODate, firstDate: ISODate | null): { caption: string; share: number } {
   const span = countedSpan(p, today, firstDate);
   const n = span ? loggedBetween(logged, span.from, span.to) : 0;
-  if (p.kind === 'year') return yearRowWords(p.key, n, today).caption;
   const elapsed = span ? diffDays(span.from, span.to) + 1 : 0;
-  return monthRowWords(p.key, n, elapsed, today).caption;
+  const share = elapsed ? n / elapsed : 0;
+  if (p.kind === 'year') return { caption: yearRowWords(p.key, n, today).caption, share };
+  return { caption: monthRowWords(p.key, n, elapsed, today).caption, share };
 }
 
 /**
@@ -65,7 +66,7 @@ export function PeriodOfferRow() {
         <ListRow
           testID="progress-period-offer-open"
           title={line}
-          subtitle={caption(offer, logged, today, firstDate)}
+          subtitle={counted(offer, logged, today, firstDate).caption}
           left={<CupKey color={colors.calories} size={12} />}
           chevron
           onPress={() => go(routeOf(offer))}
@@ -90,7 +91,6 @@ export function PeriodsCard() {
   if (!firstDate) return null;
   const month = monthPeriod(defaultMonth(today, firstDate));
   const year = yearPeriod(defaultYear(today, firstDate));
-  const icon = decorative(<Calendar size={18} color={colors.textSecondary} strokeWidth={1.9} />);
   return (
     <Card testID="progress-periods" style={{ gap: spacing.xs }}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.sm, rowGap: spacing.sm }}>
@@ -99,12 +99,23 @@ export function PeriodsCard() {
         </Text>
         {offer ? <Badge label="New" color={colors.primary} /> : null}
       </View>
-      {[month, year].map((p, i) => (
-        <React.Fragment key={p.key}>
-          {i ? <Divider /> : null}
-          <ListRow testID={`progress-periods-${p.kind}`} title={`Your ${periodName(p, today)}`} subtitle={caption(p, logged, today, firstDate)} left={icon} chevron onPress={() => go(routeOf(p))} />
-        </React.Fragment>
-      ))}
+      {[month, year].map((p, i) => {
+        const c = counted(p, logged, today, firstDate);
+        return (
+          <React.Fragment key={p.key}>
+            {i ? <Divider /> : null}
+            <ListRow
+              testID={`progress-periods-${p.kind}`}
+              title={`Your ${periodName(p, today)}`}
+              subtitle={c.caption}
+              // A small cup filled to the share of its days with food logged: the recap's own picture, in little.
+              left={<MiniCup progress={c.share} color={colors.calories} width={18} height={22} index={i} memoryKey={`periods-${p.key}-${c.share.toFixed(3)}`} />}
+              chevron
+              onPress={() => go(routeOf(p))}
+            />
+          </React.Fragment>
+        );
+      })}
     </Card>
   );
 }

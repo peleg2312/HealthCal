@@ -3108,7 +3108,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     await page.getByTestId('fasting-end').first().waitFor({ timeout: 8000 });
     check('Fast goal: a browser shows no notification line on Fasting', (await page.getByTestId('fasting-notify').count()) === 0 && (await page.getByTestId('fasting-notify-on').count()) === 0);
     const goal = (await stored()).settings.fastingTargetHours;
-    const listed = async () => (await page.getByTestId('reminders-preview').first().innerText()).includes(`${goal} h fast reached`);
+    const listed = async () => (await page.getByTestId('reminders-preview').first().innerText()).replace(/\u00A0/g, ' ').replace(/[\u2060\u200E\u2068\u2069]/g, '').includes(`${goal} h fast reached`);
     await page.goto(`${BASE}/settings/reminders`, { waitUntil: 'networkidle' });
     await page.getByTestId('reminders-fast').first().waitFor({ timeout: 15000 });
     check('Fast goal: the switch is on when never set, and Coming up lists the running fast\'s goal', (await page.getByTestId('reminders-fast').first().getAttribute('aria-checked')) === 'true' && (await listed()), `goal ${goal} h`);
@@ -3118,6 +3118,134 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     check('Fast goal: on again', (await stored()).settings.reminders.fastGoal === true && (await listed()));
     await page.goto(`${BASE}/fasting`, { waitUntil: 'networkidle' });
     await tap('fasting-end');
+  }
+
+  // ------------------------------------------- several foods in a row (src/features/food/visitAdds.ts) and the weight chart's range (builder LOGWEIGHT)
+  {
+    await page.goto(`${BASE}/food/search?meal=snack`, { waitUntil: 'networkidle' });
+    await page.getByTestId('food-search-input').first().waitFor({ timeout: 15000 });
+    const before = Object.keys((await stored()).foodEntries);
+    await fill('food-search-input', 'apple');
+    await page.waitForTimeout(900);
+    const rowName = async (id) => (await text(id)).split('\n').find((l) => /[a-z]{3}/i.test(l));
+    const second = await rowName('result-1');
+    await tap('result-1-add');
+    const field = () => page.evaluate(() => { const a = document.activeElement; return a && a.tagName === 'INPUT' ? `${a.value}:${a.selectionStart}-${a.selectionEnd}` : String(a && a.tagName); });
+    check('Several in a row: after a "+" the focus is back in the field with its words selected', (await field()) === 'apple:0-5', await field());
+    check('Several in a row: the added row keeps its place, with its amount', (await rowName('result-1')) === second && (await page.getByTestId('result-1-stepper').count()) === 1, `${second} -> ${await rowName('result-1')}`);
+    // With the keyboard: the next "+" pressed with Enter, and the focus comes back to the field.
+    await page.getByTestId('result-2').first().focus();
+    await page.keyboard.press('Tab');
+    const onAdd = await focusedId();
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+    check('Several in a row: a "+" pressed with the keyboard gives the focus back to the field', onAdd === 'result-2-add' && (await field()) === 'apple:0-5', `${onAdd}, then ${await field()}`);
+    await page.keyboard.type('yogurt');
+    await page.waitForTimeout(900);
+    await tap('result-0-add');
+    const added = () => stored().then((st) => live(st.foodEntries).filter((e) => !before.includes(e.id)));
+    check('Several in a row: three adds, the search still open', (await added()).length === 3 && /^3 added/.test(await text('search-added-count')), await text('search-added-count'));
+    await tap('search-added-open');
+    await page.getByTestId('search-added-sheet').first().waitFor({ timeout: 8000 });
+    check('Several in a row: the count opens what was added, one Undo each', (await page.locator('[data-testid^="search-added-undo-"]').count()) === 3);
+    await tap('search-added-undo-2');
+    check('Several in a row: an Undo takes back that add only, and offers Restore in its place', (await added()).length === 2 && (await page.getByTestId('search-added-restore-2').count()) === 1);
+    await tap('search-added-restore-2');
+    check('Several in a row: Restore brings it back', (await added()).length === 3);
+    await tap('search-added-close');
+    await page.waitForTimeout(600);
+    check('Several in a row: "Close search" in the sheet leaves search', !/\/food\/search/.test(page.url()), page.url());
+
+    await page.goto(`${BASE}/weight`, { waitUntil: 'networkidle' });
+    await page.getByTestId('weight-range-1y').first().waitFor({ timeout: 15000 });
+    await tap('weight-range-1y');
+    const chosen = await page.locator('[role="radiogroup"][aria-label="Chart range"] [role="radio"][aria-checked="true"]').allInnerTexts();
+    check('Weight: the range chips are one radio group, the chosen one checked', chosen.join() === '1Y', chosen.join());
+    check('Weight: the average under the chips names its range', /Average, since/.test(await text('weight-range-figures')), await text('weight-range-figures'));
+  }
+
+  // ------------------------------------------- months and years in cups (src/features/recap, builder RECAP)
+  // Progress opens a month and a year as cups (one picture each, named by what they count); the month's share card
+  // never carries weight and adds food names only when asked; the one-time line never shows in an automated browser unasked.
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require.resolve('./seed.mjs')).href);
+    const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+    await ctx.addInitScript((value) => {
+      if (!window.sessionStorage.getItem('__seeded')) {
+        window.localStorage.setItem('healthcal-v1', value);
+        window.sessionStorage.setItem('__seeded', '1');
+      }
+    }, JSON.stringify(buildSeed({ onboarded: true, theme: 'blossom' })));
+    const p = await ctx.newPage();
+    p.on('pageerror', (e) => errors.push(e.message));
+    await p.goto(`${BASE}/progress`, { waitUntil: 'networkidle' });
+    await p.getByTestId('progress-periods-month').first().waitFor({ timeout: 20000 });
+    check('Months in cups: no one-time line in an automated browser unasked', (await p.getByTestId('progress-period-offer').count()) === 0);
+    await p.getByTestId('progress-periods-month').first().scrollIntoViewIfNeeded();
+    await p.getByTestId('progress-periods-month').first().tap();
+    await p.getByTestId('recap-period-grid').first().waitFor({ timeout: 15000 });
+    const monthName = await p.getByTestId('recap-period-grid').first().getAttribute('aria-label');
+    check('Months in cups: the month is one picture, named by what its cups count', /in cups, one a day: food logged on \d+ of \d+ days/.test(monthName || ''), monthName);
+    check('Months in cups: the page is titled', (await p.title()) === 'Month in cups · HealthCal', await p.title());
+    await p.getByTestId('recap-period-share').first().tap();
+    await p.getByTestId('share-period-sheet').first().waitFor({ timeout: 8000 });
+    const card = (await p.getByTestId('share-card-preview').first().getAttribute('aria-label')) || '';
+    const foodsOff = await p.getByTestId('share-choice-foods').first().getAttribute('aria-checked');
+    check('Months in cups: the share card carries no weight, and no food names until asked', !/kilogram|pound|weight|Logged most/i.test(card) && foodsOff === 'false', `${foodsOff} | ${card}`);
+    await p.getByTestId('share-choice-foods').first().tap();
+    await p.waitForTimeout(300);
+    const withFoods = (await p.getByTestId('share-card-preview').first().getAttribute('aria-label')) || '';
+    check('Months in cups: food names join the card when chosen', /Logged most: /.test(withFoods), withFoods);
+    await p.keyboard.press('Escape');
+    await p.waitForTimeout(600);
+    await p.locator('[data-testid^="recap-period-year-"]').first().tap();
+    await p.getByTestId('recap-period-grid').first().waitFor({ timeout: 15000 });
+    await p.waitForTimeout(400);
+    const yearName = (await p.getByTestId('recap-period-grid').first().getAttribute('aria-label')) || '';
+    check('Months in cups: the month page leads to its year, said month by month', (await p.title()) === 'Year in cups · HealthCal' && /[A-Z][a-z]+, \d+ of \d+/.test(yearName), `${await p.title()} | ${yearName}`);
+    await ctx.close();
+  }
+
+  // ------------------------------------- meal photos (src/features/journal): an added photo estimate keeps a small
+  // copy of its photo on this phone only, linked to the entries it wrote; hidden with them, deleted with Undo.
+  {
+    await page.goto(`${BASE}/food/photo?meal=dinner&demoLive=1`, { waitUntil: 'networkidle' });
+    const chooser = page.waitForEvent('filechooser', { timeout: 10000 }).catch(() => null);
+    await tap('ai-choose-photo');
+    const fc = await chooser;
+    if (fc) await fc.setFiles(require('path').join(__dirname, '..', '..', 'store', 'source', 'scrambled-eggs-on-toast-cc0.jpg'));
+    await page.waitForSelector('[data-testid="ai-photo-preview"]', { timeout: 15000 }).catch(() => {});
+    await tap('ai-analyse');
+    await page.getByTestId('ai-add-to-diary').first().waitFor({ timeout: 15000 });
+    const before = live((await stored()).foodEntries).map((e) => e.id);
+    await tap('ai-add-to-diary');
+    await page.waitForTimeout(2000);
+    const added = live((await stored()).foodEntries).filter((e) => !before.includes(e.id)).map((e) => e.id);
+    const index = await page.evaluate(() => JSON.parse(localStorage.getItem('healthcal.mealPhotos') || '[]'));
+    const kept = index[index.length - 1];
+    check('meal photos: an added photo estimate keeps its photo on this phone, linked to the entries it wrote', !!kept && added.length > 0 && added.every((id) => kept.entryIds.includes(id)) && kept.meal === 'dinner', JSON.stringify(kept)?.slice(0, 120));
+    check('meal photos: never in the synced store (so never synced, backed up or exported)', !!kept && !JSON.stringify(await stored()).includes(kept.id));
+    await page.goto(`${BASE}/food/journal`, { waitUntil: 'networkidle' });
+    await page.getByTestId('journal-photo-0').first().waitFor({ timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    const img = await page.evaluate(() => {
+      const i = document.querySelector('[data-testid="journal-photo-0"] img');
+      return i ? { src: i.getAttribute('src')?.slice(0, 23), w: i.naturalWidth, h: i.naturalHeight } : null;
+    });
+    check('meal photos: the journal draws a small copy (480 px at most) from the browser database', !!img && img.src === 'data:image/jpeg;base64,' && Math.max(img.w, img.h) <= 480, JSON.stringify(img));
+    await page.evaluate((ids) => ids.forEach((id) => window.__healthcal.getState().remove('foodEntries', id)), added);
+    await page.waitForTimeout(400);
+    const hidden = (await page.getByTestId('journal-photo-0').count()) === 0;
+    await page.evaluate((ids) => ids.forEach((id) => window.__healthcal.getState().restore('foodEntries', id)), added);
+    await page.waitForTimeout(400);
+    check('meal photos: deleting every entry it produced hides it, and restoring them brings it back', hidden && (await page.getByTestId('journal-photo-0').count()) === 1);
+    await tap('journal-photo-0');
+    await tap('journal-delete');
+    const gone = (await page.getByTestId('journal-photo-0').count()) === 0;
+    await tap('toast-action');
+    check('meal photos: Delete photo hides it at once, and its Undo brings it back', gone && (await page.getByTestId('journal-photo-0').count()) === 1);
+    await page.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+    check('meal photos: Profile names how many are kept', /1 photo, on this phone only/.test(await text('profile-journal')), await text('profile-journal'));
   }
 
   const real = errors.filter((e) => !/favicon|DevTools|useNativeDriver|pointerEvents is deprecated|shadow\*/i.test(e));

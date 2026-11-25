@@ -21,7 +21,9 @@
  * and on the privacy page it stands where the "In short" section was drawn. 2026-11-25: the privacy page's
  * short layer gained its friends line (what a friend sees, from the Friends section), its export line says
  * the coach chat stays on the phone (as the coach section does), and the profile is said to hold the goal
- * weight and the calorie target. A section's `jump` label is navigation, not text of the page: adding or
+ * weight and the calorie target. Later on 2026-11-25: meal photos (src/features/journal) are said to stay on the phone,
+ * never uploaded, synced or exported (the device and export sections, the AI estimate section and the short
+ * layer's export line). A section's `jump` label is navigation, not text of the page: adding or
  * changing one does not move the date.
  */
 export const LEGAL_UPDATED = '2026-11-25';
@@ -217,7 +219,7 @@ export const PRIVACY: LegalDocument = {
     { id: 'friends', text: 'Friends are off until you turn them on; then a friend sees your workouts and streak, never your food or weight.' },
     { id: 'ads', text: 'No ads, no tracking, no analytics and no selling of data.' },
     { id: 'ai', text: 'The AI gets what you give it once you agree; the coach adds your last few questions and answers and, if shared, a week summary.' },
-    { id: 'yours', text: 'You can export everything you log or delete it at any time; the coach chat stays on this phone.' },
+    { id: 'yours', text: 'You can export everything you log or delete it at any time; the coach chat and meal photos stay on this phone.' },
   ],
   intro: 'HealthCal is built to keep your data on your phone. This page says what leaves it, when, where it goes and what is kept, for the app on Android, iPhone and the web.',
   sections: [
@@ -234,7 +236,7 @@ export const PRIVACY: LegalDocument = {
       heading: 'On your phone',
       paragraphs: [
         'Without an account, your diary, water, workouts, weights, sleep, goals and settings are stored on this device and nowhere else. On the web, this device means this browser’s storage: clearing the site’s data clears them.',
-        'Some things stay on the phone even with an account: daily steps and the day’s calories burned read from a health app, the coach chat, and your agreements to the AI features.',
+        'Some things stay on the phone even with an account: daily steps and the day’s calories burned read from a health app, the coach chat, your meal photos, and your agreements to the AI features.',
         'Reminders are scheduled on the phone itself. No server sends them.',
       ],
     },
@@ -263,6 +265,7 @@ export const PRIVACY: LegalDocument = {
         'A meal photo or description leaves the phone when you ask for an estimate, after you have agreed once on this device. What is sent is a smaller copy of the photo with any note or weighed total you add, or the words you typed.',
         'It goes to HealthCal’s server, which passes it to Anthropic, the maker of Claude, so its AI can estimate the foods and portions. Nothing else from your diary goes with it: not your name, email, body weight, goals or history.',
         'HealthCal’s server does not store the photo or the words. It records how many estimates you asked for and how large they were, for the daily allowance. Anthropic handles what it receives under its own terms.',
+        'When you add an estimate made from a photo, a small copy of the photo is kept on this phone as your meal photos, with the diary entries it added. It is never uploaded, synced or put in the export. Deleting the photo, or every entry it added, removes it, and erasing this device removes them all. Meal photos, in Profile, can stop keeping them.',
       ],
     },
     {
@@ -313,7 +316,7 @@ export const PRIVACY: LegalDocument = {
       id: 'export',
       heading: 'Export and deletion',
       paragraphs: [
-        'Your data, in Profile, exports everything you logged as a file you keep, and can erase this device.',
+        'Your data, in Profile, exports everything you logged as a file you keep, and can erase this device. The coach chat and meal photos stay on the phone and are not in the file.',
         `Delete account, under Account, removes your account and everything stored with it on HealthCal’s server, reports included. With an active ${PLUS} plan, the app ends the plan at the payment company first, so that nothing more is charged; if that cannot be done at that moment, the app says so and tells you how to cancel it there. The payment company keeps its own records of past payments, as the law asks of it.`,
       ],
     },

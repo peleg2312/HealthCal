@@ -294,6 +294,13 @@ module.exports = [
   { id: 'custom-edit', route: '/food/search', data: 'stress', taps: ['search-tab-mine', 'mine-0-edit'], waitFor: 'custom-delete', note: 'editing your own food: long name and brand' },
 
   // ---------------------------------------------------------------- Saved meals
+  // Meal photos (src/features/journal): the demo flag fills the journal with drawn photos of the demo meals.
+  { id: 'journal', route: '/food/journal', flags: { __healthcalJournalDemo: true }, note: 'meal photos: a grid by day, newest first, with the keep switch' },
+  { id: 'journal-sheet', route: '/food/journal', flags: { __healthcalJournalDemo: true }, taps: ['journal-photo-0'], sheet: true, note: 'a photo opened: the entries it produced, Open in the diary and Delete photo' },
+  { id: 'journal-empty', route: '/food/journal', note: 'no photos yet: what the screen will hold and Snap a meal' },
+  { id: 'journal-stress', route: '/food/journal', data: 'stress', flags: { __healthcalJournalDemo: true }, note: 'long food names in a photo sheet and 13 items' },
+  { id: 'journal-stress-sheet', route: '/food/journal', data: 'stress', flags: { __healthcalJournalDemo: true }, taps: ['journal-photo-0'], sheet: true, note: 'the stress day opened' },
+  { id: 'diary-menu-photos', route: '/diary', flags: { __healthcalJournalDemo: true }, taps: ['meal-menu-breakfast'], sheet: true, note: 'the meal menu whose Meal photos row counts the photos kept' },
   { id: 'meals-stress', route: '/food/meals', data: 'stress', note: 'a saved meal with a long name and 12 items' },
   { id: 'meals-empty', route: '/food/meals', data: 'empty', note: 'no saved meals' },
   { id: 'meals-dinner-past', route: '/food/meals?meal=dinner&date={day}', day: -1, note: 'logging to dinner yesterday' },

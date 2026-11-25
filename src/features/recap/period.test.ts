@@ -27,7 +27,8 @@ describe('keys and periods', () => {
   it('reads only real months and years from a search param', () => {
     expect(parseMonthKey('2026-10')).toBe('2026-10');
     expect(parseMonthKey(['2026-01'])).toBe('2026-01');
-    for (const bad of ['2026-13', '2026-1', '26-10', '1999-12', '2026-10-01', '', undefined, 5]) expect(parseMonthKey(bad)).toBeNull();
+    expect(parseMonthKey('2026-10-14')).toBe('2026-10');
+    for (const bad of ['2026-13', '2026-1', '26-10', '1999-12', '2026-10-32', '2026-10-1', '', undefined, 5]) expect(parseMonthKey(bad)).toBeNull();
     expect(parseYearKey('2026')).toBe('2026');
     for (const bad of ['26', '1999', '2101', '2026-01', undefined]) expect(parseYearKey(bad)).toBeNull();
   });
@@ -80,6 +81,8 @@ describe('cups', () => {
     // 2026-10-01 is a Thursday.
     const rows = monthRows(monthPeriod('2026-10'), map([day('2026-10-05', 1900)]), '2026-11-25', '2026-10-03');
     expect(rows).toHaveLength(5);
+    // A week wholly before the first record takes no room.
+    expect(monthRows(monthPeriod('2026-10'), map([]), '2026-11-25', '2026-10-21')).toHaveLength(2);
     expect(rows[0].cells.slice(0, 3)).toEqual([null, null, null]);
     // Oct 1 and 2 are before the first record: no cup; Oct 3 has one.
     expect(rows[0].cells[3]).toBeNull();

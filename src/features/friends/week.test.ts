@@ -114,8 +114,8 @@ describe('person marks', () => {
 
 describe('sharingSentence', () => {
   it('lists only what is shared and always says what never is', () => {
-    expect(sharingSentence({ minutes: true, streak: true, workouts: true })).toBe('Friends see your minutes and sessions, streak and workouts. Never calories, weight or food.');
-    expect(sharingSentence({ minutes: true, streak: false, workouts: false })).toBe('Friends see your minutes and sessions. Never calories, weight or food.');
-    expect(sharingSentence({ minutes: false, streak: false, workouts: false })).toBe('Friends see only your name. Never calories, weight or food.');
+    expect(sharingSentence({ minutes: true, streak: true, workouts: true })).toBe('Friends see your minutes and sessions, streak and workouts, and a meal when you show one. Never your weight or your day’s total.');
+    expect(sharingSentence({ minutes: true, streak: false, workouts: false })).toBe('Friends see your minutes and sessions, and a meal when you show one. Never your weight or your day’s total.');
+    expect(sharingSentence({ minutes: false, streak: false, workouts: false })).toBe('Friends see your name, and a meal when you show one. Never your weight or your day’s total.');
   });
 });

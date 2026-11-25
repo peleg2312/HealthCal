@@ -434,10 +434,18 @@ export function DayRingStrip({
       {/* One height on both screens: two caption lines or the chip. A note that wraps moves nothing. */}
       {/* Very large text (150% and up), or a link that does not fit beside them: the row wraps, the chip, the streak and
           the week cup going to a line under the caption where they do not fit beside it, so neither squeezes the other's words. */}
-      <View style={{ flexDirection: 'row', flexWrap: wraps ? 'wrap' : 'nowrap', alignItems: 'center', gap: spacing.sm, minHeight: CAPTION_ROW_H }}>
+      {/* Where it wraps, its lines are 12 apart, so the 44 px touch areas of the cups on the two lines meet and never overlap. */}
+      <View style={{ flexDirection: 'row', flexWrap: wraps ? 'wrap' : 'nowrap', alignItems: 'center', columnGap: spacing.sm, rowGap: wraps ? spacing.md : spacing.sm, minHeight: CAPTION_ROW_H }}>
         {grown ? <SizeProbe key={measureKey} onSize={(w) => setRowW(Math.floor(w))} /> : null}
         {showLink && link ? (
-          <View style={wraps ? { flexGrow: 1, flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm } : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <View
+            style={
+              wraps
+                ? // A line of its own as tall as the row it was (`CAPTION_ROW_H`), so the link's and the X's touch areas stay
+                  // clear of the days above, as they are when the row keeps one line.
+                  { flexGrow: 1, flexShrink: 1, minHeight: CAPTION_ROW_H, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }
+                : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }
+            }>
             {grown ? (
               <>
                 <MeasureWidth key={`long-${measureKey}`} onWidth={setLinkW}>

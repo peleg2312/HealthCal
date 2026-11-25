@@ -78,10 +78,12 @@ describe('recap words', () => {
     expect(periodSubtitle(monthPeriod('2026-10'), tally(5, 31), '2026-11-25')).toBe('Oct 1 – 31');
     expect(periodSubtitle(monthPeriod('2026-11'), { ...tally(5, 25), from: '2026-11-01', to: '2026-11-25' }, '2026-11-25')).toBe('So far · Nov 1 – 25');
     expect(periodSubtitle(yearPeriod('2026'), { ...tally(5, 66), from: '2026-09-21', to: '2026-11-25' }, '2026-11-25')).toBe('So far · Sep 21 – Nov 25');
+    // Nothing counted yet: the days so far, never the month's end.
+    expect(periodSubtitle(monthPeriod('2026-11'), { ...tally(0, 0), from: null, to: null }, '2026-11-25')).toBe('So far · Nov 1 – 25');
   });
 
   it('counts days in the singular and plural, and the hero figure with its unit', () => {
-    expect(daysFigure(tally(1, 1), monthPeriod('2026-10'), '2026-11-25')).toEqual({ value: '1', unit: 'of 1 day', label: 'with food logged' });
+    expect(daysFigure(tally(1, 1), monthPeriod('2026-10'), '2026-11-25')).toEqual({ value: '1', unit: 'of\u00A01\u00A0day', label: 'with food logged' });
     expect(daysFigure(tally(26, 31), monthPeriod('2026-11'), '2026-11-25').label).toBe('with food logged so far');
     expect(activityCaption({ activeMinutes: 30, workouts: 1, days: 1 })).toBe('1 workout on 1 day');
   });
@@ -104,8 +106,10 @@ describe('recap words', () => {
   });
 
   it('closes calmly with a fact', () => {
-    expect(closingLine(monthPeriod('2026-11'), tally(20, 25), '2026-11-25')).toBe('November is still going. Each day you log fills its cup.');
-    expect(closingLine(monthPeriod('2026-10'), tally(31, 31), '2026-11-25')).toBe('Every day of October is in your diary, one cup a day.');
-    expect(closingLine(monthPeriod('2026-10'), tally(5, 31), '2026-11-25')).toBe('October is kept in your diary, one cup a day.');
+    const line = (p: Period, t: PeriodTally) => closingLine(p, t, '2026-11-25').replace(/\u00A0/g, ' ');
+    expect(line(monthPeriod('2026-11'), tally(20, 25))).toBe('November is still going. Each day you log fills its cup.');
+    expect(line(monthPeriod('2026-10'), tally(31, 31))).toBe('Every day of October is in your diary, one cup a day.');
+    expect(line(monthPeriod('2026-10'), tally(5, 31))).toBe('October is kept in your diary, one cup a day.');
+    expect(closingLine(monthPeriod('2026-10'), tally(5, 31), '2026-11-25')).toMatch(/a\u00A0day\.$/);
   });
 });

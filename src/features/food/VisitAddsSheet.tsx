@@ -7,11 +7,13 @@ import { useStore } from '@/store';
 import { useTheme } from '@/theme';
 import type { MealType } from '@/types';
 import { Button, Divider, RestoreRow, Sheet, Text, useGrownText } from '@/ui';
+import { spokenUnits } from '@/lib/spokenUnits';
 
 import { entryRemovedToast, mealOnDay } from './addedTo';
 import { RowEmoji } from './components';
 import { displayFoodName } from './displayName';
 import { kcal } from './helpers';
+import { LangButton } from './langName';
 import { deleteEntry } from './log';
 import { undoAddLabel, visitAddCaption, VISIT_ADDS_TITLE, type VisitAdd } from './visitAdds';
 
@@ -77,13 +79,14 @@ export function VisitAddsSheet({
                     {visitAddCaption(entry, meal)}
                   </Text>
                 </View>
-                <Button
+                {/* Named with the food (a Hebrew or Arabic name in its own language on the web, `LangButton`), its units in full. */}
+                <LangButton
                   testID={`search-added-undo-${i}`}
                   title="Undo"
                   variant="ghost"
                   size="sm"
                   full={false}
-                  accessibilityLabel={withoutMarks(undoAddLabel(entry))}
+                  accessibilityLabel={spokenUnits(withoutMarks(undoAddLabel(entry)))}
                   icon={<Undo2 size={18} color={colors.actionInk} />}
                   onPress={() => deleteEntry(entry)}
                 />

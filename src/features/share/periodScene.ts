@@ -20,7 +20,8 @@ export function periodScene(content: PeriodCardContent, c: CardColors): Scene {
 
   prims.push({ k: 'text', x: PAD, y: 54, runs: [{ text: content.overline, font: 'bold', size: 11, fill: c.textSecondary, letterSpacing: 1.3 }] });
   prims.push({ k: 'text', x: PAD, y: 96, runs: [{ text: content.title, font: 'extrabold', size: 40, fill: c.text, letterSpacing: -1.2 }] });
-  const lines = wrap(content.headline, inner, 19, 'display', 2);
+  // The last two words share a line, so the headline never ends on one word alone ("far.").
+  const lines = wrap(content.headline.replace(/ (\S+)$/, '\u00A0$1'), inner, 19, 'display', 2);
   lines.forEach((line, i) => prims.push({ k: 'text', x: PAD, y: 128 + i * 24, runs: [{ text: line, font: 'display', size: 19, fill: c.text, letterSpacing: -0.2 }] }));
 
   // From the bottom up: the mark, the foods, the stats; the cups take the room left between them and the headline.

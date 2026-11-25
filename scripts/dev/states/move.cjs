@@ -183,6 +183,9 @@ const strength = [
 
 // ------------------------------------------------------------------ water
 const water = [
+  { id: 'water-layers', route: '/water', values: { drinks: 2 }, note: 'the cup poured in layers, one colour per kind (water, milk, coffee, water, a soft drink), newest on top, with the key under it' },
+  { id: 'water-layers-reached', route: '/water', values: { drinks: 2 }, taps: ['water-add-3', 'water-add-3', 'water-add-3', 'water-add-3'], waitFor: 'water-goal-reached', note: 'layers past the goal: brim-full, each keeping its share, the newest on top, the brim line' },
+  { id: 'water-layers-one-kind', route: '/water', values: { water: 0.4 }, note: 'water only: one layer and no key' },
   { id: 'water-stress', route: '/water', data: 'stress', note: '12.5 L today, 25 drinks: "Goal reached for today. 6.8 L past it." and nothing more (never "a bonus")' },
   { id: 'water-stress-all', route: '/water', data: 'stress', taps: ['section-today-s-log-action'], note: 'every one of the 25 drinks' },
   { id: 'water-imperial', route: '/water', imperial: true, note: 'fl oz' },

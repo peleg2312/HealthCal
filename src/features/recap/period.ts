@@ -30,14 +30,14 @@ const MAX_YEAR = 2100;
 
 const first = (raw: unknown): unknown => (Array.isArray(raw) ? raw[0] : raw);
 
-/** A month key from a search param ('2026-10'), or null when it is not one. */
+/** A month key from a search param ('2026-10', or a day key read as its month: '2026-10-14'), or null when it is not one. */
 export function parseMonthKey(raw: unknown): string | null {
   const s = first(raw);
   if (typeof s !== 'string') return null;
-  const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(s);
+  const m = /^(\d{4})-(0[1-9]|1[0-2])(?:-(?:0[1-9]|[12]\d|3[01]))?$/.exec(s);
   if (!m) return null;
   const y = Number(m[1]);
-  return y >= MIN_YEAR && y <= MAX_YEAR ? s : null;
+  return y >= MIN_YEAR && y <= MAX_YEAR ? `${m[1]}-${m[2]}` : null;
 }
 
 /** A year key from a search param ('2026'), or null when it is not one. */
@@ -158,7 +158,7 @@ export interface CupRow {
 
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** A month as Monday-first weeks of seven, as the calendar lays it out. No cup before the first record. */
+/** A month as Monday-first weeks of seven, as the calendar lays it out. No cup before the first record, and no week without one. */
 export function monthRows(p: Period, byDate: ReadonlyMap<ISODate, DayFacts>, today: ISODate, firstDate: ISODate | null): CupRow[] {
   const lead = diffDays(startOfWeek(p.start), p.start);
   const count = diffDays(p.start, p.end) + 1;
@@ -169,7 +169,8 @@ export function monthRows(p: Period, byDate: ReadonlyMap<ISODate, DayFacts>, tod
   }
   while (cells.length % 7) cells.push(null);
   const rows: CupRow[] = [];
-  for (let i = 0; i < cells.length; i += 7) rows.push({ key: `w${i / 7}`, label: '', cells: cells.slice(i, i + 7) });
+  // A week wholly before the first record has no cup: it takes no room either.
+  for (let i = 0; i < cells.length; i += 7) if (cells.slice(i, i + 7).some(Boolean)) rows.push({ key: `w${i / 7}`, label: '', cells: cells.slice(i, i + 7) });
   return rows;
 }
 

@@ -7,6 +7,7 @@ import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
 import { ALSO_IN_WATER, waterFor } from '@/features/drinks/rules';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
 import { MealMenuJournalRow } from '@/features/journal/JournalRows';
+import { ShowToFriendsRow, useShowMealStep } from '@/features/friends/ShowMeal';
 import { figureWords, otherFigure, setCalorieFigure, useCalorieFigure } from '@/features/today/calorieFigure';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { addDays, formatDayLabel } from '@/lib/dates';
@@ -566,7 +567,7 @@ function RepeatRow({ meal, label, previous, onRepeat }: { meal: MealType; label:
   );
 }
 
-type MenuStep = 'menu' | 'copyTo' | 'save';
+type MenuStep = 'menu' | 'copyTo' | 'save' | 'show';
 
 /** Per-meal menu: copy from an earlier day, save, copy to another day, clear. */
 export function MealMenuSheet({
@@ -603,6 +604,8 @@ export function MealMenuSheet({
   }
   // The save step is SaveMealSheet's, shown inside this sheet so the step changes in place.
   const save = useSaveMealStep({ open: !!meal && step === 'save', meal, date, entries, onClose });
+  // Showing the meal to friends is the friends feature's step, shown in place the same way.
+  const show = useShowMealStep({ open: !!meal && step === 'show', meal, date, entries, onClose });
 
   if (!meal) return <Sheet visible={false} onClose={onClose}>{null}</Sheet>;
   const label = MEAL_LABEL[meal];
@@ -643,6 +646,14 @@ export function MealMenuSheet({
     );
   }
 
+  if (step === 'show') {
+    return (
+      <Sheet visible onClose={onClose} title={show.title} subtitle={show.subtitle} footer={show.footer}>
+        {show.body}
+      </Sheet>
+    );
+  }
+
   return (
     <Sheet visible onClose={onClose} title={`${label} · ${formatDayLabel(date)}`}>
       <View>
@@ -674,6 +685,8 @@ export function MealMenuSheet({
               left={<Save size={20} color={colors.text} />}
               onPress={() => setStep('save')}
             />
+            {/* Show to friends: drawn by the friends feature only for someone with friends on, with its own divider. */}
+            <ShowToFriendsRow meal={meal} date={date} entries={entries} onOpen={() => setStep('show')} onClose={onClose} />
             <Divider inset={32} />
             <ListRow
               testID="meal-menu-copy-to"

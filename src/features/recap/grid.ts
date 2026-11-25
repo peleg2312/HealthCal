@@ -51,9 +51,10 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 
 /**
  * Sizes for `rowCount` rows drawn `width` wide: at most `maxHeight` tall when given (the share card); `labelW`
- * (a year's month names) and `headerH` (a month's weekday letters) grow on screen with the text size.
+ * (a year's month names), `headerH` (a month's weekday letters) and `minPitch` (a year's rows, top to top) grow on
+ * screen with the text size.
  */
-export function gridGeometry(kind: PeriodKind, rowCount: number, width: number, o: { maxHeight?: number; labelW?: number; headerH?: number } = {}): GridGeometry {
+export function gridGeometry(kind: PeriodKind, rowCount: number, width: number, o: { maxHeight?: number; labelW?: number; headerH?: number; minPitch?: number } = {}): GridGeometry {
   const n = Math.max(1, rowCount);
   const { maxHeight } = o;
   if (kind === 'month') {
@@ -86,6 +87,8 @@ export function gridGeometry(kind: PeriodKind, rowCount: number, width: number, 
     }
   }
   const rowH = top + cupH;
+  // Rows never closer than their month names' line (large text), so the names keep their room.
+  if (o.minPitch) rowGap = Math.max(rowGap, Math.ceil(o.minPitch - rowH));
   return { kind, width, labelW, headerH: 0, slot, cupW, cupH, top, rowH, rowGap, base: Math.min(2.5, cupW / 2.5), rim: cupW >= 8 ? 2 : 1.5, edge: 1, height: n * rowH + (n - 1) * rowGap };
 }
 

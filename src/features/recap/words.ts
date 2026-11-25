@@ -17,6 +17,9 @@ export const MONTH_LONG = ['January', 'February', 'March', 'April', 'May', 'June
 
 const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);
 
+/** The last two words held together, so a wrapped line never ends on one word alone ("a" / "day."). */
+export const lastTwo = (s: string): string => s.replace(/ (\S+)$/, '\u00A0$1');
+
 /** 'November' (with its year when that is not this year: 'November 2025'), or '2026'. */
 export function periodName(p: Period, today: ISODate): string {
   if (p.kind === 'year') return p.key;
@@ -41,7 +44,7 @@ export function cardOverline(p: Period): string {
 
 /** The header's short line: the days the figures cover ('Oct 1 – 31', 'So far · Nov 1 – 25', 'Oct 21 – Dec 31'). */
 export function periodSubtitle(p: Period, tally: PeriodTally, today: ISODate): string {
-  const range = weekRangeLabel(tally.from ?? p.start, tally.to ?? p.end);
+  const range = weekRangeLabel(tally.from ?? p.start, tally.to ?? (today < p.end ? today : p.end));
   return inProgress(p, today) ? `So far · ${range}` : range;
 }
 
@@ -49,7 +52,8 @@ export function periodSubtitle(p: Period, tally: PeriodTally, today: ISODate): s
 export function daysFigure(tally: PeriodTally, p: Period, today: ISODate): { value: string; unit: string; label: string } {
   return {
     value: formatNumber(tally.logged),
-    unit: `of ${formatNumber(tally.elapsed)} ${plural(tally.elapsed, 'day')}`,
+    // One piece ("of 329 days"): with large text it may go under the number, never split itself.
+    unit: `of\u00A0${formatNumber(tally.elapsed)}\u00A0${plural(tally.elapsed, 'day')}`,
     label: inProgress(p, today) ? 'with food logged so far' : 'with food logged',
   };
 }
@@ -84,6 +88,10 @@ export function weightWords(startKg: number, endKg: number, startDate: ISODate, 
 
 /** The calm last line: what the period is now, said as a fact. */
 export function closingLine(p: Period, tally: PeriodTally, today: ISODate): string {
+  return lastTwo(closingWords(p, tally, today));
+}
+
+function closingWords(p: Period, tally: PeriodTally, today: ISODate): string {
   const name = periodName(p, today);
   if (inProgress(p, today)) return `${name} is still going. Each day you log fills its cup.`;
   if (!tally.logged) return 'Days you log fill their cups here.';
@@ -95,7 +103,7 @@ export function closingLine(p: Period, tally: PeriodTally, today: ISODate): stri
 export function emptyWords(p: Period, today: ISODate): { title: string; message: string } {
   const name = periodName(p, today);
   return {
-    title: inProgress(p, today) ? `Nothing logged in ${name} yet` : `Nothing logged in ${name}`,
+    title: lastTwo(inProgress(p, today) ? `Nothing logged in ${name} yet` : `Nothing logged in ${name}`),
     message: `Each day you log fills a cup here: the ${p.kind} in cups, your active minutes, your water and the food you log most.`,
   };
 }

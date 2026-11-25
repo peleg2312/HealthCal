@@ -1,23 +1,44 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { RefreshCw, UserPlus } from 'lucide-react-native';
+import { RefreshCw, Settings } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, RefreshControl, View } from 'react-native';
 
-import { CheersList, FriendCard, IncomingRequests, InviteCard, Loading, OutgoingRequests } from '@/features/friends/components';
+import { CheersList, IncomingRequests, InviteCard, Loading, OutgoingRequests } from '@/features/friends/components';
+import { cheerMeal, mealsOverview } from '@/features/friends/api';
 import { markFriendsSeen } from '@/features/friends/attention';
+import type { FeedItem } from '@/features/friends/contract';
+import { feedKey, friendsWithNew, localFeed } from '@/features/friends/feed';
+import { AboutYouCard, CheersLine, FeedWorkoutCard, itemRole, listRole, PeopleRow } from '@/features/friends/FeedParts';
+import { readFeedSeen, writeFeedSeen } from '@/features/friends/feedSeen';
+import { FriendMealSheet, type OpenMeal } from '@/features/friends/FriendMealSheet';
 import { inviteFromParams, invitePath } from '@/features/friends/link';
+import { FeedMealCard } from '@/features/friends/MealCard';
+import { ownMealsByRef } from '@/features/friends/meals';
 import { SetupForm } from '@/features/friends/SetupForm';
 import { copyText, shareInvite } from '@/features/friends/share';
-import { FriendSheet, SettingsSheet } from '@/features/friends/sheets';
 import { formatCode, ownWorkoutsByRef, WORKOUT_WINDOW_DAYS } from '@/features/friends/summary';
-import { cheerCaption, cheerTarget } from '@/features/friends/week';
+import { cheerCaption } from '@/features/friends/week';
+import {
+  aboutYouLine,
+  CHEERS_TITLE,
+  cheersSummary,
+  cheerWhat,
+  FEED_EMPTY,
+  FEED_EMPTY_TITLE,
+  RECENT,
+  RECENT_SPAN,
+  SCREEN_SUBTITLE,
+  SCREEN_TITLE,
+  SETTINGS_OPEN,
+  SIGNED_OUT_LINE,
+} from '@/features/friends/words';
 import { timeAgo } from '@/features/settings/format';
 import { addDays } from '@/lib/dates';
-import { cheerFriend, leaveSocial, refreshFriends, removeFriend, respondToRequest, undoDecline, useFriends, type Friend, type FriendRequest } from '@/services/friends';
+import { cheerFriend, refreshFriends, removeFriend, respondToRequest, undoDecline, useFriends, type FriendRequest } from '@/services/friends';
 import { useNow, useToday } from '@/store/clock';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import { Button, Card, ConfirmSheet, EmptyState, goBack, Header, IconButton, Screen, SectionTitle, Text, toast } from '@/ui';
+import { Button, Card, EmptyState, goBack, Header, IconButton, Screen, SectionTitle, Sheet, Text, toast } from '@/ui';
 
 export default function FriendsScreen() {
   const { colors, spacing } = useTheme();
@@ -33,10 +54,13 @@ export default function FriendsScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState<Friend | null>(null);
-  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [cheersOpen, setCheersOpen] = useState(false);
+  const [openMeal, setOpenMeal] = useState<{ meal: OpenMeal; adding: boolean } | null>(null);
+  // What the feed held at the last look, read once as the screen opens (before this look is written).
+  const [seenBefore, setSeenBefore] = useState<Set<string> | null | undefined>(undefined);
+  useEffect(() => {
+    void readFeedSeen().then(setSeenBefore);
+  }, []);
 
   // Fresh numbers every time the screen comes into view.
   useFocusEffect(
@@ -45,20 +69,32 @@ export default function FriendsScreen() {
     }, []),
   );
 
-  const me = overview?.me ?? null;
-  // What this screen shows is no longer new: the count on the tab headers' Friends button clears.
-  const cheersShown = status === 'ready' && me ? overview?.cheers.length ?? 0 : -1;
+  const { me, friends, feed, myMeals } = mealsOverview(overview);
+  const shown = useMemo(() => localFeed({ feed, today, seeMeals: !!me?.mealsAllowed && !!me?.mealSettings.see, friends }), [feed, today, me, friends]);
+  // What this screen shows is no longer new: the count on the tab headers' Friends button clears, and the feed's keys are kept for the next look.
+  const ready = status === 'ready' && !!me;
+  const cheersShown = ready ? (overview?.cheers.length ?? 0) : -1;
   useEffect(() => {
     if (cheersShown >= 0) markFriendsSeen();
   }, [cheersShown]);
-  // Cheers name the workout by the reference friends saw; map it back with the same key.
+  const feedKeys = shown.map(feedKey).join('|');
+  useEffect(() => {
+    if (ready && seenBefore !== undefined) writeFeedSeen(feedKeys ? feedKeys.split('|') : []);
+  }, [ready, seenBefore, feedKeys]);
+  const newIds = useMemo(() => friendsWithNew(shown, seenBefore ?? null), [shown, seenBefore]);
+
+  // Cheers name a workout or a meal by the reference friends saw; map it back with the same key.
   const shareKey = me?.shareKey ?? '';
-  // A cheer can only be for a workout that was shared (the last two weeks) and is shown for two weeks, so older ones need no reference.
   const ownWorkouts = useMemo(() => {
     const since = addDays(today, -(2 * WORKOUT_WINDOW_DAYS + 7));
     return ownWorkoutsByRef(activities.filter((a) => a.date >= since), shareKey);
   }, [activities, shareKey, today]);
-  const open = overview?.friends.find((f) => f.userId === openId) ?? null;
+  const ownMeals = useMemo(() => {
+    const byRef = ownMealsByRef(shareKey, today);
+    for (const m of myMeals) byRef.set(m.ref, { day: m.day, meal: m.meal });
+    return byRef;
+  }, [shareKey, today, myMeals]);
+  const describe = (ref: string) => cheerWhat(ref, { workouts: ownWorkouts, meals: ownMeals }, today);
 
   const pull = async () => {
     setRefreshing(true);
@@ -66,8 +102,8 @@ export default function FriendsScreen() {
     setRefreshing(false);
   };
 
-  const cheer = async (friend: Friend, ref: string) => {
-    const res = await cheerFriend(friend.userId, ref);
+  const cheerItem = async (item: FeedItem) => {
+    const res = item.kind === 'meal' ? await cheerMeal(item.userId, item.ref) : await cheerFriend(item.userId, item.ref);
     if (!res.ok) toast(res.message);
   };
 
@@ -89,8 +125,7 @@ export default function FriendsScreen() {
     // entering their code is the way back, which the Add screen says.
     toast(`Declined. ${r.displayName} is not told.`, {
       label: 'Undo',
-      onPress: () =>
-        void undoDecline(r.userId).then((u) => toast(u.ok ? `The request from ${r.displayName} is back` : u.message)),
+      onPress: () => void undoDecline(r.userId).then((u) => toast(u.ok ? `The request from ${r.displayName} is back` : u.message)),
     });
   };
   const takeBack = async (r: FriendRequest) => {
@@ -99,26 +134,15 @@ export default function FriendsScreen() {
     setBusy(null);
     toast(res.ok ? `Request to ${r.displayName} taken back` : res.message);
   };
-  const remove = async (f: Friend) => {
-    setConfirmRemove(null);
-    const res = await removeFriend(f.userId);
-    toast(res.ok ? `${f.displayName} is no longer a friend. Cheers between you were removed too.` : res.message);
-  };
-  const leave = async () => {
-    setConfirmLeave(false);
-    setSettingsOpen(false);
-    const res = await leaveSocial();
-    toast(res.ok ? 'Friends turned off. Your card, friendships and cheers were removed.' : res.message);
-  };
 
-  // One action in the header: adding someone. Friends settings live on the invite card.
+  // One action in the header: Friends settings and privacy. Adding someone is the last cup of the people row.
   const headerRight = me ? (
-    <IconButton testID="friends-add-open" accessibilityLabel="Add a friend" onPress={() => router.push('/friends/add' as never)}>
-      <UserPlus size={20} color={colors.text} strokeWidth={1.9} />
+    <IconButton testID="friends-settings-open" accessibilityLabel={SETTINGS_OPEN} onPress={() => router.push('/friends/settings' as never)}>
+      <Settings size={20} color={colors.text} strokeWidth={1.9} />
     </IconButton>
   ) : null;
 
-  const header = <Header title="Friends" subtitle="Workouts and cheers" right={headerRight} />;
+  const header = <Header title={SCREEN_TITLE} subtitle={SCREEN_SUBTITLE} right={headerRight} />;
   const scrollProps = Platform.OS === 'web' ? undefined : { refreshControl: <RefreshControl refreshing={refreshing} onRefresh={pull} tintColor={colors.textSecondary} /> };
 
   // ------------------------------------------------ states without a card
@@ -127,13 +151,7 @@ export default function FriendsScreen() {
       <Screen header={header} testID="friends-screen">
         <Card testID="friends-unavailable">
           {/* Two lines and the one thing left to do here: go back to the day. */}
-          <EmptyState
-            title="Friends need an account"
-            message="This version has no accounts. Everything else works on this device."
-            action="Back to Today"
-            actionTestID="friends-back-today"
-            onAction={() => goBack('/')}
-          />
+          <EmptyState title="Friends need an account" message="This version has no accounts. Everything else works on this device." action="Back to Today" actionTestID="friends-back-today" onAction={() => goBack('/')} />
         </Card>
       </Screen>
     );
@@ -143,13 +161,7 @@ export default function FriendsScreen() {
       <Screen header={header} testID="friends-screen">
         <Card testID="friends-signed-out">
           {/* Two lines and one action: the account screen also signs in ("Already have an account?"). */}
-          <EmptyState
-            title="Friends need an account"
-            message="See each other's training week. Calories, weight and food stay private."
-            action="Create a free account"
-            actionTestID="friends-create-account"
-            onAction={() => router.push('/auth?mode=signup')}
-          />
+          <EmptyState title="Friends need an account" message={SIGNED_OUT_LINE} action="Create a free account" actionTestID="friends-create-account" onAction={() => router.push('/auth?mode=signup')} />
         </Card>
       </Screen>
     );
@@ -185,11 +197,13 @@ export default function FriendsScreen() {
   }
 
   // ------------------------------------------------ the full screen
-  const { friends, incoming, outgoing, cheers } = overview;
-  const inviteCard = <InviteCard code={me.code} sharing={me.sharing} onSettings={() => setSettingsOpen(true)} onShare={() => void shareInvite(me.code)} onCopy={() => void copyText(formatCode(me.code), 'Code copied')} />;
+  const { incoming, outgoing, cheers } = overview;
+  const copyCode = () => void copyText(formatCode(me.code), 'Code copied');
+  const viewerNames = [...new Set(myMeals.flatMap((m) => m.viewers.map((v) => v.displayName)))];
+  const units = profile.units;
+
   return (
     <Screen header={header} testID="friends-screen" scrollProps={scrollProps}>
-
       {status === 'error' ? (
         <Card tone="alt" testID="friends-error-banner">
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -201,39 +215,58 @@ export default function FriendsScreen() {
         </Card>
       ) : null}
 
-      {/* What needs an answer first, then the friends' week, then cheers. The invite card comes next only while
-          there is nobody yet; with friends it moves to the end (the header's + also adds someone). */}
-      {incoming.length ? (
-        <View style={{ gap: spacing.md }}>
-          <SectionTitle title="Requests" />
-          <IncomingRequests requests={incoming} busy={busy} onAccept={accept} onDecline={decline} />
-        </View>
-      ) : null}
+      {/* What needs an answer first, then the people, the cheers in one line, and the feed. */}
+      {incoming.length ? <IncomingRequests requests={incoming} busy={busy} onAccept={accept} onDecline={decline} /> : null}
 
-      {friends.length ? null : inviteCard}
+      {friends.length ? (
+        <PeopleRow people={friends} newIds={newIds} onOpen={(id) => router.push(`/friends/friend?id=${encodeURIComponent(id)}` as never)} onAdd={() => router.push('/friends/add' as never)} />
+      ) : (
+        <>
+          <InviteCard code={me.code} sharing={me.sharing} onShare={() => void shareInvite(me.code)} onCopy={copyCode} />
+          <Card testID="friends-empty">
+            <EmptyState title="No friends yet" message="Share your code or enter a friend's. What they show you appears here once they accept." action="Add a friend" onAction={() => router.push('/friends/add' as never)} />
+          </Card>
+        </>
+      )}
+
+      {cheers.length ? <CheersLine count={cheers.length} summary={cheersSummary(cheers, (c) => describe(c.ref))} onPress={() => setCheersOpen(true)} /> : null}
 
       {friends.length ? (
         <View style={{ gap: spacing.md }}>
-          <SectionTitle title="This week" action={friends.length === 1 ? '1 friend' : `${friends.length} friends`} />
-          {friends.map((f) => (
-            <FriendCard key={f.userId} friend={f} today={today} units={profile.units} onOpen={() => setOpenId(f.userId)} onCheer={(ref) => void cheer(f, ref)} />
-          ))}
-        </View>
-      ) : (
-        <Card testID="friends-empty">
-          <EmptyState
-            title="No friends yet"
-            message="Share your code or enter a friend's. Their week shows here once they accept."
-            action="Add a friend"
-            onAction={() => router.push('/friends/add' as never)}
-          />
-        </Card>
-      )}
-
-      {cheers.length ? (
-        <View style={{ gap: spacing.md }}>
-          <SectionTitle title="Cheers for you" />
-          <CheersList cheers={cheers} describe={(c) => cheerTarget(c.ref, ownWorkouts, today)} when={(c) => cheerCaption(c.ref, timeAgo(c.createdAt, now))} />
+          <SectionTitle title={RECENT} action={RECENT_SPAN} />
+          {shown.length ? (
+            <View {...listRole} testID="friends-feed" style={{ gap: spacing.lg }}>
+              {shown.map((item) => {
+                const key = feedKey(item);
+                return (
+                  <View key={key} {...itemRole}>
+                    {item.kind === 'meal' ? (
+                      <FeedMealCard
+                        testID={`friends-feed-meal-${item.ref.slice(0, 8)}`}
+                        name={item.displayName}
+                        avatar={item.avatar}
+                        meal={item.meal}
+                        day={item.day}
+                        today={today}
+                        items={item.items}
+                        showKcal={item.showKcal}
+                        cheered={item.cheered}
+                        onOpen={() => setOpenMeal({ meal: { owner: item, meal: item, cheered: item.cheered }, adding: false })}
+                        onAdd={() => setOpenMeal({ meal: { owner: item, meal: item, cheered: item.cheered }, adding: true })}
+                        onCheer={() => void cheerItem(item)}
+                      />
+                    ) : (
+                      <FeedWorkoutCard testID={`friends-feed-workout-${item.ref.slice(0, 8)}`} item={item} today={today} units={units} onCheer={() => void cheerItem(item)} />
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <Card testID="friends-feed-empty">
+              <EmptyState title={FEED_EMPTY_TITLE} message={FEED_EMPTY} action={me.mealsAllowed ? 'Show a meal from the diary' : undefined} onAction={me.mealsAllowed ? () => router.push('/diary' as never) : undefined} />
+            </Card>
+          )}
         </View>
       ) : null}
 
@@ -244,47 +277,20 @@ export default function FriendsScreen() {
         </View>
       ) : null}
 
-      {friends.length ? inviteCard : null}
+      {friends.length ? <AboutYouCard line={aboutYouLine(me.sharing, myMeals.length, viewerNames, me.mealsAllowed)} code={me.code} onPrivacy={() => router.push('/friends/settings' as never)} onCopy={copyCode} /> : null}
 
-      <FriendSheet
-        friend={open}
-        today={today}
-        units={profile.units}
-        onClose={() => setOpenId(null)}
-        onCheer={(f, ref) => void cheer(f, ref)}
-        onRemove={(f) => {
-          setOpenId(null);
-          setConfirmRemove(f);
+      <Sheet visible={cheersOpen} onClose={() => setCheersOpen(false)} title={CHEERS_TITLE}>
+        <CheersList cheers={cheers} describe={(c) => describe(c.ref)} when={(c) => cheerCaption(c.ref, timeAgo(c.createdAt, now))} />
+      </Sheet>
+      <FriendMealSheet
+        open={openMeal?.meal ?? null}
+        startAdding={!!openMeal?.adding}
+        onClose={() => setOpenMeal(null)}
+        onCheer={(o) => {
+          const item = shown.find((i) => i.kind === 'meal' && i.userId === o.owner.userId && i.ref === o.meal.ref);
+          if (item) void cheerItem(item);
+          setOpenMeal((cur) => (cur ? { ...cur, meal: { ...cur.meal, cheered: true } } : cur));
         }}
-      />
-      {settingsOpen ? (
-        <SettingsSheet
-          me={me}
-          visible
-          onClose={() => setSettingsOpen(false)}
-          onLeave={() => {
-            setSettingsOpen(false);
-            setConfirmLeave(true);
-          }}
-        />
-      ) : null}
-      <ConfirmSheet
-        visible={!!confirmRemove}
-        title={`Remove ${confirmRemove?.displayName ?? 'this friend'}?`}
-        message="You stop seeing each other's week, and the cheers between you are removed. They are not told, and you can add each other again with a code."
-        confirmLabel="Remove friend"
-        destructive
-        onConfirm={() => confirmRemove && void remove(confirmRemove)}
-        onCancel={() => setConfirmRemove(null)}
-      />
-      <ConfirmSheet
-        visible={confirmLeave}
-        title="Turn friends off?"
-        message="This removes your card and code, every friendship and every cheer, for you and for them. It cannot be undone, though you can turn friends on again later with a new code."
-        confirmLabel="Turn friends off"
-        destructive
-        onConfirm={() => void leave()}
-        onCancel={() => setConfirmLeave(false)}
       />
     </Screen>
   );

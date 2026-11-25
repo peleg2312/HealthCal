@@ -1,18 +1,18 @@
-import { Copy, Flame, HandHeart, Lock, Share as ShareIcon, X } from 'lucide-react-native';
+import { Copy, HandHeart, Lock, Share as ShareIcon, X } from 'lucide-react-native';
 import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { PourWait } from '@/components/PourWait';
 
-import { formatShortDate, weekdayShort } from '@/lib/dates';
-import { formatDistance, formatNumber } from '@/lib/units';
+import { weekdayShort } from '@/lib/dates';
+import { formatDistance } from '@/lib/units';
 import type { CheerReceived, Friend, FriendRequest, FriendWorkout, SocialSharing } from '@/services/friends';
 import { fonts, useTheme } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
 import { Avatar, Button, Card, Divider, figure, IconButton, MiniCup, PressableScale, Text, TextField, Toggle } from '@/ui';
 
 import { formatCode, normalizeCode } from './summary';
-import { dayLabel, friendWeek, isCurrentWeek, latestWorkout, personMark, sharesAnything, sharingSentence, type FriendDay } from './week';
+import { dayLabel, personMark, sharingSentence, type FriendDay } from './week';
 
 /** Below this width (iPhone SE) the friend screens tighten up, as Today does. */
 export function useNarrow(): boolean {
@@ -30,7 +30,7 @@ export function PersonMark({ name, avatar, size = 44 }: { name: string; avatar: 
 }
 
 /** Cheer, or the done state "Cheered". Instant: the store marks it at once and rolls it back if the server refuses. */
-export function CheerButton({ cheered, onPress, label, testID }: { cheered: boolean; onPress: () => void; label: string; testID: string }) {
+export function CheerButton({ cheered, onPress, label, testID, full = false }: { cheered: boolean; onPress: () => void; label: string; testID: string; full?: boolean }) {
   const { colors } = useTheme();
   return (
     <Button
@@ -38,7 +38,7 @@ export function CheerButton({ cheered, onPress, label, testID }: { cheered: bool
       title={cheered ? 'Cheered' : 'Cheer'}
       variant={cheered ? 'soft' : 'secondary'}
       size="sm"
-      full={false}
+      full={full}
       accessibilityLabel={cheered ? `You cheered ${label}` : `Cheer ${label}`}
       icon={<HandHeart size={16} color={cheered ? colors.primary : colors.text} strokeWidth={2.2} />}
       onPress={cheered ? undefined : onPress}
@@ -107,101 +107,10 @@ export function WorkoutRow({ w, friend, today, units, onCheer }: { w: FriendWork
   );
 }
 
-/** The streak line under a name: a flame and the count. */
-function StreakLine({ days }: { days: number }) {
-  const { colors } = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-      <Flame size={14} color={colors.caloriesInk} strokeWidth={2.2} />
-      <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
-        {days === 1 ? '1 day streak' : `${days} day streak`}
-      </Text>
-    </View>
-  );
-}
-
-/**
- * A friend's week, as in the mock: who, their minutes and sessions, a row of
- * week cups, and their latest workout with Cheer. Every part shows only when
- * the friend shares it, so someone sharing less has a shorter card, not holes.
- */
-export function FriendCard({ friend, today, units, onOpen, onCheer }: { friend: Friend; today: ISODate; units: UnitSystem; onOpen: () => void; onCheer: (ref: string) => void }) {
-  const { spacing } = useTheme();
-  const s = friend.summary;
-  const days = friendWeek(s, today);
-  const latest = latestWorkout(s);
-  const current = isCurrentWeek(s, today);
-  const hasMinutes = typeof s.minutes === 'number';
-  const slug = idFor(friend.userId);
-  const narrow = useNarrow();
-  return (
-    <Card padding={spacing.lg} testID={`friends-friend-${slug}`}>
-      <PressableScale
-        testID={`friends-card-${slug}`}
-        onPress={onOpen}
-        scaleTo={0.99}
-        // What the card shows, as drawn and in its order (WCAG 2.5.3, label in name: the mark, the name, the streak,
-        // the minutes and their line, the week's day letters), then the minutes in words and where it leads.
-        accessibilityLabel={`${[
-          personMark(friend.displayName, friend.avatar).text,
-          friend.displayName,
-          typeof s.streak === 'number' ? (s.streak === 1 ? '1 day streak' : `${s.streak} day streak`) : !sharesAnything(s) ? 'Not sharing their week right now' : '',
-          hasMinutes ? `${formatNumber(s.minutes ?? 0)} min` : '',
-          hasMinutes ? (current ? `${s.sessions ?? 0} ${s.sessions === 1 ? 'session' : 'sessions'}${narrow ? '' : ' this week'}` : s.week ? `Week of ${formatShortDate(s.week)}` : 'Last shared week') : '',
-          days ? days.map((d) => weekdayShort(d.date).slice(0, 1)).join(' ') : '',
-        ]
-          .filter(Boolean)
-          .join(', ')}. ${hasMinutes ? `${s.minutes} active minutes ${current ? 'this week' : 'in their last shared week'}. ` : ''}Open details`}
-        style={{ gap: spacing.lg }}>
-        {/* The minutes sit beside the name; a name too long for that line takes the row and the minutes go under it, at the right. */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.xs }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
-            <PersonMark name={friend.displayName} avatar={friend.avatar} />
-            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-              <Text variant="h3" numberOfLines={3}>
-                {friend.displayName}
-              </Text>
-              {typeof s.streak === 'number' ? <StreakLine days={s.streak} /> : !sharesAnything(s) ? (
-                <Text variant="caption" color="textSecondary" numberOfLines={2}>
-                  Not sharing their week right now
-                </Text>
-              ) : null}
-            </View>
-          </View>
-          {hasMinutes ? (
-            <View style={{ alignItems: 'flex-end', flexShrink: 0, marginLeft: 'auto' }}>
-              <Text variant="numL" testID={`friends-minutes-${slug}`}>
-                {formatNumber(s.minutes ?? 0)}
-                <Text variant="unit"> min</Text>
-              </Text>
-              <Text variant="caption" color="textSecondary" numberOfLines={1}>
-                {current
-                  ? `${s.sessions ?? 0} ${s.sessions === 1 ? 'session' : 'sessions'}${narrow ? '' : ' this week'}`
-                  : s.week
-                    ? `Week of ${formatShortDate(s.week)}`
-                    : 'Last shared week'}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-        {days ? <WeekCups days={days} today={today} /> : null}
-      </PressableScale>
-      {latest ? (
-        <>
-          <View style={{ marginTop: spacing.md }}>
-            <Divider />
-          </View>
-          <WorkoutRow w={latest} friend={friend} today={today} units={units} onCheer={() => onCheer(latest.id)} />
-        </>
-      ) : null}
-    </Card>
-  );
-}
-
 // ------------------------------------------------------------------ invite
 
 /** The user's own code, large and readable, with Share and Copy. On surfaceAlt, so text stays text or textSecondary. */
-export function InviteCard({ code, sharing, onShare, onCopy, onSettings }: { code: string; sharing: SocialSharing; onShare: () => void; onCopy: () => void; onSettings: () => void }) {
+export function InviteCard({ code, sharing, onShare, onCopy }: { code: string; sharing: SocialSharing; onShare: () => void; onCopy: () => void }) {
   const { colors, spacing } = useTheme();
   const size = useNarrow() ? 34 : 44;
   const c = normalizeCode(code);
@@ -243,18 +152,6 @@ export function InviteCard({ code, sharing, onShare, onCopy, onSettings }: { cod
           {sharingSentence(sharing)}
         </Text>
       </View>
-      {/* Your name, what friends see, and turning friends off. */}
-      <PressableScale
-        testID="friends-settings-open"
-        accessibilityRole="link"
-        accessibilityLabel="Friends settings"
-        onPress={onSettings}
-        hitSlop={6}
-        style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginTop: spacing.xs, marginBottom: -spacing.sm }}>
-        <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
-          Friends settings
-        </Text>
-      </PressableScale>
     </Card>
   );
 }
@@ -338,11 +235,11 @@ export function OutgoingRequests({ requests, busy, onCancel }: { requests: Frien
   );
 }
 
-/** Cheers the user received: "Maya cheered your run", newest first. */
+/** Cheers the user received: "Maya cheered your run", newest first (the cheers sheet). */
 export function CheersList({ cheers, describe, when }: { cheers: CheerReceived[]; describe: (c: CheerReceived) => string; when: (c: CheerReceived) => string }) {
   const { colors, spacing } = useTheme();
   return (
-    <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }} testID="friends-cheers">
+    <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }} testID="friends-cheers-list">
       {cheers.map((c, i) => (
         <React.Fragment key={`${c.fromUserId}-${c.ref}`}>
           {i > 0 ? <Divider inset={48} /> : null}
@@ -373,7 +270,7 @@ export function CheersList({ cheers, describe, when }: { cheers: CheerReceived[]
  * A sharing switch as the kit's ToggleRow lays it out, but with its whole sentence: what a switch
  * shares is the point of the row, so it wraps to a third line in the set-up card rather than end in "…".
  */
-function SharingRow({ title, subtitle, value, onChange, testID }: { title: string; subtitle: string; value: boolean; onChange: (v: boolean) => void; testID: string }) {
+export function SharingRow({ title, subtitle, value, onChange, testID }: { title: string; subtitle: string; value: boolean; onChange: (v: boolean) => void; testID: string }) {
   const { spacing } = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
@@ -414,7 +311,7 @@ export function NeverShared() {
     <View style={{ flexDirection: 'row', gap: 8, marginTop: spacing.sm }}>
       <Lock size={14} color={colors.textSecondary} strokeWidth={2} style={{ marginTop: 2 }} />
       <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
-        Your calories, weight and food are never shared, whatever you choose here.
+        Your weight and your day’s total are never shared, whatever you choose here. A meal leaves the phone when you show it.
       </Text>
     </View>
   );

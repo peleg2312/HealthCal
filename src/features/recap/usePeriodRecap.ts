@@ -15,6 +15,7 @@ import {
   countedSpan,
   defaultMonth,
   defaultYear,
+  loggedBetween,
   monthPeriod,
   monthTallies,
   monthsSince,
@@ -88,13 +89,13 @@ export function usePeriodRecap(kind: PeriodKind, param: unknown) {
             .slice(0, OTHER_MONTHS)
             .map((m) => {
               const s = countedSpan(monthPeriod(m), today, firstDate);
-              let n = 0;
-              const elapsed = s ? diffDays(s.from, s.to) + 1 : 0;
-              if (s) for (const d of logged) if (d >= s.from && d <= s.to) n += 1;
-              return { month: m, logged: n, elapsed };
+              return { month: m, logged: s ? loggedBetween(logged, s.from, s.to) : 0, elapsed: s ? diffDays(s.from, s.to) + 1 : 0 };
             })
         : [];
-    const years = yearsSince(firstDate, today);
+    const years = yearsSince(firstDate, today).map((y) => {
+      const s = countedSpan(yearPeriod(y), today, firstDate);
+      return { year: y, logged: s ? loggedBetween(logged, s.from, s.to) : 0, elapsed: s ? diffDays(s.from, s.to) + 1 : 0 };
+    });
 
     const share: SharePeriodInput = {
       period,
