@@ -14,7 +14,7 @@ import type { DaySummary } from '@/store/selectors';
 import { favoriteRecordId, useStore } from '@/store';
 import { cup, fonts, useLargeText, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType, WaterEntry } from '@/types';
-import { ANDROID_TOUCH, AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, IconButton, ListRow, PressableScale, ProgressBar, RestoreRow, Sheet, Text, Trough } from '@/ui';
+import { ANDROID_TOUCH, AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, figure, IconButton, ListRow, PressableScale, ProgressBar, RestoreRow, Sheet, Text, Trough } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
 import { clearEntries, copyEntries } from './actions';
@@ -33,13 +33,6 @@ import { FadeRow, Unfold, useComeBack, useLeavingRows } from './rowMotion';
 
 /** Whether the summary's details (the day as a trough, the target, workouts and macros) are open: kept for the session, so paging days keeps it. */
 let summaryOpen = false;
-
-/**
- * A block of figures read as one element with its units in full (D6-39, WCAG 3.1.4): natively an accessible
- * view named by its label; on the web an image named by it (`role="img"`), since a plain block's name is not
- * read there and its drawn words would be ("941 kcal left").
- */
-const FIGURES = Platform.OS === 'web' ? ({ role: 'img' } as const) : null;
 
 /**
  * The day's numbers at the top of the diary, compact so the meals lead the first view (Lunch's add is in it at
@@ -76,9 +69,7 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; /** Th
         <View
           testID="diary-summary-figures"
           style={{ flex: 1, minWidth: 0 }}
-          accessible
-          {...FIGURES}
-          accessibilityLabel={spokenUnits(`${kcal(Math.abs(day.remaining))} kcal ${over ? 'above the budget' : 'left'}, ${kcal(day.eaten.kcal)} kcal eaten of ${kcal(budget)} kcal`)}>
+          {...figure(spokenUnits(`${kcal(Math.abs(day.remaining))} kcal ${over ? 'above the budget' : 'left'}, ${kcal(day.eaten.kcal)} kcal eaten of ${kcal(budget)} kcal`))}>
           <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', alignItems: 'baseline', columnGap: 6 }}>
             <AnimatedNumber
               variant="numXL"
@@ -141,7 +132,7 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; /** Th
                 ['Fat', day.eaten.fat, day.macros.fatG, colors.fat, 'limit'],
               ] as const
             ).map(([label, value, target, color, goalKind]) => (
-              <View key={label} style={[big ? { flexGrow: 1, flexBasis: 120 } : { flex: 1 }, { minWidth: 0, gap: 8 }]} accessible accessibilityLabel={`${label}, ${Math.round(value)} of ${target} grams`}>
+              <View key={label} style={[big ? { flexGrow: 1, flexBasis: 120 } : { flex: 1 }, { minWidth: 0, gap: 8 }]} {...figure(`${label}, ${Math.round(value)} of ${target} grams`)}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <CupKey color={color} />
                   <Text variant="label" numberOfLines={1}>
@@ -393,8 +384,7 @@ export function MealCard({
               format={kcal}
               style={{ fontSize: 15, lineHeight: 20 }}
               // Read as one element with its unit in full ("446 kilocalories"), never as drawn.
-              accessibilityLabel={`${kcal(total)} kilocalories`}
-              {...FIGURES}>
+              {...figure(`${kcal(total)} kilocalories`)}>
               <Text variant="unit">{' kcal'}</Text>
             </AnimatedNumber>
           ) : null}

@@ -99,7 +99,7 @@ export function HabitsCard({ summary, previous, units }: { summary: PeriodSummar
         title="Hydration"
         value={w ? waterValue : null}
         unit={`${waterUnit.join(' ')} / day`}
-        detail={w ? keep(`Goal met on ${w.daysAtGoal} of ${w.daysTracked} days · goal ${formatVolume(w.avgGoalMl, units)}`) : 'No drinks logged in this range yet'}
+        detail={w ? keep(`Goal reached on ${w.daysAtGoal} of ${w.daysTracked} days · goal ${formatVolume(w.avgGoalMl, units)}`) : 'No drinks logged in this range yet'}
         progress={w ? w.avgMl / w.avgGoalMl : 0}
         trend={changeDirection('waterMl', w?.avgMl, p?.water?.avgMl)}
         change={changeWords('waterMl', w?.avgMl, p?.water?.avgMl, { period, units })}

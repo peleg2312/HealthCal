@@ -1049,7 +1049,7 @@ export function weeklyRecap(input: {
     if (score < bestScore) {
       bestScore = score;
       const parts = [`${formatNumber(Math.round(d.eaten.kcal))} of ${kcalText(d.budget)}`, `${gText(d.eaten.protein)} protein`];
-      if (waterMet) parts.push('water goal met');
+      if (waterMet) parts.push('water goal reached');
       if (d.activeMinutes > 0) parts.push(`${d.activeMinutes} active min`);
       bestDay = { date: d.date, detail: parts.join(', ') };
     }
@@ -1098,7 +1098,7 @@ export function recapWinFocus(s: PeriodSummary, units: UnitSystem, goal: GoalTyp
   const w = s.water;
   if (w && w.daysTracked >= 2) {
     const r = w.daysAtGoal / w.daysTracked;
-    if (r >= 0.7) wins.push({ score: r, text: `You hit your water goal on ${w.daysAtGoal} of ${w.daysTracked} days.` });
+    if (r >= 0.7) wins.push({ score: r, text: `You reached your water goal on ${w.daysAtGoal} of ${w.daysTracked} days.` });
     // The days at the goal are the Water tile's figure, so the focus says what the tile does not: the gap.
     else {
       const gap = w.avgGoalMl - w.avgMl;
@@ -1174,8 +1174,8 @@ export function computeMilestones(input: {
     count('days-100', '100 days logged', 'A long-term record few people build.', loggedDates, 100),
     count('weigh-ins-10', '10 weigh-ins', 'Enough for a reliable trend line.', weighIns, 10),
     count('weigh-ins-50', '50 weigh-ins', 'A trend you can trust week to week.', weighIns, 50),
-    count('water-7', '7 days at water goal', 'Counted across any days, not in a row.', waterDates, 7),
-    count('water-30', '30 days at water goal', 'Counted across any days, not in a row.', waterDates, 30),
+    count('water-7', 'Water goal reached on 7 days', 'Counted across any days, not in a row.', waterDates, 7),
+    count('water-30', 'Water goal reached on 30 days', 'Counted across any days, not in a row.', waterDates, 30),
     count('sessions-10', '10 workouts logged', 'Any activity counts.', sessionDates, 10),
     count('sessions-50', '50 workouts logged', 'Any activity counts.', sessionDates, 50),
   ];
@@ -1294,7 +1294,7 @@ export function recapTiles(r: Pick<WeeklyRecap, 'summary' | 'previous' | 'label'
     }),
     tile({
       id: 'water',
-      label: 'Water goal met',
+      label: 'Water goal reached',
       value: s.water ? s.water.daysAtGoal : null,
       unit: s.water ? `of ${s.water.daysTracked} days` : 'days',
       context: s.water ? `${plural(s.water.daysTracked, 'day')} tracked` : 'no drinks logged',

@@ -37,7 +37,7 @@ import { useNow, useToday } from '@/store/clock';
 import { useConsistency, useDay, useLive, useProfile, type DaySummary } from '@/store/selectors';
 import { motion, useLargeText, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
-import { AnimatedNumber, Button, Card, Chip, CupKey, IconButton, levelY, placeLabels, PressableScale, ProgressBar, Screen, Text, useGrownText, Vessel, type VesselLabel } from '@/ui';
+import { AnimatedNumber, Button, Card, Chip, CupKey, figure, IconButton, levelY, placeLabels, PressableScale, ProgressBar, Screen, Text, useGrownText, Vessel, type VesselLabel } from '@/ui';
 
 
 export default function TodayScreen() {
@@ -160,12 +160,6 @@ const NARROW = { padding: 12, paddingV: 10, labelSpacing: 4, labelH: 20, macrosT
  * unit of the number above it ("941 kcal left"): " kcal" needs 27 px more, and at 320 px its column has 26 to spare.
  */
 const ACTION_H = Math.max(32, SHARE_CUP);
-/**
- * A block of figures read as one element with its units in full: natively an accessible view named by its label; on the
- * web an image named by it (`role="img"`), since react-native-web reads a plain block's drawn words ("1,219 eaten of
- * 2,160") and not its name. As the diary's summary does (`FIGURES` in @/features/food/DiaryParts).
- */
-const FIGURES = Platform.OS === 'web' ? ({ role: 'img' } as const) : null;
 const ACTION_GAP = 12;
 
 function EnergyCard({
@@ -246,7 +240,7 @@ function EnergyCard({
       tick: colors.exercise,
       content: (
         // Never clipped (no numberOfLines): under a reader's own text spacing the label wraps rather than lose its end.
-        <Text variant="numM" style={{ fontSize: 17, lineHeight: lineH }} testID="today-added" {...FIGURES} accessibilityLabel={addedLabel}>
+        <Text variant="numM" style={{ fontSize: 17, lineHeight: lineH }} testID="today-added" {...figure(addedLabel)}>
           {`~${formatNumber(headroom)}`}
           <Text variant="unit">{' kcal'}</Text>
           <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
@@ -267,8 +261,7 @@ function EnergyCard({
           variant="numM"
           style={{ fontSize: 17, lineHeight: lineH }}
           testID="today-not-added"
-          {...FIGURES}
-          accessibilityLabel={`Workouts: about ${formatNumber(notAdded)} kilocalories, not added to the budget`}>
+          {...figure(`Workouts: about ${formatNumber(notAdded)} kilocalories, not added to the budget`)}>
           {`~${formatNumber(notAdded)}`}
           <Text variant="unit">{' kcal'}</Text>
           <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
@@ -342,7 +335,7 @@ function EnergyCard({
           // Text only: it never takes a tap meant for the big number above it. The budget is said here, once, as the
           // diary's summary says it ("1,219 eaten of 2,160", under "941 kcal left", whose unit it shares: " kcal" would not
           // fit its column at 320 px); the whole sum (target plus exercise) is read out.
-          <View pointerEvents="none" accessible {...FIGURES} accessibilityLabel={`${formatNumber(eaten)} kilocalories eaten. ${budgetLabel}`}>
+          <View pointerEvents="none" {...figure(`${formatNumber(eaten)} kilocalories eaten. ${budgetLabel}`)}>
             <AnimatedNumber variant="numM" value={eaten} format={(n) => formatNumber(Math.round(n))} style={{ fontSize: 17, lineHeight: lineH }} testID="today-eaten">
               <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
                 {'  eaten of '}
@@ -448,7 +441,7 @@ function EnergyCard({
             {headroom > 0 ? (
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
                 <CupKey color={colors.headroom} variant="hatched" size={11} style={{ marginTop: 8 }} />
-                <Text variant="numM" style={{ flexShrink: 1, fontSize: 17, lineHeight: 22 }} testID="today-added" {...FIGURES} accessibilityLabel={addedLabel}>
+                <Text variant="numM" style={{ flexShrink: 1, fontSize: 17, lineHeight: 22 }} testID="today-added" {...figure(addedLabel)}>
                   {`~${formatNumber(headroom)}`}
                   <Text variant="unit">{' kcal'}</Text>
                   <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
@@ -461,8 +454,7 @@ function EnergyCard({
                 variant="numM"
                 style={{ fontSize: 17, lineHeight: 22 }}
                 testID="today-not-added"
-                {...FIGURES}
-                accessibilityLabel={`Workouts: about ${formatNumber(notAdded)} kilocalories, not added to the budget`}>
+                {...figure(`Workouts: about ${formatNumber(notAdded)} kilocalories, not added to the budget`)}>
                 {`~${formatNumber(notAdded)}`}
                 <Text variant="unit">{' kcal'}</Text>
                 <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
@@ -473,7 +465,7 @@ function EnergyCard({
             {actions ? (
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
                 <CupKey color={colors.calories} size={11} style={{ marginTop: 8 }} />
-                <View pointerEvents="none" accessible {...FIGURES} accessibilityLabel={`${formatNumber(eaten)} kilocalories eaten. ${budgetLabel}`} style={{ flexShrink: 1 }}>
+                <View pointerEvents="none" {...figure(`${formatNumber(eaten)} kilocalories eaten. ${budgetLabel}`)} style={{ flexShrink: 1 }}>
                   <AnimatedNumber variant="numM" value={eaten} format={(n) => formatNumber(Math.round(n))} style={{ fontSize: 17, lineHeight: 22 }} testID="today-eaten">
                     <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
                       {' eaten of '}
@@ -602,7 +594,7 @@ function MacroColumn({ label, value, target, color, reach, narrow, stacked }: { 
   );
   if (stacked) {
     return (
-      <View style={{ gap: 8 }} accessible {...FIGURES} accessibilityLabel={`${label}, ${Math.round(value)} of ${Math.round(target)} grams`}>
+      <View style={{ gap: 8 }} {...figure(`${label}, ${Math.round(value)} of ${Math.round(target)} grams`)}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: 12 }}>
           {name}
           {amount}
@@ -612,7 +604,7 @@ function MacroColumn({ label, value, target, color, reach, narrow, stacked }: { 
     );
   }
   return (
-    <View style={{ flex: 1, minWidth: 0, gap: narrow ? NARROW.macroGap : 8 }} accessible {...FIGURES} accessibilityLabel={`${label}, ${Math.round(value)} of ${Math.round(target)} grams`}>
+    <View style={{ flex: 1, minWidth: 0, gap: narrow ? NARROW.macroGap : 8 }} {...figure(`${label}, ${Math.round(value)} of ${Math.round(target)} grams`)}>
       {name}
       {bar}
       {amount}

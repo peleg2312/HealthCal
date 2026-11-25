@@ -11,6 +11,7 @@
  * - Food names appear only with `choices.foods`.
  */
 import { addDays, fromISODate, startOfWeek } from '@/lib/dates';
+import { budgetSharePct } from '@/features/progress/budgetShare';
 import { budgetMark } from '@/lib/insights';
 import { formatNumber, formatVolume } from '@/lib/units';
 import type { ISODate, MealType, UnitSystem } from '@/types';
@@ -211,7 +212,8 @@ export function dayCardContent(input: ShareDayInput, choices: ShareChoices): Day
 
   const headline = choices.kcal
     ? { value: formatNumber(Math.round(input.kcal)), unit: `of ${formatNumber(Math.round(budget))} kcal` }
-    : { value: `${Math.round(level * 100)}%`, unit: inProgress ? 'of today’s budget' : 'of the day’s budget' };
+    : // The share as every screen says it (`budgetSharePct`: floored and in step with the on-budget mark).
+      { value: `${budgetSharePct(input.kcal, budget) ?? 0}%`, unit: inProgress ? 'of today’s budget' : 'of the day’s budget' };
 
   const stats: ShareStat[] = [];
   if (choices.water && input.waterLogged) {
@@ -221,7 +223,7 @@ export function dayCardContent(input: ShareDayInput, choices: ShareChoices): Day
       key: 'water',
       value,
       unit: unit.join(' '),
-      label: reached ? 'water, goal met' : `water of ${formatVolume(input.waterGoalMl, input.units).replace(/ /g, '\u00A0')}`,
+      label: reached ? 'water, goal reached' : `water of ${formatVolume(input.waterGoalMl, input.units).replace(/ /g, '\u00A0')}`,
       progress: input.waterGoalMl > 0 ? input.waterMl / input.waterGoalMl : 0,
     });
   }
@@ -309,7 +311,7 @@ export function weekHeadline(input: ShareWeekInput, cups: WeekCup[], choices: Sh
     lines.push({ score: onBudget / complete, text: onBudget === complete ? 'Every full day on budget.' : 'Most full days on budget.' });
   if (choices.activity && input.guidelineMinutes >= 150) lines.push({ score: 0.85, text: `Past the weekly 150 active minutes${inProgress ? ' already' : ''}.` });
   if (choices.water && input.waterDaysTracked >= 2 && input.waterDaysAtGoal / input.waterDaysTracked >= 0.7)
-    lines.push({ score: input.waterDaysAtGoal / input.waterDaysTracked, text: input.waterDaysAtGoal === input.waterDaysTracked ? 'Water goal met every day it was tracked.' : 'Water goal met on most days.' });
+    lines.push({ score: input.waterDaysAtGoal / input.waterDaysTracked, text: input.waterDaysAtGoal === input.waterDaysTracked ? 'Water goal reached every day it was tracked.' : 'Water goal reached on most days.' });
   if (logged >= 6) lines.push({ score: 0.7, text: logged === 7 ? 'Food logged every day of the week.' : `Food logged on ${logged} of 7 days.` });
   lines.sort((a, b) => b.score - a.score);
   if (lines[0]) return lines[0].text;
@@ -333,7 +335,7 @@ export function weekCardContent(input: ShareWeekInput, choices: ShareChoices): W
   const stats: ShareStat[] = complete ? [{ key: 'budget', value: `${onBudget}`, unit: `of ${complete}`, label: `full ${plural(complete, 'day')} on budget` }] : [];
   if (choices.kcal && input.avgKcal !== null) stats.push({ key: 'kcal', value: formatNumber(Math.round(input.avgKcal)), unit: 'kcal', label: 'a day on average' });
   if (choices.water && input.waterDaysTracked > 0)
-    stats.push({ key: 'water', value: `${input.waterDaysAtGoal}`, unit: `of ${input.waterDaysTracked}`, label: 'days at water goal', progress: input.waterDaysAtGoal / Math.max(1, input.waterDaysTracked) });
+    stats.push({ key: 'water', value: `${input.waterDaysAtGoal}`, unit: `of ${input.waterDaysTracked}`, label: 'days, water goal reached', progress: input.waterDaysAtGoal / Math.max(1, input.waterDaysTracked) });
   if (choices.activity && input.guidelineMinutes > 0)
     stats.push({ key: 'activity', value: formatNumber(input.guidelineMinutes), unit: 'min', label: inProgress ? 'active so far' : 'active this week' });
   if (choices.streak && input.streak > 0) stats.push({ key: 'streak', value: `${input.streak}`, unit: plural(input.streak, 'day'), label: 'logging streak' });

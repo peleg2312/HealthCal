@@ -6,7 +6,7 @@ import Svg, { Line } from 'react-native-svg';
 import { spokenUnits } from '@/lib/spokenUnits';
 import { motion, useTheme, vesselBase } from '@/theme';
 
-import { DECORATIVE } from './decorative';
+import { DECORATIVE, figure } from './decorative';
 import { useFadeAfter, usePour, useReachFlash } from './motion';
 import { brimOverhang, fillRatio, goalState, levelY, placeLabels, type GoalKind } from './vesselLayout';
 
@@ -242,7 +242,7 @@ export function Vessel({
 
   if (!labels?.length && !children) {
     return (
-      <View style={style} testID={testID} accessibilityLabel={accessibilityLabel && spokenUnits(accessibilityLabel)} accessible={!!accessibilityLabel}>
+      <View style={style} testID={testID} {...figure(accessibilityLabel && spokenUnits(accessibilityLabel))}>
         {cupView}
       </View>
     );

@@ -111,16 +111,19 @@ describe('webAutoComplete', () => {
 });
 
 describe('spokenFieldName', () => {
-  it('says a short unit at the end of the label in full', () => {
-    expect(spokenFieldName('Neck, in')).toBe('Neck, inches');
-    expect(spokenFieldName('Height, ft')).toBe('Height, feet');
-    expect(spokenFieldName('Weight (kg)')).toBe('Weight (kilograms)');
-    expect(spokenFieldName('Water, fl oz')).toBe('Water, fluid ounces');
+  it('keeps the label as drawn, then says its short unit in full (label in name)', () => {
+    expect(spokenFieldName('Neck, in')).toBe('Neck, in, inches');
+    expect(spokenFieldName('Height, ft')).toBe('Height, ft, feet');
+    expect(spokenFieldName('Weight (kg)')).toBe('Weight (kg), kilograms');
+    expect(spokenFieldName('Water, fl oz')).toBe('Water, fl oz, fluid ounces');
   });
   it("adds the field's own unit when the label does not name it", () => {
     expect(spokenFieldName('Protein', 'g')).toBe('Protein, grams');
     expect(spokenFieldName('Calories', 'kcal')).toBe('Calories, kilocalories');
-    expect(spokenFieldName('Weight, kg', 'kg')).toBe('Weight, kilograms');
+    expect(spokenFieldName('Weight, kg', 'kg')).toBe('Weight, kg, kilograms');
+  });
+  it('always holds the drawn label', () => {
+    for (const label of ['Neck, in', 'Weight (kg)', 'Water, fl oz', 'Protein', 'Other amount']) expect(spokenFieldName(label, 'ml')!.startsWith(label)).toBe(true);
   });
   it('leaves a label alone when there is no unit to say', () => {
     expect(spokenFieldName('Name')).toBe('Name');

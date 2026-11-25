@@ -164,11 +164,11 @@ export function dayOnTrack(day: DaySummary): boolean {
 }
 
 export function checkInBody(day: DaySummary, units: UnitSystem): string {
-  if (dayOnTrack(day)) return `Everything is logged and on track today: ${caloriesLine(day)}, protein and water goals met.`;
+  if (dayOnTrack(day)) return `Everything is logged and on track today: ${caloriesLine(day)}, protein and water goals reached.`;
   const parts: string[] = [caloriesLine(day)];
   const proteinLeft = Math.round(day.macros.proteinG - day.eaten.protein);
-  parts.push(proteinLeft > 0 ? `${proteinLeft} g protein to go` : 'protein goal met');
-  parts.push(day.waterRemainingMl > 0 ? `${volumeText(day.waterRemainingMl, units)} water to go` : 'water goal met');
+  parts.push(proteinLeft > 0 ? `${proteinLeft} g protein to go` : 'protein goal reached');
+  parts.push(day.waterRemainingMl > 0 ? `${volumeText(day.waterRemainingMl, units)} water to go` : 'water goal reached');
   const unlogged = MEALS.filter((m) => !hasFoodLogged(day.byMeal[m.key])).map((m) => m.label.toLowerCase());
   const tail = unlogged.length ? ` Not logged yet: ${unlogged.join(', ')}.` : '';
   const sentence = parts.join(', ');

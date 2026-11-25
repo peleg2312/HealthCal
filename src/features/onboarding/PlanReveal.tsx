@@ -7,7 +7,7 @@ import { bodyFatText, weightText } from '@/features/trackers/helpers';
 import { formatNumber, formatVolume } from '@/lib/units';
 import { spokenUnits } from '@/lib/spokenUnits';
 import { useTextSize, useTheme } from '@/theme';
-import { AnimatedNumber, Button, Card, CupKey, decorative, Divider, FadeUp, haptic, levelY, MacroBar, PressableScale, Text, useReducedMotion, Vessel } from '@/ui';
+import { AnimatedNumber, Button, Card, CupKey, decorative, Divider, FadeUp, figure, haptic, levelY, MacroBar, PressableScale, Text, useReducedMotion, Vessel } from '@/ui';
 
 import { ARRIVAL_POUR, stepHeadingRef } from './components';
 import { METHOD_LABEL, type Plan } from './model';
@@ -146,9 +146,10 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
           <Card
             style={{ gap: spacing.md }}
             testID="plan-projection"
-            accessible
-            accessibilityLabel={spokenUnits(
-              `The road to ${weightText(projection.targetKg, units)}: ${range}, around ${looseDate(projection.date, now)} at about ${pace} a week. A projection, not a promise.`,
+            {...figure(
+              spokenUnits(
+                `The road to ${weightText(projection.targetKg, units)}: ${range}, around ${looseDate(projection.date, now)} at about ${pace} a week. A projection, not a promise.`,
+              ),
             )}>
             <View style={{ gap: spacing.xs }}>
               <Text variant="h3">{`The road to ${weightText(projection.targetKg, units)}`}</Text>
@@ -423,7 +424,7 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
     // At 130% text and more the labels no longer fit between the levels they describe: the target leads in
     // full width, then a smaller cup with the other figures in a column beside it, then the note under both.
     return (
-      <View style={{ gap: spacing.md }} accessible accessibilityLabel={spoken}>
+      <View style={{ gap: spacing.md }} {...figure(spoken)}>
         <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
           <AnimatedNumber variant="numXL" color="caloriesInk" testID="plan-kcal" value={target} from={0} duration={ARRIVAL_POUR} delay={POUR_DELAY} format={(n) => formatNumber(Math.round(n))} />
           <Text variant="unit">kcal a day</Text>

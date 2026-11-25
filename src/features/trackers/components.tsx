@@ -256,7 +256,9 @@ export function HistoryItem({ children }: { children: React.ReactNode }) {
 export function HistoryRow({ testID, title, subtitle, value, onPress }: { testID: string; title: string; subtitle?: string; value: string; onPress: () => void }) {
   const { colors, spacing } = useTheme();
   const big = useLargeText();
-  const said = spokenUnits([title, subtitle?.replace(/\u00A0/g, ' '), value].filter(Boolean).join(', ')).replace(/\bvs\b/g, 'against the');
+  // Named by what it shows, in the order drawn (the value under the title with large text), units as drawn (WCAG
+  // 2.5.3, label in name): "Today, −0.1 kg vs previous · 18% body fat, 78.8 kg".
+  const said = (big ? [title, value, subtitle] : [title, subtitle, value]).filter(Boolean).map((p) => p!.replace(/\u00A0/g, ' ')).join(', ');
   return (
     <PressableScale
       testID={testID}

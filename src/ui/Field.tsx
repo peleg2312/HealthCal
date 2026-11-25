@@ -111,8 +111,9 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
           {...rest}
           {...(web as object)}
           ref={setRef as never}
-          // Its name says the unit in full: the label's short unit or the one drawn in the field ("Protein, grams").
-          accessibilityLabel={spokenUnits(rest.accessibilityLabel ?? spokenFieldName(label, suffix) ?? rest.placeholder ?? '') || undefined}
+          // Its name holds its label as drawn, then the unit in full: the label's short unit or the one drawn in the
+          // field ("Neck, in, inches", "Protein, grams"; `spokenFieldName`, label in name).
+          accessibilityLabel={(rest.accessibilityLabel ?? spokenFieldName(label, suffix) ?? rest.placeholder ?? '') || undefined}
           accessibilityHint={error || rest.accessibilityHint || hint}
           onFocus={(e) => {
             setFocused(true);

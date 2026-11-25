@@ -761,7 +761,7 @@ function WaterScreen() {
       <Card style={{ gap: spacing.md }}>
         {/* Two sentences: reading text (body), never a caption. The key's sentence stays whole on its line. */}
         <Text variant="body" color="textSecondary">
-          {week.some((d) => d.waterMl > 0) ? `Goal met on ${daysMet} of 7 days.` : 'Bars fill in as you log drinks.'} {'Dashed\u00A0line:\u00A0the\u00A0goal.'}
+          {week.some((d) => d.waterMl > 0) ? `Goal reached on ${daysMet} of 7 days.` : 'Bars fill in as you log drinks.'} {'Dashed\u00A0line:\u00A0the\u00A0goal.'}
         </Text>
         <BarChart
           // One image for a screen reader: the summary, then every day's amount (chartWords).

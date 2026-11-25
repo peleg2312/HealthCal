@@ -186,7 +186,7 @@ export function DayStepper({ value, onChange, testIDPrefix = 'day', latest, next
         onPress={() => !isToday && onChange(todayDate)}
         accessibilityLabel={entryDaySpoken(value, todayDate)}
         style={{ flex: 1, minWidth: 0, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, minHeight: 44 }}>
-        <CalendarDays size={16} color={colors.textSecondary} strokeWidth={1.9} />
+        <CalendarDays size={18} color={colors.textSecondary} strokeWidth={1.9} />
         <Text variant="label" testID={`${testIDPrefix}-label`} numberOfLines={1} style={{ flexShrink: 1 }}>
           {entryDayLabel(value, todayDate)}
         </Text>

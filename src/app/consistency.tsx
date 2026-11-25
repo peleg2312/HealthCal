@@ -47,7 +47,7 @@ function cellLabel(cell: CalendarCell): string {
   const above = Math.round(cell.kcal - cell.budget);
   const share = cell.ratio > 1 ? `${formatNumber(Math.max(1, above))} kcal above the budget` : `${budgetSharePct(cell.kcal, cell.budget) ?? 0}% of the budget`;
   const food = cell.future ? 'upcoming' : !cell.logged ? 'not logged' : cell.isToday ? `${share} so far` : cell.partial ? `partly logged, ${share}` : `${share}${cell.onBudget ? ', on budget' : ''}`;
-  return spokenUnits([formatDayLabel(cell.date), food, cell.waterMet ? 'water goal met' : '', cell.trained ? 'workout logged' : ''].filter(Boolean).join(', '));
+  return spokenUnits([formatDayLabel(cell.date), food, cell.waterMet ? 'water goal reached' : '', cell.trained ? 'workout logged' : ''].filter(Boolean).join(', '));
 }
 
 /**
@@ -277,7 +277,7 @@ export default function ConsistencyScreen() {
           <Legend swatch={<Check size={11} color={colors.success} strokeWidth={3} />} label="On budget, 90 to 100%" />
           <Legend swatch={<CupKey color={colors.warning} />} label="Above budget" />
           {rows.some((r) => r.some((c) => c?.partial)) ? <Legend swatch={<CupKey color={withOpacity(colors.calories, PARTIAL)} />} label="Partly logged" /> : null}
-          <Legend swatch={<CupKey color={colors.water} size={7} />} label="Water goal met" />
+          <Legend swatch={<CupKey color={colors.water} size={7} />} label="Water goal reached" />
           <Legend swatch={<Dumbbell size={12} color={colors.exercise} strokeWidth={2.4} />} label="Workout" />
         </View>
       </Card>

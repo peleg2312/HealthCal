@@ -10,7 +10,7 @@
  * - weight (the trend's average): 0.3 kg. No share: 5% of a body would hide every real change, and the
  *   trend is already smoothed, so what is left under 0.3 kg is the gut and water.
  * - waterMl (millilitres a day): 100 ml and 5%.
- * - share (a share of days, 0 to 1: days at the water goal, days on budget): 10 points. One day is 3 to
+ * - share (a share of days, 0 to 1: days the water goal was reached, days on budget): 10 points. One day is 3 to
  *   14 points of a range, so a single day either way is never an arrow on 30 or 90 days.
  * - minutes (active minutes a week): 15 min and 5%.
  * - sleep (hours a night): 15 minutes and 5%.
@@ -85,7 +85,7 @@ function roundsToZero(kind: ChangeKind, n: number): boolean {
 /**
  * The change in words, for a tile's spoken label: "Up 37 kcal a day from the previous 30 days",
  * "Down 0.6 kg from the previous 30 days", "About the same as the previous 30 days: up 37 kcal a day"
- * (under the rule, so drawn as a dash). A share of days is said as the two shares: "Days at the goal
+ * (under the rule, so drawn as a dash). A share of days is said as the two shares: "Days the goal was reached
  * up from 20% to 31% of tracked days, against the previous 30 days". Null when either value is missing.
  */
 export function changeWords(
@@ -96,7 +96,7 @@ export function changeWords(
     /** 'the previous 30 days' is said from '30 days'. */
     period: string;
     units?: UnitSystem;
-    /** What a share counts, e.g. 'Days at the water goal'. */
+    /** What a share counts, e.g. 'Days the water goal was reached'. */
     subject?: string;
     /** The earlier period said in full instead ('the week before'). */
     than?: string;

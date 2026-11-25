@@ -14,8 +14,8 @@ const WIN_TILE: { id: RecapTile['id']; test: RegExp }[] = [
   { id: 'activity', test: /^\d[\d,]* active minutes in \d+ sessions?, past the weekly / },
   // "Protein averaged 150 g against your 152 g goal."
   { id: 'protein', test: /^Protein averaged / },
-  // "You hit your water goal on 5 of 7 days."
-  { id: 'water', test: /^You hit your water goal on \d+ of \d+ days?\./ },
+  // "You reached your water goal on 5 of 7 days."
+  { id: 'water', test: /^You reached your water goal on \d+ of \d+ days?\./ },
 ];
 
 /** The tile whose figures the win already says, or null (a win about calories, weight or logging). */

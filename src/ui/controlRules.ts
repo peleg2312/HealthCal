@@ -197,16 +197,16 @@ const FIELD_UNITS: Record<string, string> = {
 };
 
 /**
- * A text field's spoken name with its unit in full: a short unit at the end of the label ("Neck, in",
- * "Weight (kg)") is said as its word ("Neck, inches"), and the unit drawn inside the field (`suffix`, "g")
- * is added when the label does not name it ("Protein, grams"). A suffix that is not a unit ("servings")
- * adds nothing. The label as drawn keeps its short unit.
+ * A text field's spoken name: its label as drawn, short unit included (WCAG 2.5.3, label in name: "Neck, in"),
+ * then its unit in full: the label's own short unit ("Neck, in, inches", "Weight (kg), kilograms"), else the
+ * unit drawn inside the field (`suffix`, "g": "Protein, grams"). A suffix that is not a unit ("servings") adds
+ * nothing.
  */
 export function spokenFieldName(label: string | undefined, suffix?: string): string | undefined {
   if (!label) return label;
-  const name = label.replace(/(,\s*|\s\()(fl oz|kcal|kg|lbs?|oz|ml|mg|g|L|cm|in|ft|km|mi|min|h|%)(\)?)$/, (_m, pre: string, unit: string, close: string) => `${pre}${FIELD_UNITS[unit]}${close}`);
-  const word = suffix ? FIELD_UNITS[suffix.trim()] : undefined;
-  return word && !name.includes(word) ? `${name}, ${word}` : name;
+  const own = label.match(/(?:,\s*|\s\()(fl oz|kcal|kg|lbs?|oz|ml|mg|g|L|cm|in|ft|km|mi|min|h|%)\)?$/);
+  const word = (own ? FIELD_UNITS[own[1]] : undefined) ?? (suffix ? FIELD_UNITS[suffix.trim()] : undefined);
+  return word && !label.includes(word) ? `${label}, ${word}` : label;
 }
 
 /**

@@ -18,7 +18,7 @@ describe('chart words', () => {
   it('names water by day with the goal and the days it was met', () => {
     const days = ['2026-11-18', '2026-11-19', '2026-11-20', '2026-11-21', '2026-11-22', '2026-11-23', '2026-11-24'].map((date, i) => ({ date, ml: i === 6 ? 1230 : i * 700, goalMl: 3300 }));
     const label = waterChartLabel(days, '2026-11-24', 'metric');
-    expect(label.startsWith('Water by day, Nov 18 to today, goal 3.3 litres, met on 1 of 7 days.')).toBe(true);
+    expect(label.startsWith('Water by day, Nov 18 to today, goal 3.3 litres, reached on 1 of 7 days.')).toBe(true);
     expect(label).toContain('Wednesday none');
     expect(label).toContain('today 1.23 litres.');
     expect(label.split(', ').length).toBeGreaterThan(7);

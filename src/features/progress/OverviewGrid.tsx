@@ -148,10 +148,10 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         color={colors.water}
         value={w ? `${w.daysAtGoal}` : null}
         unit={w ? `of ${w.daysTracked} days` : undefined}
-        caption={w ? `at goal · ${formatVolume(w.avgMl, units)} a day` : 'No drinks logged yet'}
-        captionShort={w ? 'at goal' : 'No drinks yet'}
-        // The mark and its words compare the number shown: the share of tracked days at the goal.
-        compare={changeWords('share', waterShare(w), waterShare(p?.water ?? null), { period, subject: 'Days at the water goal' })}
+        caption={w ? `goal reached · ${formatVolume(w.avgMl, units)} a day` : 'No drinks logged yet'}
+        captionShort={w ? 'goal reached' : 'No drinks yet'}
+        // The mark and its words compare the number shown: the share of tracked days the goal was reached.
+        compare={changeWords('share', waterShare(w), waterShare(p?.water ?? null), { period, subject: 'Days the water goal was reached' })}
         trend={changeDirection('share', waterShare(w), waterShare(p?.water ?? null))}
         period={period}
         onPress={() => onOpen('habits')}

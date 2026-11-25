@@ -1,11 +1,11 @@
 import { router } from 'expo-router';
-import { Triangle } from 'lucide-react-native';
+import { ChevronRight, Triangle } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { fonts, useLargeText, useTheme } from '@/theme';
 import type { Direction } from '@/lib/insights';
-import { Card, Chip, CupKey, PressableScale, Sheet, Text, useGrownText } from '@/ui';
+import { Button, Card, Chip, CupKey, PressableScale, Sheet, Text, useGrownText } from '@/ui';
 
 import type { RangeDays } from './useProgressData';
 
@@ -14,9 +14,10 @@ export function go(route: string) {
 }
 
 /**
- * A Pour card with a Bricolage title, a small subtitle and an optional
- * underlined text link to the detail screen. The data colour appears only as
- * a cup key before the title (never as a tinted tile or as text).
+ * A Pour card with a Bricolage title, a small subtitle and an optional way to
+ * the detail screen: the kit's small ghost Button with a chevron, as a section's
+ * way to another screen is everywhere. The data colour appears only as a cup key
+ * before the title (never as a tinted tile or as text).
  */
 export function SectionCard({
   title,
@@ -42,7 +43,7 @@ export function SectionCard({
   testID?: string;
   children: React.ReactNode;
 }) {
-  const { spacing } = useTheme();
+  const { colors, spacing } = useTheme();
   return (
     <Card testID={testID} style={{ gap: spacing.lg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -60,21 +61,23 @@ export function SectionCard({
             </Text>
           ) : null}
         </View>
-        {link ? <TextLink testID={testID ? `${testID}-link` : undefined} label={linkLabel} accessibilityLabel={`${title}: ${linkLabel}`} onPress={() => go(link)} /> : null}
+        {link ? (
+          <Button
+            testID={testID ? `${testID}-link` : undefined}
+            title={linkLabel}
+            accessibilityLabel={`${title}: ${linkLabel}`}
+            variant="ghost"
+            size="sm"
+            full={false}
+            iconRight={<ChevronRight size={18} color={colors.primaryInk} strokeWidth={2.2} />}
+            onPress={() => go(link)}
+            // The chevron ends near the card's text edge, as Train's "All activities" does.
+            style={{ paddingRight: 6, alignSelf: 'center' }}
+          />
+        ) : null}
       </View>
       {children}
     </Card>
-  );
-}
-
-/** An underlined text link in the text colour, with a 44 px touch target (primary text is too faint on bg in light). */
-export function TextLink({ label, onPress, testID, accessibilityLabel }: { label: string; onPress: () => void; testID?: string; accessibilityLabel?: string }) {
-  return (
-    <PressableScale testID={testID} onPress={onPress} accessibilityRole="link" accessibilityLabel={accessibilityLabel ?? label} hitSlop={6} style={{ minHeight: 44, justifyContent: 'center', paddingLeft: 8 }}>
-      <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
-        {label}
-      </Text>
-    </PressableScale>
   );
 }
 

@@ -25,7 +25,9 @@ import { startWaitLoop, waitDuration, WAIT_HIGH, WAIT_REST } from './loop';
  *
  * `working` pours it in a loop while the AI works (./loop.ts: 1,120 ms a turn): the drop falls into
  * the cup as the level pours up, the level falls back and the drop returns. The loop never claims a
- * share done. Under reduced motion nothing loops: the cup rests at `level` with the drop above it.
+ * share done, and moves for 5 s at most: after four turns the cup pours to `level` with the drop above it
+ * and holds still for the rest of the wait (WCAG 2.2.2). Under reduced motion nothing loops: the cup rests at
+ * `level` with the drop above it from the start.
  * Only transforms and opacity animate. Decorative: hidden from screen readers, the words beside it
  * carry the meaning.
  */
@@ -115,14 +117,14 @@ export function AiMark({
       } else {
         dropOpacity.set(withTiming(1, { duration: motion.duration.fade, easing: ease.enter }));
       }
-    }, false);
+    }, false, undefined, level);
     return () => {
       stop();
       cancelAnimation(dropY);
       dropY.set(0);
       dropOpacity.set(withTiming(1, { duration: motion.duration.fade, easing: ease.enter }));
     };
-  }, [loop, fall, dropOpacity, dropY]);
+  }, [loop, fall, dropOpacity, dropY, level]);
 
   const dropStyle = useAnimatedStyle(() => ({ opacity: dropOpacity.get(), transform: [{ translateY: dropY.get() }] }));
 

@@ -228,7 +228,7 @@ export function coachTip(
       day.remaining >= 0
         ? day.waterRemainingMl > 0
           ? 'Within budget so far, with water still to go.'
-          : 'Within budget, and the water goal is done.'
+          : 'Within budget, and the water goal is reached.'
         : 'Close to your budget for the day.',
     tone: 'positive',
   };

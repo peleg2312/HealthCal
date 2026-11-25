@@ -42,7 +42,7 @@ describe('winTile', () => {
   it('finds the water tile in the water win', () => {
     const s = { ...quiet(), water: { avgMl: 2500, avgGoalMl: 2400, daysAtGoal: 5, daysTracked: 7 } };
     const { win } = recapWinFocus(s, 'metric', 'lose');
-    expect(win).toBe('You hit your water goal on 5 of 7 days.');
+    expect(win).toBe('You reached your water goal on 5 of 7 days.');
     expect(winTile(win)).toBe('water');
   });
 

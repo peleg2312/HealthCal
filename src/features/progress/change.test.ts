@@ -86,8 +86,8 @@ describe('changeWords: the change said with its size', () => {
   });
 
   it('says a share of days as the two shares', () => {
-    expect(changeWords('share', 0.31, 0.2, { period, subject: 'Days at the water goal' })).toBe('Days at the water goal up from 20% to 31%, against the previous 30 days');
-    expect(changeWords('share', 0.31, 0.28, { period, subject: 'Days at the water goal' })).toBe('Days at the water goal: 31%, about the same as the previous 30 days (28%)');
+    expect(changeWords('share', 0.31, 0.2, { period, subject: 'Days the water goal was reached' })).toBe('Days the water goal was reached up from 20% to 31%, against the previous 30 days');
+    expect(changeWords('share', 0.31, 0.28, { period, subject: 'Days the water goal was reached' })).toBe('Days the water goal was reached: 31%, about the same as the previous 30 days (28%)');
   });
 
   it('says a week total against the week before without "a week" twice', () => {

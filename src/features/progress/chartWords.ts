@@ -45,12 +45,12 @@ export function pointDay(date: ISODate, today: ISODate, byWeekday: boolean): str
   return byWeekday ? WEEKDAYS_LONG[fromISODate(date).getDay()] : formatShortDate(date);
 }
 
-/** Water's last 7 days: "Water by day, last 7 days, goal 3.3 litres, met on 3 of 7 days. Wednesday 2.1 litres, …". */
+/** Water's last 7 days: "Water by day, last 7 days, goal 3.3 litres, reached on 3 of 7 days. Wednesday 2.1 litres, …". */
 export function waterChartLabel(days: readonly { date: ISODate; ml: number; goalMl: number }[], today: ISODate, units: UnitSystem): string {
   const goal = days[days.length - 1]?.goalMl ?? 0;
-  const met = days.filter((d) => d.goalMl > 0 && d.ml >= d.goalMl).length;
+  const reached = days.filter((d) => d.goalMl > 0 && d.ml >= d.goalMl).length;
   const span = days.length ? `${formatShortDate(days[0].date)} to ${days[days.length - 1].date === today ? 'today' : formatShortDate(days[days.length - 1].date)}` : '';
-  const summary = `Water by day, ${span}, goal ${formatVolume(goal, units)}, met on ${met} of ${days.length} days`;
+  const summary = `Water by day, ${span}, goal ${formatVolume(goal, units)}, reached on ${reached} of ${days.length} days`;
   return chartLabel(summary, days.map((d) => `${pointDay(d.date, today, true)} ${d.ml > 0 ? formatVolume(d.ml, units) : 'none'}`));
 }
 

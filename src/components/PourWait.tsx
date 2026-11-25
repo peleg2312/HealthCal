@@ -23,8 +23,10 @@ import { Text } from '@/ui';
  *
  * One turn of the loop is 910 ms: the level rises from 15% to 75% over `duration.draw` (600 ms,
  * the pour's ease-out), rests for `duration.settle` (150 ms), fades over `duration.fade` (160 ms)
- * and starts again (`TURN_MS` adds the three tokens, so the turn follows them). Only a transform and an opacity move. Under reduced motion (the app's one
- * switch, `useReducedMotion`) nothing loops: the cup is half full and still.
+ * and starts again (`TURN_MS` adds the three tokens, so the turn follows them). Only a transform and an opacity move. It moves for 5 s
+ * at most (WCAG 2.2.2, `STILL_TURNS`): five turns, then one pour to half full, where it holds still for the rest of
+ * the wait while the sentence beside it keeps saying what is happening. Under reduced motion (the app's one
+ * switch, `useReducedMotion`) nothing loops: the cup is half full and still from the start.
  */
 export function PourWait({
   size = 'tile',
@@ -46,20 +48,35 @@ export function PourWait({
   // One clock for the whole turn, 0 to 1, so the level and the fade can never drift apart and a new
   // turn starts both from their beginnings. An Animated value lives in state, not a ref: it is read while rendering.
   const [turn] = useState(() => new Animated.Value(0));
+  // After the last turn: the one pour from the low level to half full, 0 to 1, and true once the turns are over.
+  const [settle] = useState(() => new Animated.Value(0));
+  const [still, setStill] = useState(false);
 
   useEffect(() => {
     if (reduce) return;
-    const loop = Animated.loop(Animated.timing(turn, { toValue: 1, duration: TURN_MS, easing: Easing.linear, useNativeDriver: Platform.OS !== 'web' }));
-    loop.start();
+    const native = Platform.OS !== 'web';
+    const loop = Animated.loop(Animated.timing(turn, { toValue: 1, duration: TURN_MS, easing: Easing.linear, useNativeDriver: native }), { iterations: STILL_TURNS });
+    let last: Animated.CompositeAnimation | null = null;
+    loop.start(({ finished }) => {
+      if (!finished) return;
+      setStill(true);
+      last = Animated.timing(settle, { toValue: 1, duration: motion.duration.pourSmall, easing: Easing.bezier(...motion.easing.pour), useNativeDriver: native });
+      last.start();
+    });
     return () => {
       loop.stop();
+      last?.stop();
       turn.setValue(0);
     };
-  }, [reduce, turn]);
+  }, [reduce, turn, settle]);
 
   // The fill is as tall as the cup and slides up inside its clipped box.
-  const translateY = reduce ? (1 - REST) * inner : turn.interpolate({ inputRange: RISE.at, outputRange: RISE.level.map((l) => (1 - l) * inner) });
-  const opacity = reduce ? 1 : turn.interpolate({ inputRange: [0, FADE_FROM, 1], outputRange: [1, 1, 0] });
+  const translateY = reduce
+    ? (1 - REST) * inner
+    : still
+      ? settle.interpolate({ inputRange: [0, 1], outputRange: [(1 - LOW) * inner, (1 - REST) * inner] })
+      : turn.interpolate({ inputRange: RISE.at, outputRange: RISE.level.map((l) => (1 - l) * inner) });
+  const opacity = reduce || still ? 1 : turn.interpolate({ inputRange: [0, FADE_FROM, 1], outputRange: [1, 1, 0] });
 
   return (
     <View
@@ -123,6 +140,8 @@ const REST = 0.5;
 
 /** One turn: the rise (`draw`), the rest (`settle`), the fade (`fade`). */
 const TURN_MS = motion.duration.draw + motion.duration.settle + motion.duration.fade;
+/** The turns that, with the last pour to half full, end within 5 s (WCAG 2.2.2): 4,550 ms, then 360 ms. */
+const STILL_TURNS = Math.floor((5000 - motion.duration.pourSmall) / TURN_MS);
 const FADE_FROM = (motion.duration.draw + motion.duration.settle) / TURN_MS;
 
 /**

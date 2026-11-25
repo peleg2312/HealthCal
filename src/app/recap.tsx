@@ -15,6 +15,7 @@ import { useRecapReady } from '@/features/progress/recapReady';
 import { useRecap } from '@/features/progress/useRecap';
 import { winTile } from '@/features/progress/recapWin';
 import { ShareWeekButton } from '@/features/share';
+import { noteVariant } from '@/features/settings/noteText';
 import { useLargeText, useTheme } from '@/theme';
 import { AnimatedNumber, Card, CupKey, Divider, EmptyState, FadeUp, figure, Header, IconButton, PressableScale, Screen, Sheet, Text } from '@/ui';
 

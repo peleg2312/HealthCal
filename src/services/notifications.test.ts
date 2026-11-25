@@ -189,7 +189,7 @@ describe('planReminders', () => {
 
   it('writes a short positive check-in when everything is on track', () => {
     const s = day('2026-11-11', { meals: ['breakfast', 'lunch', 'dinner'], eaten: 1900, protein: 150, waterMl: 2500 });
-    expect(checkInBody(s, 'metric')).toBe('Everything is logged and on track today: 200 kcal left, protein and water goals met.');
+    expect(checkInBody(s, 'metric')).toBe('Everything is logged and on track today: 200 kcal left, protein and water goals reached.');
     const partial = day('2026-11-11', { meals: ['breakfast'], eaten: 900, protein: 60, waterMl: 1000 });
     expect(checkInBody(partial, 'metric')).toBe('1,200 kcal left, 90 g protein to go, 1.5 L water to go. Not logged yet: lunch, dinner.');
   });

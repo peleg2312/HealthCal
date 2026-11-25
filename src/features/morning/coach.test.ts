@@ -442,7 +442,7 @@ describe('drinks from the diary only', () => {
     expect(latte.improveKind).toBe('water');
   });
 
-  it('diary drinks up to the goal never read as water at its goal', () => {
+  it('diary drinks up to the goal never read as reaching the water goal', () => {
     const base = { kcal: 2080, protein: 160, waterGoalMl: 3300, hasWater: false };
     const latte = run({ y: facts({ ...base, waterMl: 3400 }), lastNight: { hours: 7.5 }, plan: { waterMl: 3400, waterTracked: false } });
     const none = run({ y: facts({ ...base, waterMl: 0 }), lastNight: { hours: 7.5 }, plan: { waterMl: 0, waterTracked: false } });

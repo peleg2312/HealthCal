@@ -49,7 +49,7 @@ describe('day card content', () => {
   it('carries water, activity and the streak by default, and no food names', () => {
     const c = dayCardContent(day(), DEFAULT_SHARE_CHOICES);
     expect(c.stats.map((s) => s.key)).toEqual(['water', 'activity', 'streak']);
-    expect(c.stats[0]).toMatchObject({ value: '2.4', unit: 'L', label: 'water, goal met' });
+    expect(c.stats[0]).toMatchObject({ value: '2.4', unit: 'L', label: 'water, goal reached' });
     expect(c.foods).toBeNull();
     expect(allText(dayScene(c, darkColors).prims)).not.toMatch(/Salmon|Banana/);
   });

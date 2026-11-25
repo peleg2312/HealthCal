@@ -114,18 +114,19 @@ function goodPhrase(item: ReviewItem, y: DayFacts): string {
     case 'budget':
       return 'a day within budget';
     case 'protein':
-      return 'protein at its goal';
+      return 'reaching the protein goal';
     case 'water':
-      return 'water at its goal';
+      // A goal to reach has one word, "reached", wherever it is said.
+      return 'reaching the water goal';
     default:
       return 'the whole day logged';
   }
 }
 
-/** One or two went-well items as one phrase: "your workout and a full night's sleep", "protein and water at their goals". */
+/** One or two went-well items as one phrase: "your workout and a full night's sleep", "reaching the protein and water goals". */
 export function goodList(items: readonly ReviewItem[], y: DayFacts): string {
   const kinds = items.map((i) => i.kind);
-  if (kinds.length === 2 && kinds[0] === 'protein' && kinds[1] === 'water') return 'protein and water at their goals';
+  if (kinds.length === 2 && kinds[0] === 'protein' && kinds[1] === 'water') return 'reaching the protein and water goals';
   return items.map((i) => goodPhrase(i, y)).join(' and ');
 }
 
