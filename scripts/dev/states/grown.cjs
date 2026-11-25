@@ -39,4 +39,20 @@ for (const [steps, tag] of [
     { id: `text${tag}-add-sheet`, route: '/', taps: [...up, 'tab-add'], sheet: true, note: `the + sheet at ${tag}% text` },
   );
 }
+// Water at the same steps, opened from Today's water row after the size is set (WATERGROWN): the cup's words at their
+// levels in boxes measured as drawn, four glasses a row wherever their words fit, the title row on one line while it
+// fits, and the drink chips and the cup's key in lines from their widths as drawn. Milk is tapped twice: at 320 px
+// with grown text the first tap only scrolls the kind row (DrinkKindRow brings a chip into view as it takes the focus).
+for (const [steps, tag] of [
+  [1, '115'],
+  [2, '130'],
+]) {
+  const toWater = [...sized('today', steps), 'today-water'];
+  states.push(
+    { id: `text${tag}-water`, route: '/', taps: toWater, waitFor: 'water-hero', note: `Water at ${tag}% text: the cup with its key, the glasses, the title row` },
+    { id: `text${tag}-water-layers`, route: '/', values: { drinks: 2 }, taps: toWater, waitFor: 'water-key', note: `Water at ${tag}% text with five drinks of four kinds: the layers and a key of several items` },
+    { id: `text${tag}-water-milk`, route: '/', now: todayAt(13, 30), taps: [...toWater, 'water-beverage-milk', 'water-beverage-milk', 'water-choice-milk_whole'], waitFor: 'water-drink-line', note: `Water at ${tag}% text, whole milk chosen: the choice chips and the glasses with their calories` },
+    { id: `text${tag}-water-reached`, route: '/', taps: [...toWater, 'water-add-3', 'water-add-3', 'water-add-3', 'water-add-3', 'water-add-3'], waitFor: 'water-goal-reached', note: `Water at ${tag}% text, the goal reached: the brim line and the line under the cup` },
+  );
+}
 module.exports = states;

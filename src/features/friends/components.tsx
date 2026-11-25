@@ -83,7 +83,7 @@ export function WorkoutRow({ w, friend, today, units, onCheer }: { w: FriendWork
     // Cheer sits beside the workout; a name too long for that line takes the row and Cheer goes under it, at the right.
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.sm, minHeight: 56, paddingVertical: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
-        <Text style={{ fontSize: 17, lineHeight: 22, width: 22, textAlign: 'center' }} accessibilityElementsHidden importantForAccessibility="no">
+        <Text style={{ fontSize: 17, lineHeight: 22, minWidth: 22, textAlign: 'center' }} accessibilityElementsHidden importantForAccessibility="no">
           {w.emoji || '·'}
         </Text>
         <View style={{ flexShrink: 1, minWidth: 0 }}>

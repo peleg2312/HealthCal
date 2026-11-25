@@ -410,6 +410,12 @@ const friendsMeals = [
   { id: 'friends-teen', route: '/auth?mode=signin', taps: friends('meals.teen@example.com'), waitFor: 'friends-feed', note: 'under 18: workouts and cheers only' },
   { id: 'friends-teen-settings', route: '/auth?mode=signin', taps: [...friends('meals.teen@example.com'), 'friends-settings-open'], waitFor: 'friends-settings-under-18', note: 'under 18: no meal settings' },
   { id: 'friends-feed-empty', route: '/auth?mode=signin', taps: friends('meals.none@example.com'), waitFor: 'friends-feed-empty', note: 'a friend, nothing shown yet' },
+  // At 200% text (the app's own size): rows wrap and stack, buttons take their lines, nothing is cut.
+  { id: 'friends-feed-200', route: '/auth?mode=signin', flags: { __healthcalTextSize: true }, taps: friends(DANA), waitFor: 'friends-feed', note: 'the feed at 200% text' },
+  { id: 'friends-meal-add-200', route: '/auth?mode=signin', flags: { __healthcalTextSize: true }, taps: [...friends(DANA), 'friends-feed-meal-1-add'], sheet: true, note: 'add to my diary at 200% text' },
+  { id: 'friends-friend-200', route: '/auth?mode=signin', flags: { __healthcalTextSize: true }, taps: [...friends(DANA), '^friends-person-'], waitFor: 'friend-screen', note: 'a friend’s page at 200% text' },
+  { id: 'friends-settings-200', route: '/auth?mode=signin', flags: { __healthcalTextSize: true }, taps: [...friends(DANA), 'friends-settings-open'], waitFor: 'friends-settings-meals', note: 'friends settings at 200% text' },
+  { id: 'friends-show-sheet-200', route: '/auth?mode=signin', flags: { __healthcalTextSize: true }, taps: [...signIn(DANA), 'tab-diary', { wait: 1200 }, 'meal-menu-lunch', 'meal-menu-show'], sheet: true, note: 'show lunch at 200% text' },
 ];
 
 // ------------------------------------------------------------------ online drinks (a build with a backend)

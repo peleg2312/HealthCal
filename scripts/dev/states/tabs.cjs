@@ -58,7 +58,38 @@ const rail = [
   { id: 'today-rail-past', route: '/', taps: [`today-day-${isoDay(-1)}`, { wait: 300 }], waitFor: 'today-rail', note: 'yesterday picked on the strip: "that week, 45 that day" under the week\'s minutes' },
 ];
 
+// Kept days and the caption row's links (src/features/streak/kept.ts, builder STREAK). The seed logs every day up to
+// its today, so the clock moves on to leave the page's yesterday with no food between logged days, which the streak
+// keeps (drawn with the dashed kept line), inside the week shown on any weekday: two days on (the seed's day after is
+// quiet), or, when that would be a Monday (the seed made on a Saturday, whose kept day would be last week's), one day
+// on with the seed's own today left without food (values.eaten 0).
+const keptAt = (() => {
+  const d = new Date();
+  const saturday = d.getDay() === 6;
+  d.setDate(d.getDate() + (saturday ? 1 : 2));
+  d.setHours(15, 0, 0, 0);
+  return { now: d.getTime(), ...(saturday ? { values: { eaten: 0 } } : null) };
+})();
+// The month or year link needs the clock in its window and no week link in front of it: the first day of next month's
+// first week, or of December 26 to 31, that is a Thursday to a Sunday (the week's link shows Monday to Wednesday).
+const linkDay = (year, month, from, to) => {
+  for (let day = from; day <= to; day++) {
+    const d = new Date(year, month, day, 10, 0);
+    if ([4, 5, 6, 0].includes(d.getDay())) return d.getTime();
+  }
+  return new Date(year, month, from, 10, 0).getTime();
+};
+const now0 = new Date();
+const kept = [
+  { id: 'today-kept-day', route: '/', ...keptAt, waitFor: 'today-week', note: 'yesterday with nothing logged between logged days: its cup wears the dashed kept line, its name says it is kept' },
+  { id: 'today-kept-line', route: '/', ...keptAt, flags: { __healthcalKeptDay: true }, waitFor: 'today-kept-line', note: 'the one-time line in the caption row: "Kept: one quiet day does not break your streak." with its X' },
+  { id: 'diary-kept-day', route: '/diary', ...keptAt, waitFor: 'diary-week', note: "the diary's strip draws the same kept day" },
+  { id: 'today-period-link', route: '/', now: linkDay(now0.getFullYear(), now0.getMonth() + 1, 1, 7), flags: { __healthcalPeriodOffer: true }, waitFor: 'today-period-open', note: 'early in a month, no week link: "Your <month> is ready" with its X' },
+  { id: 'today-year-link', route: '/', now: linkDay(now0.getFullYear(), 11, 26, 31), flags: { __healthcalPeriodOffer: true }, waitFor: 'today-period-open', note: 'the last days of December: "Your <year> is ready"' },
+];
+
 module.exports = [
+  ...kept,
   ...header,
   ...water,
   ...rail,

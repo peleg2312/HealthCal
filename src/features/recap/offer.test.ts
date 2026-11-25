@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { addDays } from '@/lib/dates';
 
-import { parseDealt, periodOffer, withDealt } from './offer';
+import { parseDealt, periodLinkWords, periodOffer, withDealt } from './offer';
 
 const run = (from: string, n: number) => new Set(Array.from({ length: n }, (_, i) => addDays(from, i)));
 
@@ -58,5 +58,35 @@ describe('the device’s list', () => {
     expect(list).toHaveLength(8);
     expect(list[0]).toBe('2026-03');
     expect(withDealt(['2026-10', '2026'], '2026-10')).toEqual(['2026', '2026-10']);
+  });
+});
+
+describe('Today’s link (periodLinkWords)', () => {
+  const october = run('2026-10-01', 26);
+  it('says the month is ready, with the month alone as its short form, and where it leads', () => {
+    const p = periodOffer('2026-11-02', october, '2026-09-01', [])!;
+    const w = periodLinkWords(p, '2026-11-02', october, '2026-09-01');
+    expect(w.label).toBe('Your October is ready');
+    expect(w.short).toBe('Your October');
+    expect(w.hint).toBe('October: 26 of 31 days logged. Opens the month in cups');
+    expect(w.route).toBe('/recap/month?month=2026-10');
+    expect(w.hide).toBe('Hide your October in cups');
+    expect(w.hidden).toBe('Month in cups hidden. It stays on Progress.');
+  });
+
+  it('says the year around New Year, and another year’s month by its name alone when short', () => {
+    const year = run('2026-06-01', 200);
+    const y = periodLinkWords(periodOffer('2027-01-03', year, '2026-06-01', [])!, '2027-01-03', year, '2026-06-01');
+    expect([y.label, y.short, y.route]).toEqual(['Your 2026 is ready', 'Your 2026', '/recap/year?year=2026']);
+    const m = periodLinkWords(periodOffer('2027-01-03', year, '2026-06-01', ['2026'])!, '2027-01-03', year, '2026-06-01');
+    expect([m.label, m.short]).toEqual(['Your December 2026 is ready', 'Your December']);
+  });
+
+  it('uses no exclamation mark and no word of pressure', () => {
+    const p = periodOffer('2026-11-02', october, '2026-09-01', [])!;
+    for (const s of Object.values(periodLinkWords(p, '2026-11-02', october, '2026-09-01'))) {
+      expect(s).not.toContain('!');
+      expect(s).not.toMatch(/\b(upgrade|unlock|premium|last chance|missed|should)\b/i);
+    }
   });
 });

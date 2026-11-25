@@ -2685,13 +2685,13 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     }
   }
 
-  // ------------------------------------------- one tap closes a sheet and opens another (src/ui/Sheet.tsx, src/ui/sheetHistory.ts)
+  // ------------------------------------------- a sheet over a pushed screen and the browser's Back (src/ui/Sheet.tsx, src/ui/sheetHistory.ts)
   // On the web an open sheet adds a history entry so the browser's Back closes it, and a sheet closed any other way
-  // takes its entry off with one history.back(). When one tap closes sheet A and opens sheet B, that step back is the
-  // app's own: B must stay open, the person's Back then closes B on the same address, and a sheet closed by its scrim
-  // leaves no entry behind (the next Back leaves the screen). Friends has two such pairs (a friend's sheet -> "Remove
-  // Sam?", Friends settings -> "Turn friends off?"); with no backend the friends store is set directly
-  // (window.__healthcalFriends, a test-hook build only), so nothing is sent.
+  // takes its entry off with one history.back(). Friends' two questions now open over screens of their own (a friend's
+  // page -> "Remove Sam?", Friends settings -> "Turn friends off?"): Back closes the question on the same address, and a
+  // question closed by its scrim leaves no entry behind (the next Back leaves the screen). With no backend each screen's
+  // own refresh empties the friends store, so the store is set again after each move (window.__healthcalFriends, a
+  // test-hook build only), and nothing is sent.
   {
     const { buildSeed } = await import(require('url').pathToFileURL(require.resolve('./seed.mjs')).href);
     const seed = buildSeed({ onboarded: true, theme: 'dark' });
@@ -2713,52 +2713,64 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const where = () => sp.evaluate(() => location.pathname + location.search);
     const d = new Date();
     const week = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const fill = async () => {
+      await sp.waitForTimeout(400);
+      await sp.evaluate(
+        (wk) =>
+          window.__healthcalFriends.setState({
+            status: 'ready',
+            error: null,
+            overview: {
+              me: { code: 'ABCD2345', displayName: 'Alex', avatar: '', sharing: { workouts: true, streak: true, minutes: true }, shareKey: '0'.repeat(32), mealSettings: { auto: [], kcal: false, see: true }, mealsAllowed: true, audience: [] },
+              friends: [{ userId: 'friend-sam', displayName: 'Sam', avatar: '', since: null, summary: { week: wk, minutes: 95, sessions: 3, streak: 4 }, summaryUpdatedAt: null, cheered: [], shareMeals: true, seeMeals: true }],
+              incoming: [],
+              outgoing: [],
+              cheers: [],
+              feed: [],
+              myMeals: [],
+            },
+          }),
+        week,
+      );
+    };
     await sp.goto(`${BASE}/`, { waitUntil: 'networkidle' });
     await sp.getByTestId('today-friends').first().waitFor({ timeout: 20000 });
     await stap('today-friends');
     await sp.getByTestId('friends-screen').first().waitFor({ timeout: 15000 });
-    await sp.waitForTimeout(300);
-    await sp.evaluate(
-      (wk) =>
-        window.__healthcalFriends.setState({
-          status: 'ready',
-          error: null,
-          overview: {
-            me: { code: 'ABCD2345', displayName: 'Alex', avatar: '', sharing: { workouts: true, streak: true, minutes: true }, shareKey: '0'.repeat(32) },
-            friends: [{ userId: 'friend-sam', displayName: 'Sam', avatar: '', since: null, summary: { week: wk, minutes: 95, sessions: 3, streak: 4 }, summaryUpdatedAt: null, cheered: [] }],
-            incoming: [],
-            outgoing: [],
-            cheers: [],
-          },
-        }),
-      week,
-    );
-    const card = await sp.getByTestId('friends-card-friend-sam').first().waitFor({ timeout: 10000 }).then(() => true, () => false);
+    await fill();
+    const person = await sp.getByTestId('friends-person-friend-sam').first().waitFor({ timeout: 10000 }).then(() => true, () => false);
+    check('sheet history: Friends shows a friend from the store (no backend)', person && (await where()) === '/friends', await where());
+    await stap('friends-person-friend-sam');
+    await fill();
+    const page = await sp.getByTestId('friends-remove').first().waitFor({ timeout: 10000 }).then(() => true, () => false);
     const at = await where();
-    check('sheet pair: Friends shows a friend from the store (no backend)', card && at === '/friends', at);
-    await stap('friends-card-friend-sam');
-    const friendSheet = await shown('friends-remove');
     await stap('friends-remove');
-    // Past the sheet's own wait before it adds its entry (120 ms) and the closing sheet's step back.
+    // Past the sheet's own wait before it adds its entry (120 ms).
     await sp.waitForTimeout(500);
     const removeOpen = (await shown('confirm-yes')) && (await sp.getByText('Remove Sam?').count()) > 0;
-    check('sheet pair: one tap closes the friend sheet and opens "Remove Sam?", which stays open', friendSheet && removeOpen && !(await shown('friends-remove')), `friend sheet ${friendSheet}, question ${removeOpen}`);
+    check('sheet history: a friend’s page opens "Remove Sam?"', page && at === '/friends/friend?id=friend-sam' && removeOpen, `${at}, question ${removeOpen}`);
     await sp.goBack();
     await sp.waitForTimeout(500);
-    check("sheet pair: the browser's Back then closes it, the address unchanged and the screen as it was", !(await shown('confirm-yes')) && (await where()) === at && (await shown('friends-card-friend-sam')), `${await where()}, question ${await shown('confirm-yes')}`);
+    check("sheet history: the browser's Back closes it, the address unchanged and the page as it was", !(await shown('confirm-yes')) && (await where()) === at && (await shown('friends-remove')), `${await where()}, question ${await shown('confirm-yes')}`);
+    // Back to Friends (the hidden screens under a pushed one keep their own header-back in the page).
+    await sp.goBack();
+    await sp.waitForTimeout(500);
+    await fill();
     await stap('friends-settings-open');
-    const settingsSheet = await shown('friends-leave');
+    await fill();
+    const settings = await sp.getByTestId('friends-leave').first().waitFor({ timeout: 10000 }).then(() => true, () => false);
+    const atSettings = await where();
     await stap('friends-leave');
     await sp.waitForTimeout(500);
     const leaveOpen = (await shown('confirm-yes')) && (await sp.getByText('Turn friends off?').count()) > 0;
-    check('sheet pair: "Turn friends off" closes Friends settings and opens its question, which stays open', settingsSheet && leaveOpen && !(await shown('friends-leave')), `settings ${settingsSheet}, question ${leaveOpen}`);
+    check('sheet history: Friends settings opens "Turn friends off?"', settings && atSettings === '/friends/settings' && leaveOpen, `${atSettings}, question ${leaveOpen}`);
     // The scrim, above the sheet.
     await sp.touchscreen.tap(180, 40);
     await sp.waitForTimeout(500);
-    check('sheet pair: the scrim closes the question, the address unchanged', !(await shown('confirm-yes')) && (await where()) === at, await where());
+    check('sheet history: the scrim closes the question, the address unchanged', !(await shown('confirm-yes')) && (await where()) === atSettings, await where());
     await sp.goBack();
     await sp.waitForTimeout(600);
-    check('sheet pair: no sheet left an entry behind: one Back leaves Friends for Today', (await where()) === '/' && (await shown('today-friends')), await where());
+    check('sheet history: no sheet left an entry behind: one Back leaves settings for Friends', (await where()) === '/friends', await where());
     await sctx.close();
   }
 
@@ -3251,6 +3263,118 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     check('meal photos: Delete photo hides it at once, and its Undo brings it back', gone && (await page.getByTestId('journal-photo-0').count()) === 1);
     await page.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
     check('meal photos: Profile names how many are kept', /1 photo, on this phone only/.test(await text('profile-journal')), await text('profile-journal'));
+  }
+
+  // ------------------------------------------- kept days (src/features/streak/kept.ts, builder STREAK)
+  // The page's yesterday has no food between logged days, inside the week shown on any weekday (two days on from the
+  // seed, or from a Saturday one day on with the seed's today left without food): the streak keeps it, and Today's
+  // strip and Consistency draw it with the dashed kept line and name it kept. The one-time line shows only when the
+  // page asks, is kept as said on this device once it has been in front for 3 s, and its X hides it; it never comes
+  // back. Covered by the morning page before it was seen, it is not said and shows when Today is back in front.
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require.resolve('./seed.mjs')).href);
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const saturday = new Date().getDay() === 6;
+    const later = new Date();
+    later.setDate(later.getDate() + (saturday ? 1 : 2));
+    later.setHours(15, 0, 0, 0);
+    const quiet = new Date(later);
+    quiet.setDate(quiet.getDate() - 1);
+    const y = iso(quiet);
+    const seedFor = (values) => JSON.stringify(buildSeed({ onboarded: true, theme: 'blossom', ...(values ? { values } : null) }));
+    const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+    await ctx.clock.setFixedTime(later);
+    await ctx.addInitScript((value) => {
+      if (!window.sessionStorage.getItem('__seeded')) {
+        window.localStorage.setItem('healthcal-v1', value);
+        window.sessionStorage.setItem('__seeded', '1');
+      }
+    }, seedFor(saturday ? { eaten: 0 } : null));
+    const p = await ctx.newPage();
+    p.on('pageerror', (e) => errors.push(e.message));
+    await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    const day = p.getByTestId(`today-day-${y}`).first();
+    await day.waitFor({ timeout: 20000 });
+    const name = (await day.getAttribute('aria-label')) || '';
+    check("kept days: a quiet yesterday between logged days is named kept on Today's strip", /nothing logged, kept: one quiet day does not break your streak$/.test(name), name);
+    check('kept days: its cup wears the dashed kept line', (await p.locator(`[data-testid="today-day-${y}"] [data-testid="kept-mark"]`).count()) === 1);
+    await p.waitForTimeout(1200);
+    const said = () => p.evaluate(() => localStorage.getItem('healthcal.keptDaySaid'));
+    check('kept days: no one-time line in an automated browser unasked', (await p.getByTestId('today-kept-line').count()) === 0 && (await said()) === null);
+    await ctx.addInitScript(() => {
+      window.__healthcalKeptDay = true;
+    });
+    await p.reload({ waitUntil: 'networkidle' });
+    const line = await p.getByTestId('today-kept-line').first().waitFor({ timeout: 10000 }).then(() => true).catch(() => false);
+    const early = await said();
+    await p.waitForTimeout(3600);
+    const late = await said();
+    check('kept days: the one-time line shows when asked, and is kept as said on this device once it has been in front for 3 s (never in the store)', line && early === null && late === '1' && !JSON.stringify(await p.evaluate(() => window.__healthcal.getState())).includes('keptDay'), `${line} ${early} ${late}`);
+    const block = await p.getByTestId('today-week').first().boundingBox();
+    check('kept days: the line moves nothing (the slim strip stays 102 px)', !!block && Math.round(block.height) === 102, JSON.stringify(block));
+    const hid = await p.getByTestId('today-kept-hide').first().tap({ timeout: 5000 }).then(() => true).catch(() => false);
+    await p.waitForTimeout(400);
+    check('kept days: its X hides it', hid && (await p.getByTestId('today-kept-line').count()) === 0);
+    await p.reload({ waitUntil: 'networkidle' });
+    await p.getByTestId(`today-day-${y}`).first().waitFor({ timeout: 20000 });
+    await p.waitForTimeout(1500);
+    check('kept days: said once, it never comes back on this device', (await p.getByTestId('today-kept-line').count()) === 0);
+    await p.goto(`${BASE}/consistency`, { waitUntil: 'networkidle' });
+    await p.getByTestId('consistency-calendar').first().waitFor({ timeout: 15000 });
+    const legend = await p.getByTestId('consistency-calendar').first().innerText();
+    check('kept days: the Consistency legend names the kept line', /Kept: a quiet day in a streak/.test(legend), legend.slice(-200));
+    if (y.slice(0, 7) === iso(later).slice(0, 7)) {
+      const cell = (await p.getByTestId(`consistency-day-${y}`).first().getAttribute('aria-label')) || '';
+      check('kept days: the calendar names the same day kept and draws its line', /not logged, kept: one quiet day does not break your streak/.test(cell) && (await p.locator(`[data-testid="consistency-day-${y}"] [data-testid="kept-mark"]`).count()) === 1, cell);
+    }
+    await ctx.close();
+
+    // A morning start: yesterday quiet with water logged, so the morning page rises over Today 900 ms in. Today's
+    // clock (yesterday's food removed in the page first) or, from a Monday, the next day with the seed's today left
+    // without food, so the kept day is in the week shown.
+    const monday = new Date().getDay() === 1;
+    const dawn = new Date();
+    dawn.setDate(dawn.getDate() + (monday ? 1 : 0));
+    dawn.setHours(8, 10, 0, 0);
+    const dusk = new Date(dawn);
+    dusk.setDate(dusk.getDate() - 1);
+    const yd = iso(dusk);
+    const mctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+    await mctx.clock.setFixedTime(dawn);
+    await mctx.addInitScript(([value, prep]) => {
+      if (!prep || window.sessionStorage.getItem('__prepped')) {
+        window.__healthcalMorning = true;
+        window.__healthcalKeptDay = true;
+      }
+      if (!window.sessionStorage.getItem('__seeded')) {
+        window.localStorage.setItem('healthcal-v1', value);
+        window.sessionStorage.setItem('__seeded', '1');
+      }
+    }, [seedFor(monday ? { eaten: 0 } : null), !monday]);
+    const m = await mctx.newPage();
+    m.on('pageerror', (e) => errors.push(e.message));
+    await m.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    if (!monday) {
+      await m.getByTestId('today-week').first().waitFor({ timeout: 20000 });
+      await m.evaluate(async (date) => {
+        const s = window.__healthcal.getState();
+        for (const e of Object.values(s.foodEntries)) if (!e.deleted && e.date === date) s.remove('foodEntries', e.id);
+        await window.__healthcal.flush?.();
+        window.sessionStorage.setItem('__prepped', '1');
+      }, yd);
+      await m.waitForTimeout(800);
+      await m.reload({ waitUntil: 'networkidle' });
+    }
+    const rose = await m.getByTestId('morning-screen').first().waitFor({ timeout: 10000 }).then(() => true).catch(() => false);
+    await m.waitForTimeout(1500);
+    const under = await m.evaluate(() => localStorage.getItem('healthcal.keptDaySaid'));
+    check('kept days: covered by the morning page before it was seen, the line is not said', rose && under === null, `${rose} ${under}`);
+    const closed = await m.getByTestId('header-close').first().click({ timeout: 5000 }).then(() => true).catch(() => false);
+    const back = await m.getByTestId('today-kept-line').first().waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
+    await m.waitForTimeout(3600);
+    const after = await m.evaluate(() => localStorage.getItem('healthcal.keptDaySaid'));
+    check('kept days: back on Today after the morning page, the line shows and is then kept as said', closed && back && after === '1', `${closed} ${back} ${after}`);
+    await mctx.close();
   }
 
   const real = errors.filter((e) => !/favicon|DevTools|useNativeDriver|pointerEvents is deprecated|shadow\*/i.test(e));

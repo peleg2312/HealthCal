@@ -19,9 +19,11 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 
 import { shiftMonth } from '@/features/progress/consistency';
+import { diffDays } from '@/lib/dates';
 import type { ISODate } from '@/types';
 
-import { loggedBetween, monthKeyOf, monthPeriod, yearKeyOf, yearPeriod, type Period } from './period';
+import { countedSpan, loggedBetween, monthKeyOf, monthPeriod, yearKeyOf, yearPeriod, type Period } from './period';
+import { MONTH_LONG, monthRowWords, periodName, yearRowWords } from './words';
 
 export const OFFER_KEY = 'healthcal.periodRecapDealt';
 /** The first days of a month that offer the month before. */
@@ -55,6 +57,34 @@ export function periodOffer(today: ISODate, loggedDates: ReadonlySet<ISODate>, f
   if (dealt.includes(monthKey) || monthKeyOf(firstDate) > monthKey) return null;
   const m = monthPeriod(monthKey);
   return loggedBetween(loggedDates, m.start, m.end) >= OFFER_MONTH_MIN_DAYS ? m : null;
+}
+
+/**
+ * Today's words for the offered period, as the week caption's link (after "Your week is ready", one link at a time):
+ * 'Your October is ready', and under 360 px (or where the whole label, measured, does not fit) 'Your October', the
+ * month alone even for another year's, beside the streak and the week cup. The hint says what it counts and where it
+ * leads; the hide X and its toast say which period, and that it stays on Progress.
+ */
+export function periodLinkWords(
+  p: Period,
+  today: ISODate,
+  loggedDates: ReadonlySet<ISODate>,
+  firstDate: ISODate | null,
+): { label: string; short: string; hint: string; hide: string; hidden: string; route: string } {
+  const name = periodName(p, today);
+  const span = countedSpan(p, today, firstDate);
+  const n = span ? loggedBetween(loggedDates, span.from, span.to) : 0;
+  const elapsed = span ? diffDays(span.from, span.to) + 1 : 0;
+  const caption = p.kind === 'year' ? yearRowWords(p.key, n, today).caption : monthRowWords(p.key, n, elapsed, today).caption;
+  const what = p.kind === 'year' ? 'year' : 'month';
+  return {
+    label: `Your ${name} is ready`,
+    short: `Your ${p.kind === 'year' ? p.key : MONTH_LONG[Number(p.key.slice(5)) - 1]}`,
+    hint: `${name}: ${caption}. Opens the ${what} in cups`,
+    hide: `Hide your ${name} in cups`,
+    hidden: `${what === 'year' ? 'Year' : 'Month'} in cups hidden. It stays on Progress.`,
+    route: p.kind === 'month' ? `/recap/month?month=${p.key}` : `/recap/year?year=${p.key}`,
+  };
 }
 
 /** The stored list read back: only period keys, newest kept last. Anything else is an empty list. */

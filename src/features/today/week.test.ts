@@ -88,6 +88,12 @@ describe('dayCellLabel', () => {
     const day = d('2025-12-29', 1500, 2000);
     expect(dayCellLabel(dayRing(day, '2026-01-02'), '2026-01-02', day)).toBe('M 29, Monday, Dec 29, 2025, 1,500 kilocalories eaten of 2,000');
   });
+  it('says a quiet day the streak kept is kept, after what it shows, and never on a day still to come', () => {
+    const quiet = d('2026-11-11', null);
+    expect(dayCellLabel(dayRing(quiet, TODAY), TODAY, quiet, true)).toBe('W 11, Wednesday, Nov 11, nothing logged, kept: one quiet day does not break your streak');
+    expect(dayCellLabel(dayRing(quiet, TODAY), TODAY, quiet)).toBe('W 11, Wednesday, Nov 11, nothing logged');
+    expect(dayCellLabel({ date: '2026-11-15', state: 'future', progress: 0, close: false }, TODAY, undefined, true)).toBe('S 15, Sunday, Nov 15');
+  });
 });
 
 describe('startDate', () => {

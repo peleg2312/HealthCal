@@ -5,6 +5,7 @@
 import { addDays, formatShortDate, fromISODate, startOfWeek, toISODate } from '@/lib/dates';
 import { budgetMark, isCompleteDay, type InsightDay } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
+import { KEPT_SPOKEN } from '@/features/streak/kept';
 import type { ISODate } from '@/types';
 
 /**
@@ -49,9 +50,10 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
  * the figures grouped as drawn and the unit in full ("M 23, Monday, Nov 23, 2,024 kilocalories eaten of
  * 2,082"), so a figure straight after "Nov 23," is never heard as a year. A day above its budget says so
  * (its cup wears the amber lip); a day with nothing logged, or before the profile was made, says that; a day
- * still to come is its date only (its cup is drawn dashed, and a locked one is read as dimmed).
+ * still to come is its date only (its cup is drawn dashed, and a locked one is read as dimmed). A quiet day the streak
+ * kept (`isKeptDay`, drawn with its dashed kept line) ends with `KEPT_SPOKEN`, so it is never heard as a break.
  */
-export function dayCellLabel(ring: DayRing, today: ISODate, day?: Pick<InsightDay, 'entries' | 'eaten' | 'budget'>): string {
+export function dayCellLabel(ring: DayRing, today: ISODate, day?: Pick<InsightDay, 'entries' | 'eaten' | 'budget'>, kept = false): string {
   const date = ring.date;
   const d = fromISODate(date);
   const word =
@@ -70,7 +72,7 @@ export function dayCellLabel(ring: DayRing, today: ISODate, day?: Pick<InsightDa
         : ring.state === 'before'
           ? ', before you started'
           : ', nothing logged';
-  return `${DAY_LETTERS[d.getDay()]} ${d.getDate()}, ${word}${kcal}`;
+  return `${DAY_LETTERS[d.getDay()]} ${d.getDate()}, ${word}${kcal}${kept && ring.state !== 'future' ? `, ${KEPT_SPOKEN}` : ''}`;
 }
 
 /** The local day the profile was made, from `profile.onboardedAt`; undefined when unknown. */

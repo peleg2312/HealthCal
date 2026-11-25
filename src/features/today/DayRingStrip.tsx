@@ -2,6 +2,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react-native'
 import React, { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Platform, ScrollView, useWindowDimensions, View, type AccessibilityActionEvent, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type ViewStyle } from 'react-native';
 
+import { KeptMark, useKeptDays } from '@/features/streak/KeptMark';
 import { diffDays, formatShortDate, fromISODate, startOfWeek } from '@/lib/dates';
 import { useDays } from '@/store/selectors';
 import { cup, fonts, MAX_CONTENT_WIDTH, useTheme, useVeryLargeText } from '@/theme';
@@ -35,6 +36,8 @@ const SELECTED_MARK_W = 18;
  * 22 px date), the whole block 102 (Today's 132).
  */
 const SLIM_CUP = { width: 16, height: 20 };
+/** The full strip's cups: `MiniCup`'s own size. */
+const FULL_CUP = { width: 30, height: 38 };
 const SLIM_DAYS_H = 62;
 
 /** A mouse or trackpad on web: where the week arrows show. Everywhere else the week-picker cup does the same with a tap. */
@@ -83,7 +86,12 @@ function stripBleed(windowW: number, gutter: number): number {
  * week" as accessibility actions. A swipe that starts on the strip pages weeks, never days.
  * `slim` draws it with small cups and tighter gaps (102 px, the same rows and controls), as both tabs do, and says the
  * current week's caption without its lead ("2 full days on budget"). `link` puts a link with its hide X in the
- * caption's place on the current week (Today's "Your week is ready").
+ * caption's place on the current week (Today's "Your week is ready", else a month or a year in cups); `notice` a line
+ * with its hide X before it (Today's one-time "Kept: one quiet day does not break your streak.").
+ *
+ * A quiet day the streak kept (`keptDays` in @/features/streak/kept: no food logged, bridged between logged days) is
+ * drawn as its cup with the dashed kept line across it (`KeptMark`), never as an empty cup that reads as a break, and
+ * its name ends with what that means (`dayCellLabel`).
  */
 export function DayRingStrip({
   today,
@@ -97,6 +105,7 @@ export function DayRingStrip({
   jumpTestID,
   slim = false,
   link,
+  notice,
   style,
 }: {
   today: ISODate;
@@ -131,6 +140,12 @@ export function DayRingStrip({
    * week"), named by its whole words, so it keeps one line beside the X, the streak and the week cup.
    */
   link?: { label: string; short?: string; hint: string; testID: string; onPress: () => void; hide?: { label: string; testID: string; onPress: () => void } } | null;
+  /**
+   * A line said in the caption's place on the current week ahead of the link, the note and the caption, with a hide X
+   * beside it (Today's one-time kept-day line). It keeps to two lines: its `short` words where the whole line, measured
+   * at its room as drawn, would take more (and always under 360 px); with text grown it may wrap further, as the note does.
+   */
+  notice?: { text: string; short: string; testID: string; hide: { label: string; testID: string; onPress: () => void } } | null;
   /** Placement only (a margin): the block's own height never changes. */
   style?: StyleProp<ViewStyle>;
 }) {
@@ -150,6 +165,8 @@ export function DayRingStrip({
   const count = diffDays(weekDates(today, STRIP_WEEKS - 1)[0], today) + 1;
   const days = useDays(count, today);
   const byDate = new Map(days.map((d) => [d.date, d]));
+  // The quiet days the streak kept: drawn with the dashed kept line, and said so.
+  const kept = useKeptDays(today);
 
   const scrollTo = (b: number, animated: boolean) => {
     if (width > 0) ref.current?.scrollTo({ x: (maxBack - b) * width, animated });
@@ -221,8 +238,15 @@ export function DayRingStrip({
     const timer = setTimeout(() => setNoteShown(noteText), reduce ? 0 : noteDelay);
     return () => clearTimeout(timer);
   }, [noteText, noteDelay, reduce]);
-  const showLink = !!link && back === 0;
-  const showNote = !showLink && noteText !== null && noteShown === noteText && back === 0;
+  const showNotice = !!notice && back === 0;
+  const showLink = !showNotice && !!link && back === 0;
+  const showNote = !showNotice && !showLink && noteText !== null && noteShown === noteText && back === 0;
+  // The notice's whole line, its short words and one line, drawn unseen at the room the row leaves it (`noticeRoom`).
+  const [noticeH, setNoticeH] = useState<{ long: number; short: number; one: number }>({ long: 0, short: 0, one: 0 });
+  const onNoticeH = (key: 'long' | 'short' | 'one') => (e: LayoutChangeEvent) => {
+    const h = e.nativeEvent.layout.height;
+    setNoticeH((v) => (v[key] === h ? v : { ...v, [key]: h }));
+  };
 
   const captionFor = (b: number) =>
     b < 0
@@ -260,17 +284,30 @@ export function DayRingStrip({
   // accessory (Today's streak).
   const side =
     selected !== today ? <Chip testID={jumpTestID ?? `${testIDPrefix}-jump-today`} label={narrow ? 'Today' : 'Back to today'} selected onPress={() => onSelect(today)} /> : accessory;
+  // A link with a short form is measured at every text size (a month's name is longer than "week": "Your September is
+  // ready" does not fit beside the streak at 360 px), the rest only with text grown; the layout is the same either way.
+  const measuring = grown || (showLink && !!link?.short) || showNotice;
   // The room for the link's words: the row less what sits beside them (the chip or streak with the week controls, as
   // drawn; its X and its chevron, with the gaps between), the same whichever way the row is laid out, so a choice never
   // flips it.
   // The X's and the streak's touch areas reach past their cups (`TOUCH_REACH` each), so the two keep that much more apart.
   const linkRoom = rowW ? rowW - (groupW ? groupW + spacing.sm + (link?.hide ? 2 * TOUCH_REACH : 0) : 0) - (link?.hide ? PICK_CUP + spacing.sm : 0) - LINK_MARK : 0;
-  // "Your week is ready" or its short form: the short one under 360 px, and with text grown wherever the whole label,
-  // measured as drawn, is wider than its room (`fitsRoom`), so it keeps one line.
-  const linkShort = !!link?.short && (narrow || (grown && !fitsRoom(linkW, linkRoom)));
+  // "Your week is ready" or its short form: the short one under 360 px, and wherever the whole label, measured as drawn,
+  // is wider than its room (`fitsRoom`), so it keeps one line.
+  const linkShort = !!link?.short && (narrow || (measuring && !fitsRoom(linkW, linkRoom)));
+  // The notice's room as the row lays it out on one line: the row less the chip or streak and the week controls, its X
+  // with the gap before it and, beside the streak, the 4 px more that keeps their touch areas apart. Measured against it,
+  // never against the room it has once the row wraps, so a choice never flips it.
+  const noticeRoom = rowW ? rowW - (groupW ? groupW + spacing.sm : 0) - PICK_CUP - spacing.sm - (side ? 2 * TOUCH_REACH - spacing.sm : 0) : 0;
+  const noticeLines = (h: number) => (noticeH.one > 0 && h > 0 ? Math.round(h / noticeH.one) : 1);
+  // Its whole line where that keeps to two lines; else its short words (always under 360 px).
+  const noticeShort = narrow || (noticeRoom > 0 && noticeLines(noticeH.long) > 2);
+  // Where even the words shown take more than two lines beside the streak (a 320 px phone at 115%), the row wraps as with
+  // very large text: the line on its own, the streak and the week cup under it.
+  const noticeWraps = grown && showNotice && noticeRoom > 0 && noticeLines(noticeShort ? noticeH.short : noticeH.long) > 2;
   // Where even the words shown do not fit beside the streak and the week cup (a 320 px phone at 130%), the row wraps as
   // with very large text, rather than split "Your week" from its chevron.
-  const wraps = large || (grown && showLink && !fitsRoom(linkShort ? shortW : linkW, linkRoom));
+  const wraps = large || noticeWraps || (grown && showLink && !fitsRoom(linkShort ? shortW : linkW, linkRoom));
   // Natively and on touch the arrows are not drawn: every day offers the same as actions.
   const weekActions = [
     ...(back < maxBack ? [{ name: 'previousWeek', label: 'Previous week' }] : []),
@@ -373,7 +410,7 @@ export function DayRingStrip({
                       accessibilityActions={weekActions}
                       onAccessibilityAction={onWeekAction}
                       // Starts with the words drawn on it ("M 23"), then the day in full and its figures as drawn: label in name.
-                      accessibilityLabel={dayCellLabel(ring, today, summary)}
+                      accessibilityLabel={dayCellLabel(ring, today, summary, kept.has(d))}
                       // A future day is drawn dashed; fading it as well would make its date unreadable.
                       dimDisabled={false}
                       style={{ flex: 1, minHeight: 44, alignItems: 'center', gap: thin ? 2 : 6, paddingBottom: thin ? 0 : 2 }}>
@@ -385,16 +422,20 @@ export function DayRingStrip({
                           <View style={{ width: 3, height: 3, borderRadius: 1, backgroundColor: colors.textTertiary }} />
                         </View>
                       ) : (
-                        <MiniCup
-                          index={i}
-                          memoryKey={`cal-${d}`}
-                          progress={ring.progress}
-                          over={ring.state === 'over'}
-                          future={future}
-                          color={colors.calories}
-                          width={thin ? SLIM_CUP.width : undefined}
-                          height={thin ? SLIM_CUP.height : undefined}
-                        />
+                        <View>
+                          <MiniCup
+                            index={i}
+                            memoryKey={`cal-${d}`}
+                            progress={ring.progress}
+                            over={ring.state === 'over'}
+                            future={future}
+                            color={colors.calories}
+                            width={thin ? SLIM_CUP.width : undefined}
+                            height={thin ? SLIM_CUP.height : undefined}
+                          />
+                          {/* A quiet day the streak kept: the dashed kept line across its cup, never an empty cup alone. */}
+                          {kept.has(d) ? <KeptMark width={thin ? SLIM_CUP.width : FULL_CUP.width} height={thin ? SLIM_CUP.height : FULL_CUP.height} /> : null}
+                        </View>
                       )}
                       <View
                         style={{
@@ -436,8 +477,42 @@ export function DayRingStrip({
           the week cup going to a line under the caption where they do not fit beside it, so neither squeezes the other's words. */}
       {/* Where it wraps, its lines are 12 apart, so the 44 px touch areas of the cups on the two lines meet and never overlap. */}
       <View style={{ flexDirection: 'row', flexWrap: wraps ? 'wrap' : 'nowrap', alignItems: 'center', columnGap: spacing.sm, rowGap: wraps ? spacing.md : spacing.sm, minHeight: CAPTION_ROW_H }}>
-        {grown ? <SizeProbe key={measureKey} onSize={(w) => setRowW(Math.floor(w))} /> : null}
-        {showLink && link ? (
+        {measuring ? <SizeProbe key={measureKey} onSize={(w) => setRowW(Math.floor(w))} /> : null}
+        {showNotice && notice ? (
+          <FadeUp key={notice.testID} style={wraps ? { flexGrow: 1, flexShrink: 1, minHeight: CAPTION_ROW_H, flexDirection: 'row', alignItems: 'center', gap: spacing.sm } : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              {/* The whole line, the short words and one line, drawn unseen at the room the row leaves the line: how
+                  many lines each takes. */}
+              {noticeRoom > 0 ? (
+                <View pointerEvents="none" {...MEASURE_HIDDEN} style={{ position: 'absolute', left: 0, top: 0, width: noticeRoom, height: 0, overflow: 'hidden', opacity: 0 }}>
+                  <Text key={`long-${measureKey}`} variant="caption" onLayout={onNoticeH('long')}>
+                    {notice.text}
+                  </Text>
+                  <Text key={`short-${measureKey}`} variant="caption" onLayout={onNoticeH('short')}>
+                    {notice.short}
+                  </Text>
+                  <Text key={`one-${measureKey}`} variant="caption" onLayout={onNoticeH('one')}>
+                    {notice.short.split(' ')[0]}
+                  </Text>
+                </View>
+              ) : null}
+              <Text variant="caption" color="text" numberOfLines={large || grown ? undefined : 2} testID={notice.testID} accessibilityLiveRegion="polite">
+                {noticeShort ? notice.short : notice.text}
+              </Text>
+            </View>
+            {/* The line takes the row, so the X sits by the streak: 12 apart, so their touch areas (each reaching
+                `TOUCH_REACH` past its cup) meet and never overlap. */}
+            <IconButton
+              testID={notice.hide.testID}
+              accessibilityLabel={notice.hide.label}
+              tone="clear"
+              size={32}
+              onPress={notice.hide.onPress}
+              style={side ? { marginRight: 2 * TOUCH_REACH - spacing.sm } : undefined}>
+              <X size={18} color={colors.textSecondary} strokeWidth={1.9} />
+            </IconButton>
+          </FadeUp>
+        ) : showLink && link ? (
           <View
             style={
               wraps
@@ -446,7 +521,7 @@ export function DayRingStrip({
                   { flexGrow: 1, flexShrink: 1, minHeight: CAPTION_ROW_H, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }
                 : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }
             }>
-            {grown ? (
+            {measuring ? (
               <>
                 <MeasureWidth key={`long-${measureKey}`} onWidth={setLinkW}>
                   <Text variant="label" style={{ fontSize: 13, lineHeight: 17 }}>
@@ -494,8 +569,8 @@ export function DayRingStrip({
             {caption}
           </Text>
         )}
-        {grown ? (
-          // With text grown the chip or streak and the week controls are one group, measured as drawn (the room left to
+        {measuring ? (
+          // With text grown (or a link measured) the chip or streak and the week controls are one group, measured as drawn (the room left to
           // the caption's link), that goes to a line under the caption together when the row wraps.
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
             <SizeProbe key={measureKey} onSize={(w) => setGroupW(Math.ceil(w))} />
@@ -534,6 +609,13 @@ export function DayRingStrip({
 }
 
 const sentenceCase = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+/** Unseen, unread and untouched: the notice's measuring copies. */
+const MEASURE_HIDDEN = {
+  accessibilityElementsHidden: true,
+  importantForAccessibility: 'no-hide-descendants' as const,
+  ...(Platform.OS === 'web' ? ({ 'aria-hidden': true } as object) : null),
+};
 
 /** Whole weeks from the week holding `date` back to the week holding `today` (negative for a later week, down to -ahead). */
 function weeksBetween(date: ISODate, today: ISODate, ahead = 0): number {

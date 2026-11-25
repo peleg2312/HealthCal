@@ -7,6 +7,8 @@ import { hasFoodLogged } from '@/features/drinks/via';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { currentKcal } from '@/features/food/usuals';
 import { useRecapReady } from '@/features/progress/recapReady';
+import { markPeriodDealt, offerAllowed, periodLinkWords, periodOffer, unmarkPeriodDealt, useDealtPeriods } from '@/features/recap/offer';
+import { useFirstDate } from '@/features/recap/usePeriodRecap';
 import { figureWords, otherFigure, setCalorieFigure, useCalorieFigure } from '@/features/today/calorieFigure';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
 import { cupHeightFor, fitsRoom } from '@/features/today/fit';
@@ -19,9 +21,11 @@ import { ReadyRim } from '@/features/today/ReadyRim';
 import { recapLine } from '@/features/today/recapLine';
 import { MorningWatcher } from '@/features/morning/useMorningPage';
 import { useBackToToday } from '@/features/today/useBackToToday';
-import { startDate } from '@/features/today/week';
+import { startDate, weekDates } from '@/features/today/week';
 import { todayTitle } from '@/features/today/greetingTitle';
 import { TabHeader, tabDay, tabTitleRoom, tabTitleSize } from '@/components/TabHeader';
+import { useKeptDays } from '@/features/streak/KeptMark';
+import { useKeptNote } from '@/features/streak/keptNote';
 import { MilestoneSheet } from '@/features/streak/MilestoneSheet';
 import { AFTER_STRIP_MS, StreakMark } from '@/features/streak/StreakMark';
 import { useStreakMoment } from '@/features/streak/useStreakMoment';
@@ -33,7 +37,7 @@ import { MEALS, MEAL_LABEL, MEAL_SHARE, mealForTime } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
 import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
-import { useConsistency, useDay, useDays, useLive, useProfile, type DaySummary } from '@/store/selectors';
+import { foodLoggedDates, useConsistency, useDay, useDays, useLive, useProfile, type DaySummary } from '@/store/selectors';
 import { MAX_CONTENT_WIDTH, motion, useDrawnFontSize, useTheme, useVeryLargeText } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
 import { AnimatedNumber, Badge, Button, Card, CupKey, figure, IconButton, PressableScale, ProgressBar, Screen, Text, toast, useGrownText, Vessel, type VesselLabel } from '@/ui';
@@ -60,6 +64,11 @@ export default function TodayScreen() {
   // The Now card's words and actions for this hour; Meals tags its meal "Now" and leaves its Repeat to it.
   const nowState = useNowState(day, yesterday.entries.length ? { eaten: yesterday.eaten.kcal, budget: yesterday.budget } : null);
   const recapLink = useRecapLink(isToday && !firstDay);
+  // One link at a time in the caption row: the week's while it is announced, else a month or a year in cups.
+  const periodLink = usePeriodLink(isToday && !firstDay && !recapLink);
+  // The quiet days the streak kept; the first time one shows in this week, one line says what it means, once.
+  const kept = useKeptDays(todayDate);
+  const keptNote = useKeptNote(weekDates(todayDate).some((d) => kept.has(d)), isToday);
   // The "What fits" sheet: null when closed, else whether protein is the gap it was opened for.
   const [fits, setFits] = useState<{ proteinFirst: boolean } | null>(null);
 
@@ -100,7 +109,8 @@ export default function TodayScreen() {
         // Said in the caption's place once the streak cup has poured and its number ticked up, so
         // logging never pushes the page down and the line never runs ahead of the count.
         note={isToday && streak.line ? { text: streak.line, delay: AFTER_STRIP_MS, testID: 'today-streak-line' } : null}
-        link={recapLink}
+        link={recapLink ?? periodLink}
+        notice={keptNote}
       />
 
       {/* The day card: the calorie cup, the macros and water with its one-tap glass, the things checked at a glance.
@@ -154,6 +164,39 @@ function useRecapLink(enabled: boolean) {
     testID: 'today-recap-open',
     onPress: () => router.push(`/recap?week=${recap.week}` as never),
     hide: { label: NOW_WORDS.recapHide, testID: 'today-recap-dismiss', onPress: dismiss },
+  };
+}
+
+/**
+ * "Your October is ready" (or "Your 2026 is ready") as the week caption's link when a month or a year has ended
+ * (`periodOffer`, the rule Progress's one-time line follows), shown only while the week's link is not: it opens the
+ * month or year in cups (which deals with it); its X puts it away, with Undo. Dealt with on this device only
+ * (`healthcal.periodRecapDealt`), so Progress then offers it no more either. In an automated browser only with
+ * `window.__healthcalPeriodOffer = true`.
+ */
+function usePeriodLink(enabled: boolean) {
+  const today = useToday();
+  const food = useLive('foodEntries');
+  const firstDate = useFirstDate(today);
+  const dealt = useDealtPeriods();
+  const logged = foodLoggedDates(food);
+  const offer = enabled ? periodOffer(today, logged, firstDate, offerAllowed() ? dealt : null) : null;
+  if (!offer) return null;
+  const words = periodLinkWords(offer, today, logged, firstDate);
+  return {
+    label: words.label,
+    short: words.short,
+    hint: words.hint,
+    testID: 'today-period-open',
+    onPress: () => router.push(words.route as never),
+    hide: {
+      label: words.hide,
+      testID: 'today-period-dismiss',
+      onPress: () => {
+        markPeriodDealt(offer.key);
+        toast(words.hidden, { label: 'Undo', onPress: () => unmarkPeriodDealt(offer.key) });
+      },
+    },
   };
 }
 

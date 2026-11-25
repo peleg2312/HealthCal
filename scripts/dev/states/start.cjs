@@ -174,6 +174,8 @@ const weeks = [
   { id: 'consistency-stress', route: '/consistency', data: 'stress', waitFor: 'consistency-screen', note: 'a 412-day streak' },
   { id: 'consistency-empty', route: '/consistency', data: 'empty', waitFor: 'consistency-screen', note: 'nothing logged yet' },
   { id: 'consistency-prev-month', route: '/consistency', taps: ['consistency-month-prev'], waitFor: 'consistency-calendar', note: 'the month before' },
+  // The seed's quiet days are 21 and 24 days back: from the 1st to the 21st of a month they are last month's.
+  { id: 'consistency-kept', route: '/consistency', ...(new Date().getDate() <= 21 ? { taps: ['consistency-month-prev'] } : null), waitFor: 'consistency-calendar', note: 'the seed\'s single quiet days (21 and 24 days back) wear the dashed kept line; the legend names it' },
   { id: 'consistency-help-sheet', route: '/consistency', taps: ['consistency-rhythm-help'], sheet: true, note: 'weekly rhythm explainer' },
   { id: 'consistency-edit-sheet', route: '/consistency', taps: ['consistency-rhythm-edit'], sheet: true, note: 'weekly rhythm goals' },
 ];

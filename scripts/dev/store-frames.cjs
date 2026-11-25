@@ -329,20 +329,21 @@ async function captureBackend(browser, buildSeed) {
     await until(maya, '[data-testid="friends-add-outcome-sent"]');
     await go(alex, '/friends');
     await tap(alex, '[data-testid^="friends-accept-"]');
-    await until(alex, '[data-testid^="friends-card-"]');
+    await until(alex, '[data-testid^="friends-person-"]');
     // Each cheers the other's latest workout.
+    // The feed's first workout card carries its own Cheer (friends-feed-workout-0-cheer).
     await go(maya, '/friends');
-    await until(maya, '[data-testid^="friends-cheer-"]');
-    await tap(maya, '[data-testid^="friends-cheer-"]');
+    await until(maya, '[data-testid="friends-feed-workout-0-cheer"]');
+    await tap(maya, '[data-testid="friends-feed-workout-0-cheer"]');
     await maya.page.waitForTimeout(1200);
     await go(alex, '/friends');
-    await until(alex, '[data-testid^="friends-cheer-"]');
-    await tap(alex, '[data-testid^="friends-cheer-"]');
+    await until(alex, '[data-testid="friends-feed-workout-0-cheer"]');
+    await tap(alex, '[data-testid="friends-feed-workout-0-cheer"]');
     await alex.page.waitForTimeout(1200);
     const state = await alex.context.storageState();
 
-    // Maya's card and the cheers received, as one piece, with the screen scrolled to them.
-    const friendsSpec = { lift: ['^friends-friend-', 'friends-cheers'], liftPad: 14, scrollTo: '^friends-friend-', scrollOffset: 250 };
+    // The cheers received and Maya's workout in the feed, as one piece, with the screen scrolled to them.
+    const friendsSpec = { lift: ['friends-cheers', 'friends-feed-workout-0'], liftPad: 14, scrollTo: 'friends-cheers', scrollOffset: 250 };
     // With --describe there is no photo hero: the card holding the dish name and the total is lifted.
     const photoSpec = flags.describe ? { lift: ['ai-dish'], liftRow: true } : { lift: ['ai-photo-hero'] };
     const analyse = async (d) => {

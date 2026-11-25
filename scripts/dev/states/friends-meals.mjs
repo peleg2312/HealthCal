@@ -13,6 +13,8 @@
 // Every password is "correct horse battery".
 import crypto from 'node:crypto';
 
+import { buildSeed } from '../seed.mjs';
+
 const API = process.env.API || 'http://localhost:54321';
 const PASSWORD = 'correct horse battery';
 const hex = () => crypto.randomBytes(16).toString('hex');
@@ -36,7 +38,11 @@ async function post(path, body, token) {
   if (!r.ok) throw new Error(`${path} ${r.status} ${text}`);
   return text ? JSON.parse(text) : null;
 }
-async function person(email, name, birthDate = '1990-05-01') {
+/**
+ * `lead`: the account's profile is a whole demo profile dated a day ahead, so a device that signs in takes it
+ * (and its age) instead of pushing its own over it. Used for the teen, whose age is the point of the state.
+ */
+async function person(email, name, birthDate = '1990-05-01', lead = false) {
   let s;
   try {
     s = await post('/auth/v1/signup', { email, password: PASSWORD });
@@ -45,8 +51,9 @@ async function person(email, name, birthDate = '1990-05-01') {
   }
   const p = { email, token: s.access_token, id: s.user.id, name };
   // The server reads the age from the synced profile, as for the coach.
-  const at = new Date(Date.now() - 86_400_000).toISOString();
-  await post('/rest/v1/rpc/push_profile', { p_profile: { name, birthDate }, p_profile_updated_at: at, p_settings: null, p_settings_updated_at: null }, p.token);
+  const at = new Date(Date.now() + (lead ? 1 : -1) * 86_400_000).toISOString();
+  const profile = lead ? { ...buildSeed({ onboarded: true }).state.profile, name, birthDate, updatedAt: at } : { name, birthDate };
+  await post('/rest/v1/rpc/push_profile', { p_profile: profile, p_profile_updated_at: at, p_settings: null, p_settings_updated_at: null }, p.token);
   const card = await post('/rest/v1/rpc/social_setup', { p_display_name: name, p_avatar: '', p_sharing: { workouts: true, streak: true, minutes: true } }, p.token);
   p.code = card.code;
   p.shareKey = card.share_key;
@@ -99,7 +106,7 @@ await rpc(sam, 'send_cheer', { p_to: dana.id, p_ref: `day:${day(0)}` });
 await rpc(jo, 'send_cheer', { p_to: dana.id, p_ref: `day:${day(-1)}` });
 
 // Under 18: friends on, one friend; no meal control anywhere.
-const teen = await person('meals.teen@example.com', 'Noa', '2010-03-14');
+const teen = await person('meals.teen@example.com', 'Noa', '2010-03-14', true);
 await befriend(teen, sam);
 // Friends on, one friend, nothing shown or logged yet.
 const none = await person('meals.none@example.com', 'Ari');

@@ -124,7 +124,7 @@ export function FeedWorkoutCard({ item, today, units, onCheer, testID }: { item:
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
         <PersonMark name={item.displayName} avatar={item.avatar} size={40} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: large ? undefined : 36 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: large ? undefined : 36, marginBottom: large ? 0 : 4 }}>
             <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold, flex: 1, minWidth: 0 }}>
               {isolateRtl(item.displayName)}
             </Text>

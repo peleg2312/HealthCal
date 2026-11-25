@@ -65,7 +65,39 @@ module.exports = [
   { id: 'text200-toast-water', route: '/', taps: ['^today-water-', { wait: 300 }], waitFor: 'toast', flags: big, note: "Today's glass and its toast at 200% text" },
   // Profile > App > Text size, at the designed size, then Larger five times: the page's own text grows to 200%.
   { id: 'text-size-row-larger', route: '/profile', taps: Array(5).fill('profile-text-size-larger'), waitFor: 'profile-text-size', note: 'Text size from 100% to 200% by its own control (no flag)' },
+  ...keptAndLinks(),
 ];
+
+/**
+ * Kept days and the caption row's month link (builder STREAK) with text grown: 115% and 130% set on Profile's own
+ * control and then Today (the kept line shows on the first arrival on Today), and 200% by the flag. The clock is two
+ * days on from the seed (yesterday kept; one day on from a Saturday, with the seed's today left without food), or a
+ * Thursday to Sunday early next month (a month link, no week link).
+ */
+function keptAndLinks() {
+  // A quiet yesterday inside the week shown on any weekday (as in tabs.cjs): two days on, or from a Saturday one day
+  // on with the seed's own today left without food.
+  const kept = new Date();
+  const saturday = kept.getDay() === 6;
+  kept.setDate(kept.getDate() + (saturday ? 1 : 2));
+  kept.setHours(15, 0, 0, 0);
+  const keptAt = { now: kept.getTime(), ...(saturday ? { values: { eaten: 0 } } : null) };
+  const n = new Date();
+  let month = new Date(n.getFullYear(), n.getMonth() + 1, 1, 10, 0);
+  while (![4, 5, 6, 0].includes(month.getDay())) month = new Date(month.getFullYear(), month.getMonth(), month.getDate() + 1, 10, 0);
+  const up = (steps) => [...Array(steps).fill('profile-text-size-larger'), 'header-back', { wait: 800 }];
+  return [
+    ...[
+      [1, '115'],
+      [2, '130'],
+    ].flatMap(([steps, tag]) => [
+      { id: `text${tag}-today-kept-line`, route: '/profile', ...keptAt, flags: { __healthcalKeptDay: true }, taps: up(steps), waitFor: 'today-kept-line', note: `the kept line and the kept cup at ${tag}% text` },
+      { id: `text${tag}-today-period-link`, route: '/profile', now: month.getTime(), flags: { __healthcalPeriodOffer: true }, taps: up(steps), waitFor: 'today-period-open', note: `"Your <month> is ready" at ${tag}% text` },
+    ]),
+    { id: 'text200-today-kept-line', route: '/', ...keptAt, flags: { ...big, __healthcalKeptDay: true }, waitFor: 'today-kept-line', note: 'the kept line and the kept cup at 200% text' },
+    { id: 'text200-today-period-link', route: '/', now: month.getTime(), flags: { ...big, __healthcalPeriodOffer: true }, waitFor: 'today-period-open', note: '"Your <month> is ready" at 200% text' },
+  ];
+}
 
 /** States of the set-up, account, morning and plan lists, again at 200% text (id prefixed with text200-). */
 function settingsAt200() {
@@ -99,5 +131,5 @@ function settingsAt200() {
     ]),
     ...pick(require('./morning.cjs'), ['morning', 'morning-first']),
     ...pick(require('./plan.cjs'), ['plan-free-month', 'plan-plus']),
-  ];
+];
 }

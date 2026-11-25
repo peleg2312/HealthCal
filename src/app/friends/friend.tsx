@@ -161,7 +161,7 @@ export default function FriendScreen() {
       ) : null}
 
       <View style={{ gap: spacing.md }}>
-        <SectionTitle title={RECENT_WORKOUTS} />
+        {workouts.length ? <SectionTitle title={RECENT_WORKOUTS} /> : null}
         <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }} testID="friend-workouts">
           <View {...listRole}>
             {workouts.map((w, i) => (

@@ -33,8 +33,12 @@ import { pickToast, placePick, yourDrinks } from '@/features/drinks/pick';
 import { loadDrinkMemory, rememberDrinkChoice, useDrinkMemory } from '@/features/drinks/memory';
 import { diaryWaterCaption, diaryWaterOpenLabel, waterDeleteLabel } from '@/features/drinks/diary';
 import { DRINK_MAX_ML, drinkAmountCheck, drinkMeal, enteredDrinkKind, entryFor, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterAfter, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle, type WaterAfter } from '@/features/drinks/rules';
+import { amountRowWraps, glassTileMin } from '@/features/drinks/grownFit';
+import { cupHeightFor } from '@/features/today/fit';
+import { MeasureWidth, SizeProbe, useMeasureKey } from '@/features/today/MeasureWidth';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
-import { cup, useLargeText, useTextGrowth, useTheme } from '@/theme';
+import { keepTogether } from '@/lib/text';
+import { cup, useDrawnFontSize, useTextGrowth, useTheme, useVeryLargeText } from '@/theme';
 import { pourLandsAt } from '@/theme/motion';
 import type { Beverage, Food, WaterEntry } from '@/types';
 import { spokenUnits } from '@/lib/spokenUnits';
@@ -128,18 +132,15 @@ function reachedNote(extra: string | null): string | null {
   return extra ? `${extra} past it.` : null;
 }
 
-/**
- * The glass tiles in even rows: as many a row as fit at 72 px or more, spread over as few rows as
- * that needs and balanced, so four glasses on a 320 px phone are two and two rather than three and
- * one stretched across the screen. A short last row is padded (-1) so every tile keeps one width.
- */
-/** A glass tile's least width with large text: "500 ml" whole at 200%, two tiles a row at 320 px. */
+/** A glass tile's least width with very large text (`VERY_LARGE_TEXT`): "500 ml" whole at 200%, two tiles a row at 320 px. */
 const BIG_TILE = 128;
 /**
- * A glass tile's least width once text grows at all, a reader's own text spacing included (`useGrownText`):
- * "500 ml" never parts from its unit, so the tile makes room for it whole (two a row at 360) rather than cut it.
+ * The glass tile's water edge. Once text grows at all, a reader's own text spacing included (`useGrownText`), a tile
+ * is as wide as its widest words as drawn (the amount, "500 ml", which never parts from its unit, or a word of its
+ * caption) and their room inside this edge, measured on the device (`MeasureWidth`, `glassTileMin`), and never under
+ * the designed 72 px: four glasses stay a row wherever their words fit.
  */
-const GROWN_TILE = 96;
+const TILE_EDGE = 3;
 /**
  * The glass tile's water fill: a flat tint of the water key over the card. On it the amount stays 11:1 or more
  * and the caption ("Small", textSecondary) 6.9:1 or more in every look, and the water edge 3.4:1 or more.
@@ -160,6 +161,11 @@ function tintOver(color: string, base: string, share: number): string {
   return `#${mixed.map((n) => n.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/**
+ * The glass tiles in even rows: as many a row as fit at `minTile` px or more (72 at the designed size), spread over
+ * as few rows as that needs and balanced, so four glasses on a 320 px phone are two and two rather than three and
+ * one stretched across the screen. A short last row is padded (-1) so every tile keeps one width.
+ */
 function tileRows(count: number, screenW: number, minTile = 72): number[][] {
   const content = Math.min(screenW, 560) - 40;
   const fit = Math.max(1, Math.floor((content + 8) / (minTile + 8)));
@@ -199,7 +205,7 @@ function GlassTile({ title, subtitle, icon, onPress, testID, accessibilityLabel 
         // (blurred, D2-03, mean against the hero's), above the kind chips. A flat tint of the whole tile, never a
         // level: it is a button, not an amount. Laid on the card colour, so it reads as water on every paper.
         backgroundColor: tintOver(colors.water, colors.surface, GLASS_FILL),
-        borderWidth: 3,
+        borderWidth: TILE_EDGE,
         borderColor: colors.water,
         alignItems: 'center',
         justifyContent: 'center',
@@ -223,11 +229,34 @@ function WaterScreen() {
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
-  // Large text (Profile's text size, or the phone's): the cup's words leave the cup's side for a column of
-  // their own and the glasses go two a row, so nothing is cut or overlaps.
-  const big = useLargeText();
+  // Very large text (150% and up, `VERY_LARGE_TEXT`: the app's size or the phone's): the cup's words leave the cup's
+  // side for a column of their own and the glasses go two a row, so nothing is cut or overlaps. Through the phone's
+  // common steps (Android's 1.15 and 1.3, iOS to xxxLarge, the app's 115% and 130%) and under a reader's own text
+  // spacing the screen keeps its designed shape with larger text (`fit`): each of the cup's words is in a box measured
+  // from the text drawn in it and the cup grows to hold them only when they need it (`cupHeightFor`), the glasses stay
+  // four a row while their words, measured as drawn, fit a tile (`glassTileMin`), and "Other amount" keeps Add beside
+  // it while both fit the row (`amountRowWraps`). At the designed size nothing changes.
+  const big = useVeryLargeText();
   const grown = useGrownText();
+  const fit = grown && !big;
   const growth = useTextGrowth();
+  const drawn = useDrawnFontSize();
+  // Every measuring part mounts again as Water comes back into focus (a size changed meanwhile is measured again).
+  const measureKey = useMeasureKey();
+  // The cup's three word boxes as measured (fit only), by key; until measured, the designed box grown as its text is.
+  const [boxes, setBoxes] = useState<Record<string, number>>({});
+  const measureBox = (name: string) => (_w: number, height: number) => {
+    const h = Math.ceil(height);
+    if (Math.abs((boxes[name] ?? 0) - h) >= 1) setBoxes((b) => ({ ...b, [name]: h }));
+  };
+  // The key's lines past the first, as drawn (fit only), which a narrow phone's cup gives up.
+  const [keyExtra, setKeyExtra] = useState(0);
+  // The widest of the glass tiles' words as drawn (fit only).
+  const [tileWordsW, setTileWordsW] = useState(0);
+  // "Other amount" and Add (fit only): the field's label, Add and their row as drawn.
+  const [fieldLabelW, setFieldLabelW] = useState(0);
+  const [addW, setAddW] = useState(0);
+  const [amountRowW, setAmountRowW] = useState(0);
   const profile = useProfile();
   const settings = useStore((s) => s.settings);
   const units = profile.units;
@@ -423,14 +452,44 @@ function WaterScreen() {
   const keyRoom = Math.min(screenW, 560) - 40 - 36;
   const keyLineCount = keyShown ? keyLines(keyItems, units, keyRoom, growth).length : 0;
   // Under 360 px the cup gives up the room of every key line past the first, so the glasses stay in the first view
-  // at 320 x 640 whatever the day holds (the first line fits in the room the screen already has).
-  const vesselH = narrow ? Math.max(136, 168 - Math.max(0, keyLineCount - 1) * (KEY_LINE + 4)) : 220;
+  // at 320 x 640 whatever the day holds (the first line fits in the room the screen already has). With text grown
+  // (fit) that room is the key's lines as drawn.
+  const keyExtraH = fit ? (keyShown ? keyExtra : 0) : Math.max(0, keyLineCount - 1) * (KEY_LINE + 4);
+  const vesselH = narrow ? Math.max(136, 168 - keyExtraH) : 220;
+  // The glass tiles' words (fit only, measured as drawn): each amount whole, and each caption by its words, each
+  // number kept with its unit as Text draws it, since a caption may wrap at its words with text grown.
+  const tileWords = settings.waterPresets.flatMap((ml, i) => {
+    const subtitle = shownPlan(ml, 'glass').tile ?? (i === 0 ? 'Small' : undefined);
+    return [{ amount: true, text: formatVolume(ml, units) }, ...(subtitle ? keepTogether(subtitle).split(' ').map((text) => ({ amount: false, text })) : [])];
+  });
+  // A tile's least width: the designed 72 px, very large text's own, or with text grown its widest words as drawn and
+  // their room inside the water edge (the designed 72 until measured).
+  const tileMin = big ? BIG_TILE : fit ? glassTileMin(tileWordsW, TILE_EDGE) : 72;
+  // "Other amount" and Add: Add goes under the field with very large text, or with text grown where the field's label
+  // and Add, as drawn, do not fit the row side by side.
+  const amountWraps = big || (fit && amountRowWraps(fieldLabelW, addW, spacing.sm, amountRowW));
   const cupA11y = spokenUnits(`${formatVolume(consumed, units)} of ${formatVolume(goal, units)}`);
-  const key = keyShown ? <DrinkKey testID="water-key" items={keyItems} units={units} room={keyRoom} /> : null;
+  const key = keyShown ? <DrinkKey testID="water-key" items={keyItems} units={units} room={keyRoom} onExtraHeight={fit ? setKeyExtra : undefined} /> : null;
+  // Text grown (fit): a word box is its measured height, at first the designed one grown as its text is drawn.
+  const goalH = fit ? (boxes.goal ?? Math.ceil((20 * drawn(12.5)) / 12.5)) : 20;
+  const percentH = fit ? (boxes.percent ?? Math.ceil((72 * drawn(narrow ? 44 : 54)) / (narrow ? 44 : 54))) : 72;
+  const drunkH = fit ? (boxes.drunk ?? Math.ceil((24 * drawn(17)) / 17)) : 24;
+  // With text grown each box's words report their height and wrap at their words in the column beside the cup.
+  const boxed = (name: string, node: React.ReactNode) =>
+    fit ? (
+      <View>
+        <SizeProbe key={measureKey} onSize={measureBox(name)} />
+        {node}
+      </View>
+    ) : (
+      node
+    );
+  // The cup holds its word boxes beside it: the designed height, taller only when grown text needs it.
+  const vesselFitH = fit ? cupHeightFor(vesselH, [goalH, percentH, drunkH], 8) : vesselH;
 
-  // The cup's three words: placed at their levels beside the cup, or with large text in a column of their own.
+  // The cup's three words: placed at their levels beside the cup, or with very large text in a column of their own.
   const goalWords = (
-    <Text variant="caption" color="textSecondary" numberOfLines={1}>
+    <Text variant="caption" color="textSecondary" numberOfLines={fit ? undefined : 1}>
       {`Goal ${formatVolume(goal, units)}`}
     </Text>
   );
@@ -502,8 +561,8 @@ function WaterScreen() {
               memoryKey={`water-${date}`}
               width={narrow ? 76 : 96}
               // Under 360 px the cup is shorter (and shorter still for a key of two lines or more), so all four
-              // glasses stay in the first view at 320 x 640.
-              height={vesselH}
+              // glasses stay in the first view at 320 x 640. With text grown, as tall as its word boxes need.
+              height={vesselFitH}
               labelGap={narrow ? 14 : 18}
               // Labels that meet at some level keep 8 px between them, at every value.
               labelSpacing={8}
@@ -512,21 +571,22 @@ function WaterScreen() {
                 {
                   key: 'goal',
                   at: goal,
-                  height: 20,
-                  content: goalWords,
+                  height: goalH,
+                  content: boxed('goal', goalWords),
                 },
                 {
                   key: 'percent',
                   at: (Math.min(consumed, goal) + goal) / 2,
-                  height: 72,
-                  content: percentWords,
+                  height: percentH,
+                  content: boxed('percent', percentWords),
                 },
                 {
                   key: 'drunk',
                   at: Math.min(consumed, goal),
-                  height: 24,
+                  height: drunkH,
                   tick: consumed > 0 ? colors.rim : undefined,
-                  content: drunkWords(true),
+                  // One line at the designed size; with text grown it wraps at its words rather than be cut.
+                  content: boxed('drunk', drunkWords(!fit)),
                 },
               ]}
             />
@@ -547,17 +607,19 @@ function WaterScreen() {
             ) : null}
           </Text>
         ) : (
-          // What is left, said once: the figure and, in the same line, about how many glasses that is.
+          // What is left, said once: the figure and, in the same line, about how many glasses that is. With text grown
+          // (fit) the unit rides with the figure, so where the line wraps "2.07 L" stays whole and the words go under it.
           <View style={{ flexDirection: 'row', alignItems: 'baseline', columnGap: 6, flexWrap: 'wrap' }}>
             <AnimatedNumber
               testID="water-left"
               variant="numL"
               value={left}
               format={(ml) => volumeNumber(ml, left, units, leftLitreDecimals(left))}
-              {...figure(spokenUnits(`${formatVolume(left, units)} left to drink, about ${glassesLeft(landing?.left ?? left, glassMl)} × ${formatVolume(glassMl, units)}`))}
-            />
+              {...figure(spokenUnits(`${formatVolume(left, units)} left to drink, about ${glassesLeft(landing?.left ?? left, glassMl)} × ${formatVolume(glassMl, units)}`))}>
+              {fit ? <Text variant="unit" style={{ fontSize: 15 }}>{` ${volumeUnitFor(left, units)}`}</Text> : undefined}
+            </AnimatedNumber>
             <Text variant="unit" style={{ fontSize: 15, flexShrink: 1 }}>
-              {`${volumeUnitFor(left, units)} left, `}
+              {fit ? 'left, ' : `${volumeUnitFor(left, units)} left, `}
               <Text testID="water-glasses" variant="unit" style={{ fontSize: 15 }}>
                 {`about ${glassesLeft(landing?.left ?? left, glassMl)} × ${formatVolume(glassMl, units)}`}
               </Text>
@@ -588,7 +650,25 @@ function WaterScreen() {
         />
       )}
       <View style={{ gap: spacing.sm }}>
-        {tileRows(settings.waterPresets.length, screenW, big ? BIG_TILE : grown ? GROWN_TILE : 72).map((row, r) => (
+        {fit ? (
+          // The tiles' words as drawn, the widest first: each amount whole, and each word of a caption ("129 kcal" whole).
+          <MeasureWidth key={`words-${measureKey}`} onWidth={setTileWordsW}>
+            <View style={{ alignItems: 'flex-start' }}>
+              {tileWords.map((w, k) =>
+                w.amount ? (
+                  <Text key={k} variant="numM" tabular style={{ fontSize: 17, lineHeight: 22 }}>
+                    {w.text}
+                  </Text>
+                ) : (
+                  <Text key={k} variant="caption">
+                    {w.text}
+                  </Text>
+                ),
+              )}
+            </View>
+          </MeasureWidth>
+        ) : null}
+        {tileRows(settings.waterPresets.length, screenW, tileMin).map((row, r) => (
           <View key={r} style={{ flexDirection: 'row', gap: spacing.sm }}>
             {row.map((i) => {
               if (i < 0) return <View key={`pad-${r}-${i}`} style={{ flex: 1 }} />;
@@ -613,15 +693,22 @@ function WaterScreen() {
         ))}
       </View>
       <View>
-        {/* With large text the field keeps at least 200 px and Add goes under it when both do not fit one line. */}
-        <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', gap: spacing.sm, alignItems: 'flex-start' }}>
+        {/* With very large text the field keeps at least 200 px and Add goes under it when both do not fit one line; with
+            text grown (fit) Add stays beside the field while the field's label and Add, as drawn, fit the row. */}
+        <View style={{ flexDirection: 'row', flexWrap: amountWraps ? 'wrap' : 'nowrap', gap: spacing.sm, alignItems: 'flex-start' }}>
+          {fit ? <SizeProbe key={`row-${measureKey}`} onSize={(w) => setAmountRowW(Math.floor(w))} /> : null}
+          {fit ? (
+            <MeasureWidth key={`label-${measureKey}`} onWidth={setFieldLabelW}>
+              <Text variant="label">Other amount</Text>
+            </MeasureWidth>
+          ) : null}
           {/* A visible label that lasts (WCAG 3.3.2), with the unit as its suffix: its spoken name is the kit's
               ("Other amount, millilitres"), and an empty field shows no placeholder that could pass for a value.
               What the amount needs is said under the row, tied to the field (`aria-describedby` on the web, the
               hint natively), so the field's box ends at its cup and Add lines up with the cup. */}
           <NumberField
             testID="water-custom-input"
-            style={big ? { flexGrow: 1, flexBasis: 200 } : { flex: 1 }}
+            style={amountWraps ? { flexGrow: 1, flexBasis: big ? 200 : fieldLabelW } : { flex: 1 }}
             label="Other amount"
             suffix={volumeUnit(units)}
             decimals={0}
@@ -637,8 +724,17 @@ function WaterScreen() {
               words about a typed minus): above it a blank line as tall as the field's label, with the field's own 6 px,
               so its top is the cup's top at every text size, and it is as tall as the cup. Once large text has sent it
               under the field it needs no such line. */}
-          <View style={{ gap: 6 }} onLayout={big ? (e) => setAddWrapped(e.nativeEvent.layout.y > 1) : undefined}>
-            {big && addWrapped ? null : (
+          <View
+            style={{ gap: 6 }}
+            onLayout={
+              grown
+                ? (e) => {
+                    setAddWrapped(e.nativeEvent.layout.y > 1);
+                    setAddW(Math.ceil(e.nativeEvent.layout.width));
+                  }
+                : undefined
+            }>
+            {amountWraps && addWrapped ? null : (
               <Text variant="label" {...DECORATIVE}>
                 {'\u00A0'}
               </Text>

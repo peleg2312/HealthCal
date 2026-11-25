@@ -159,7 +159,7 @@ export function useShowMealStep({ open, meal, date, entries, onClose }: { open: 
   };
 
   const body = (
-    <View style={{ gap: spacing.lg }} testID="show-meal">
+    <View style={{ gap: spacing.md }} testID="show-meal">
       <View style={{ gap: spacing.sm }}>
         <Text variant="overline" color="textSecondary">
           {WHAT_THEY_SEE}
@@ -193,7 +193,7 @@ export function useShowMealStep({ open, meal, date, entries, onClose }: { open: 
           {pickable.length ? WHO_NOTE : NOBODY_TO_PICK}
         </Text>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 48 }}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text variant="bodyStrong" style={{ fontFamily: fonts.semibold }}>
             {SHOW_KCAL}

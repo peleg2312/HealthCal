@@ -10,6 +10,8 @@ import { solidBar } from '@/features/progress/calorieBars';
 import { spokenUnits } from '@/features/progress/chartWords';
 import { go } from '@/features/progress/parts';
 import { setRhythmTarget, useConsistencyData } from '@/features/progress/useConsistencyData';
+import { KEPT_LEGEND, KEPT_SPOKEN } from '@/features/streak/kept';
+import { KeptKey, KeptMark, useKeptDays } from '@/features/streak/KeptMark';
 import { useLargeText, useTheme, withOpacity } from '@/theme';
 import { AnimatedNumber, BarChart, Button, Card, CupKey, EmptyState, figure, Header, IconButton, MiniCup, Screen, Sheet, Stepper, Text } from '@/ui';
 
@@ -40,14 +42,14 @@ function rhythmLabel(starts: string[], i: number, narrow: boolean): string {
 /** The lighter fill of a partly logged day, as on the recap and Progress. */
 const PARTIAL = 0.45;
 
-/** What a day of the calendar says, in words, for a screen reader. */
-function cellLabel(cell: CalendarCell): string {
+/** What a day of the calendar says, in words, for a screen reader: a quiet day the streak kept says so after "not logged". */
+function cellLabel(cell: CalendarCell, kept = false): string {
   // Above the budget says by how much (the amber lip), never a rounded share that could read as on it. A share is
   // the check-in's (`budgetSharePct`), so one day reads one figure on both, and 90% only on a day on budget.
   const above = Math.round(cell.kcal - cell.budget);
   const share = cell.ratio > 1 ? `${formatNumber(Math.max(1, above))} kcal above the budget` : `${budgetSharePct(cell.kcal, cell.budget) ?? 0}% of the budget`;
   const food = cell.future ? 'upcoming' : !cell.logged ? 'not logged' : cell.isToday ? `${share} so far` : cell.partial ? `partly logged, ${share}` : `${share}${cell.onBudget ? ', on budget' : ''}`;
-  return spokenUnits([formatDayLabel(cell.date), food, cell.waterMet ? 'water goal reached' : '', cell.trained ? 'workout logged' : ''].filter(Boolean).join(', '));
+  return spokenUnits([formatDayLabel(cell.date), food, kept ? KEPT_SPOKEN : '', cell.waterMet ? 'water goal reached' : '', cell.trained ? 'workout logged' : ''].filter(Boolean).join(', '));
 }
 
 /**
@@ -57,16 +59,20 @@ function cellLabel(cell: CalendarCell): string {
  * budget). Below it, a check for a fully logged day on budget (90 to 100% of
  * it, `budgetMark`; never under an amber day), a cup key for the water goal
  * and a small dumbbell for a workout (a shape of its own, so the two marks are
- * told apart without their colours). Today's date is an ink box.
+ * told apart without their colours). Today's date is an ink box. A quiet day the streak kept (`keptDays`) wears the
+ * dashed kept line across its cup (`KeptMark`), so it never reads as a break.
  * The month pours in a diagonal wave from the top left (`index`), and each
  * day remembers its level for the session, so reopening the page or coming
  * back to a month does not pour again.
  */
-function DayCell({ cell, index }: { cell: CalendarCell | null; index: number }) {
+/** The calendar's cups. */
+const CELL_CUP = { width: 22, height: 26 };
+
+function DayCell({ cell, index, kept = false }: { cell: CalendarCell | null; index: number; kept?: boolean }) {
   const { colors } = useTheme();
   if (!cell) return <View style={{ flex: 1, height: 68 }} />;
   return (
-    <View style={{ flex: 1, height: 68, alignItems: 'center', gap: 3 }} accessible accessibilityRole="image" accessibilityLabel={cellLabel(cell)} testID={`consistency-day-${cell.date}`}>
+    <View style={{ flex: 1, height: 68, alignItems: 'center', gap: 3 }} accessible accessibilityRole="image" accessibilityLabel={cellLabel(cell, kept)} testID={`consistency-day-${cell.date}`}>
       <View
         style={{
           minWidth: 24,
@@ -93,9 +99,10 @@ function DayCell({ cell, index }: { cell: CalendarCell | null; index: number }) 
         future={cell.future}
         index={index}
         memoryKey={`consistency-${cell.date}`}
-        width={22}
-        height={26}
+        width={CELL_CUP.width}
+        height={CELL_CUP.height}
       />
+      {kept ? <KeptMark width={CELL_CUP.width} height={CELL_CUP.height} /> : null}
       </View>
       <View
         aria-hidden
@@ -129,6 +136,8 @@ export default function ConsistencyScreen() {
   const { colors, spacing } = useTheme();
   const bigText = useLargeText();
   const d = useConsistencyData();
+  // The quiet days the streak kept, by the one rule (@/features/streak/kept): drawn with the kept line, and said so.
+  const kept = useKeptDays(d.today);
   const thisMonth = monthOf(d.today);
   const firstMonth = d.firstDate ? monthOf(d.firstDate) : thisMonth;
   const [month, setMonth] = useState(thisMonth);
@@ -261,7 +270,7 @@ export default function ConsistencyScreen() {
           {rows.map((row, i) => (
             <View key={i} style={{ flexDirection: 'row' }}>
               {row.map((cell, j) => (
-                <DayCell key={cell?.date ?? `pad-${i}-${j}`} cell={cell} index={i + j} />
+                <DayCell key={cell?.date ?? `pad-${i}-${j}`} cell={cell} index={i + j} kept={!!cell && kept.has(cell.date)} />
               ))}
             </View>
           ))}
@@ -277,6 +286,7 @@ export default function ConsistencyScreen() {
           <Legend swatch={<Check size={11} color={colors.success} strokeWidth={3} />} label="On budget, 90 to 100%" />
           <Legend swatch={<CupKey color={colors.warning} />} label="Above budget" />
           {rows.some((r) => r.some((c) => c?.partial)) ? <Legend swatch={<CupKey color={withOpacity(colors.calories, PARTIAL)} />} label="Partly logged" /> : null}
+          <Legend swatch={<KeptKey />} label={KEPT_LEGEND} />
           <Legend swatch={<CupKey color={colors.water} size={7} />} label="Water goal reached" />
           <Legend swatch={<Dumbbell size={12} color={colors.exercise} strokeWidth={2.4} />} label="Workout" />
         </View>

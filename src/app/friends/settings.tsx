@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { EyeOff, Lock, Users } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
@@ -136,7 +136,8 @@ export default function FriendsSettingsScreen() {
     setConfirmLeave(false);
     const res = await leaveSocial();
     toast(res.ok ? 'Friends turned off. Your card, friendships, cheers and meals were removed.' : res.message);
-    if (res.ok) router.replace('/friends' as never);
+    // Back to Friends, which shows its set-up again (never a second Friends screen on top of the first).
+    if (res.ok) goBack('/friends');
   };
   const toggleAuto = (m: MealType) => {
     const on = me.mealSettings.auto.includes(m);
@@ -319,6 +320,9 @@ export default function FriendsSettingsScreen() {
           />
         }>
         <View style={{ gap: spacing.md }} testID="friends-audience">
+          <Text variant="caption" color="textSecondary">
+            {AUDIENCE_NOTE}
+          </Text>
           <ChipWrap>
             {friends
               .filter((f) => f.shareMeals)
@@ -340,9 +344,6 @@ export default function FriendsSettingsScreen() {
                 />
               ))}
           </ChipWrap>
-          <Text variant="caption" color="textSecondary">
-            {AUDIENCE_NOTE}
-          </Text>
         </View>
       </Sheet>
       <ConfirmSheet
