@@ -5,7 +5,9 @@
  * The page opens on the first visit of a new day in the morning, once a day (the seen day is kept
  * on the device and, for someone signed in, in the synced settings once this morning's pull has
  * landed), and never over something the person came for: a reminder's action, a deep link,
- * another tab, a pushed screen or an open sheet. Only the verdict 'due' writes anything; every
+ * another tab, a pushed screen or an open sheet; nor over or right after something the person did
+ * in this visit before the look decided (a log, a screen or a sheet they opened: 'acted'), so a quick
+ * log at a morning's first launch is never followed by a page. Only the verdict 'due' writes anything; every
  * other one marks nothing, so a reminder that opens the app at 07:00 leaves a plain open at 07:30
  * its page, and after noon it does not appear that day.
  */
@@ -31,6 +33,7 @@ export type MorningReason =
   | 'seen'
   | 'not-morning'
   | 'nothing-yesterday'
+  | 'acted'
   | 'elsewhere'
   | 'sheet'
   | 'reminder'
@@ -65,6 +68,16 @@ export interface MorningInput {
   reminderFrom: number;
   /** This visit came from a deep link. */
   linked: boolean;
+  /**
+   * When the person last did something in the app (opened a screen or a sheet, logged, changed or deleted a
+   * record of theirs: ./acted), or null.
+   */
+  actedAt: number | null;
+  /**
+   * Acting at or after this moment (ms) belongs to this visit: the look's start (a cold start's, the app's
+   * launch), or for the look on arriving at Today (`waitsForToday`) the start of the look that waited for it.
+   */
+  actedFrom: number;
 }
 
 export interface MorningVerdict {
@@ -86,6 +99,8 @@ export function morningVerdict(i: MorningInput): MorningVerdict {
   if (i.minutes < MORNING_FROM || i.minutes >= MORNING_UNTIL) return no('not-morning');
   const { food, activities, water } = i.yesterday;
   if (food + activities + water === 0) return no('nothing-yesterday');
+  // The person is already doing something: the page stands down for this visit (and waits for no later arrival).
+  if (i.actedAt !== null && i.actedAt >= i.actedFrom) return no('acted');
   if (!i.onToday) return no('elsewhere');
   if (i.sheetOpen) return no('sheet');
   if (i.reminderAt !== null && i.reminderAt >= i.reminderFrom) return no('reminder');
@@ -105,7 +120,8 @@ export function reminderSince(lookStartedAt: number): number {
 /**
  * The look found the app on another tab or a pushed screen, and nothing else stood in the way:
  * the page waits for the person's next arrival on Today (that day only). Not after a reminder or
- * a link (they decide first), and not for an open sheet (the person is busy on Today itself).
+ * a link (they decide first), not for an open sheet (the person is busy on Today itself), and not
+ * when the person opened that screen or logged in this visit ('acted' comes before 'elsewhere').
  */
 export function waitsForToday(i: MorningInput): boolean {
   return morningVerdict(i).reason === 'elsewhere' && morningVerdict({ ...i, onToday: true }).open;

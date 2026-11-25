@@ -22,6 +22,13 @@
  * reminder or a link counts from the moment the look began (or for a cold start, from the app's
  * start), so a slow start-up cannot let the page rise over a reminder's action.
  *
+ * Never over or right after something the person did ('acted' in ./rule): from the moment a look
+ * begins until it decides (the sync wait included), a screen they open (the route leaving Today), a
+ * sheet on screen (asked every POLL_MS while a look is pending) and a record of theirs written on this
+ * device (./acted, from every store change) count as acting in this visit, and the page stands down;
+ * a look on arriving at Today counts from the start of the look that waited for it, so a screen opened
+ * on the way never leads to a page on the way back.
+ *
  * When due: for someone signed in it first waits (at most SYNC_WAIT_MS) for a sync round that
  * ends after the look began, and decides again on what it pulled, so a page seen on another
  * device this morning is not shown again. Then it marks the day seen on this device (./seen, its
@@ -46,6 +53,7 @@ import { useHydration } from '@/store/persistence';
 import type { ISODate, SyncedRecord } from '@/types';
 import { sheetOnScreen } from '@/ui';
 
+import { wroteByPerson } from './acted';
 import { morningAllowed } from './allowed';
 import { launch } from './launch';
 import { isPlainLink, laterDay, linkToToday, morningVerdict, pulledSince, reminderSince, waitsForToday, yieldsToUpdate, type MorningInput } from './rule';
@@ -57,6 +65,8 @@ export const SETTLE_MS = 900;
 const LINK_WINDOW_MS = 3000;
 /** For someone signed in, the longest wait for this morning's sync before deciding without it. */
 export const SYNC_WAIT_MS = 8000;
+/** How often a pending look asks whether a sheet is on screen (a sheet opened and closed again is acting too). */
+const POLL_MS = 100;
 
 type LookKind = 'cold' | 'return' | 'today';
 
@@ -110,15 +120,26 @@ export function useMorningPage(): void {
 
   // Where the app is, for the timeout to read: kept current by an effect, never read in render.
   const onTodayRef = useRef(false);
-  // A look that found the app elsewhere waits for Today on that day (the day it was armed).
+  // A look that found the app elsewhere waits for Today on that day (the day it was armed), counting the
+  // person's acting from the start of that look.
   const armedDay = useRef<ISODate | null>(null);
-  const lookRef = useRef<((kind: LookKind) => void) | null>(null);
+  const armedFrom = useRef(0);
+  const lookRef = useRef<((kind: LookKind, actedFrom?: number) => void) | null>(null);
+  // When the person last did something in the app (./acted, a screen, a sheet): read by the looks, never in render.
+  const actedAt = useRef<number | null>(null);
+  const lastPath = useRef(pathname);
+  useEffect(() => {
+    if (pathname === lastPath.current) return;
+    lastPath.current = pathname;
+    // A screen or tab opened; arriving back on Today is not acting (it is what a waiting look waits for).
+    if (pathname !== '/') actedAt.current = Date.now();
+  }, [pathname]);
   useEffect(() => {
     onTodayRef.current = onToday;
     if (!onToday || armedDay.current === null) return;
     const day = armedDay.current;
     armedDay.current = null;
-    if (day === today()) lookRef.current?.('today');
+    if (day === today()) lookRef.current?.('today', armedFrom.current);
   }, [onToday]);
 
   const coldDone = useRef(false);
@@ -136,8 +157,25 @@ export function useMorningPage(): void {
     let away: Away | null = AppState.currentState !== 'active' ? { at: Date.now(), day: today() } : null;
     // Started without being in front (launched in the background): the cold look waits for the front.
     let coldOnActive = false;
+    // While a look is pending or deciding: a sheet on screen counts as acting.
+    let poll: ReturnType<typeof setInterval> | null = null;
+    const startPoll = () => {
+      if (poll) return;
+      poll = setInterval(() => {
+        if (sheetOnScreen()) actedAt.current = Date.now();
+      }, POLL_MS);
+    };
+    const stopPoll = () => {
+      if (poll) clearInterval(poll);
+      poll = null;
+    };
+    // A log, an edit or a delete of the person's own (never a pull of older records or a health store's).
+    const unsubscribe = useStore.subscribe((next, prev) => {
+      const now = Date.now();
+      if (wroteByPerson(next, prev, now)) actedAt.current = now;
+    });
 
-    const decide = async (kind: LookKind, lookStartedAt: number) => {
+    const decide = async (kind: LookKind, lookStartedAt: number, actedFrom: number) => {
       if (deciding) return;
       deciding = true;
       try {
@@ -174,6 +212,8 @@ export function useMorningPage(): void {
             // A cold start: any reminder answered since the app started. Otherwise from just before this look.
             reminderFrom: cold ? reminderSince(launch.at) : reminderSince(lookStartedAt),
             linked: linkedCold || recentLink,
+            actedAt: actedAt.current,
+            actedFrom,
           };
           return { input, day, verdict: morningVerdict(input) };
         };
@@ -181,7 +221,10 @@ export function useMorningPage(): void {
         const settled = (r: ReturnType<typeof read>): boolean => {
           if (typeof __DEV__ !== 'undefined' && __DEV__) console.info('[morning]', kind, r.verdict.reason);
           if (r.verdict.open) return true;
-          if (waitsForToday(r.input)) armedDay.current = r.day;
+          if (waitsForToday(r.input)) {
+            armedDay.current = r.day;
+            armedFrom.current = actedFrom;
+          }
           return false;
         };
 
@@ -208,10 +251,11 @@ export function useMorningPage(): void {
         if (typeof __DEV__ !== 'undefined' && __DEV__) console.warn('[morning]', e);
       } finally {
         deciding = false;
+        stopPoll();
       }
     };
 
-    const look = (kind: LookKind) => {
+    const look = (kind: LookKind, waitedFrom?: number) => {
       if (deciding) return;
       const startedAt = Date.now();
       const asKind: LookKind = kind === 'cold' || pendingKind === 'cold' ? 'cold' : kind;
@@ -219,10 +263,13 @@ export function useMorningPage(): void {
       if (pendingKind === null) pendingStart = startedAt;
       pendingKind = asKind;
       const from = pendingStart;
+      // A cold start counts from the launch; a look on arriving at Today from the look that waited for it.
+      const actedFrom = asKind === 'cold' ? Math.min(launch.at, from) : (waitedFrom ?? from);
+      startPoll();
       timer = setTimeout(() => {
         timer = null;
         pendingKind = null;
-        void decide(asKind, from);
+        void decide(asKind, from, actedFrom);
       }, SETTLE_MS);
     };
     lookRef.current = look;
@@ -275,6 +322,8 @@ export function useMorningPage(): void {
       alive = false;
       lookRef.current = null;
       if (timer) clearTimeout(timer);
+      stopPoll();
+      unsubscribe();
       appState?.remove();
       links?.remove();
     };

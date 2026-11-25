@@ -35,6 +35,8 @@ const due: MorningInput = {
   reminderAt: null,
   reminderFrom: reminderSince(NOW),
   linked: false,
+  actedAt: null,
+  actedFrom: NOW,
 };
 const v = (patch: Partial<MorningInput>) => morningVerdict({ ...due, ...patch });
 
@@ -53,6 +55,7 @@ describe('morningVerdict', () => {
       [{ seenDay: '2026-11-17' }, 'seen'],
       [{ minutes: 13 * 60 }, 'not-morning'],
       [{ yesterday: { food: 0, activities: 0, water: 0 } }, 'nothing-yesterday'],
+      [{ actedAt: NOW + 400 }, 'acted'],
       [{ onToday: false }, 'elsewhere'],
       [{ sheetOpen: true }, 'sheet'],
       [{ reminderAt: NOW - 500 }, 'reminder'],
@@ -123,6 +126,23 @@ describe('morningVerdict', () => {
   it('a deep link blocks', () => {
     expect(v({ linked: true }).reason).toBe('link');
   });
+
+  it('stands down once the person has acted in this visit: never over or right after what they just did', () => {
+    // A + sheet tile logged 400 ms into the look; search opened and closed again; a sheet opened and closed.
+    expect(v({ actedAt: NOW + 400 }).reason).toBe('acted');
+    expect(v({ actedAt: NOW }).reason).toBe('acted');
+    // Acting during a signed-in person's sync wait, after the first verdict: the second read stands down.
+    expect(v({ actedAt: NOW + 6000 }).reason).toBe('acted');
+    // What was done before this visit's look began is not this visit's.
+    expect(v({ actedAt: NOW - 1 }).reason).toBe('due');
+    expect(v({ actedAt: NOW - 3_600_000 }).reason).toBe('due');
+    // It comes before where the app is, so a screen the person opened never arms a later opening on Today.
+    expect(v({ actedAt: NOW + 400, onToday: false }).reason).toBe('acted');
+    expect(v({ actedAt: NOW + 400, sheetOpen: true }).reason).toBe('acted');
+    // And after the checks that do not depend on this visit.
+    expect(v({ actedAt: NOW + 400, seenDay: '2026-11-17' }).reason).toBe('seen');
+    expect(v({ actedAt: NOW + 400, minutes: 13 * 60 }).reason).toBe('not-morning');
+  });
 });
 
 describe('waitsForToday', () => {
@@ -137,6 +157,8 @@ describe('waitsForToday', () => {
     expect(waitsForToday({ ...due, onToday: false, seenDay: '2026-11-17' })).toBe(false);
     expect(waitsForToday({ ...due, onToday: false, minutes: 13 * 60 })).toBe(false);
     expect(waitsForToday({ ...due, sheetOpen: true })).toBe(false);
+    // The person opened that screen (or logged) in this visit: no page on the way back to Today.
+    expect(waitsForToday({ ...due, onToday: false, actedAt: NOW + 300 })).toBe(false);
   });
 });
 

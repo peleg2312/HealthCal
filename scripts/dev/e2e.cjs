@@ -2479,6 +2479,47 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     await sctx.close();
   }
 
+  // ------------------------------------------- a sheet's row that opens a screen (src/ui/Sheet.tsx, heldWrites in src/ui/sheetHistory.ts)
+  // The + sheet's "Search food" closes the sheet (whose clean-up steps back off its history entry) and opens search in
+  // the same tap. The router must never hear that step as the person's Back: on a busy phone it used to undo the move
+  // under way and leave Today on screen (3 in 34 loads; 6 in 14 with the processor slowed 4 times). Each try from a fresh
+  // load, with the processor slowed 4 times: search opens, and one Back returns to Today with no sheet.
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require.resolve('./seed.mjs')).href);
+    const seed = buildSeed({ onboarded: true, theme: 'dark' });
+    const nctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce' });
+    await nctx.addInitScript((value) => {
+      if (!window.sessionStorage.getItem('__seeded')) {
+        window.localStorage.setItem('healthcal-v1', value);
+        window.sessionStorage.setItem('__seeded', '1');
+      }
+    }, JSON.stringify(seed));
+    const np = await nctx.newPage();
+    np.on('pageerror', (e) => errors.push(e.message));
+    const slow = await nctx.newCDPSession(np);
+    const tries = [];
+    for (let i = 0; i < 8; i++) {
+      await slow.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      await np.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+      await np.getByTestId('tab-add').first().waitFor({ timeout: 20000 });
+      await np.waitForTimeout(800);
+      await slow.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      await np.getByTestId('tab-add').first().tap();
+      await np.waitForTimeout(i % 2 ? 400 : 900);
+      await np.getByTestId('quick-search').first().tap();
+      const opened = await np.getByTestId('food-search-input').first().waitFor({ state: 'visible', timeout: 8000 }).then(() => true, () => false);
+      const at = await np.evaluate(() => ({ path: location.pathname, title: document.title }));
+      await np.goBack();
+      await np.waitForTimeout(800);
+      const back = await np.evaluate(() => ({ path: location.pathname, title: document.title, dialogs: document.querySelectorAll('[role="dialog"]').length }));
+      tries.push({ ok: opened && at.path === '/food/search' && !/^Today/.test(at.title) && back.path === '/' && /^Today/.test(back.title) && back.dialogs === 0, at, back });
+    }
+    await slow.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    const bad = tries.filter((t) => !t.ok);
+    check("a sheet's row that opens a screen: + then Search food opens search every time, and one Back returns to Today", bad.length === 0, `${tries.length - bad.length} of ${tries.length}${bad.length ? `; ${JSON.stringify(bad[0])}` : ''}`);
+    await nctx.close();
+  }
+
   // ------------------------------------------- Appearance: the newer looks (src/theme/resolve.ts)
   // A newer look is stored as `look` beside its fallback in `theme` (an older copy shows Light or Dark);
   // the four older choices write `theme` and remove `look`. The page's ground is the palette's own bg,
