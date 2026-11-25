@@ -68,8 +68,9 @@ const fasting = [[0, '0'], [0.05, '5'], [0.37, '37'], [0.85, '85'], [1, '100'], 
 }));
 
 // ------------------------------------------------------------------ the share card
-const share = [[0, '0'], [0.6, '60'], [1.3, '130']].map(([eaten, pct]) => ({
-  id: `sweep-share-eaten-${pct}`, route: '/', values: { eaten, exercise: 290 }, taps: ['today-share', 'share-choice-kcal'], sheet: true,
+// From the diary, where Share is at every hour on a day with food (an empty day has none, so 0% is not reached).
+const share = [[0.6, '60'], [1.3, '130']].map(([eaten, pct]) => ({
+  id: `sweep-share-eaten-${pct}`, route: '/diary', values: { eaten, exercise: 290 }, taps: ['diary-share', 'share-choice-kcal'], sheet: true,
   note: `the share card at ${pct}% eaten, calories shown`,
 }));
 

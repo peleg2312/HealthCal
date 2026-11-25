@@ -47,7 +47,7 @@ module.exports = [
   { id: 'text200-terms', route: '/legal/terms', flags: big, note: 'Terms of use at 200% text' },
   { id: 'text200-privacy', route: '/legal/privacy', flags: big, note: 'Privacy at 200% text' },
   { id: 'text200-welcome', route: '/welcome', data: 'fresh', waitFor: 'welcome-get-started', flags: big, note: 'welcome at 200% text' },
-  { id: 'text200-share-sheet', route: '/', taps: ['today-share'], sheet: true, flags: big, note: "the day's share sheet at 200% text" },
+  { id: 'text200-share-sheet', route: '/diary', taps: ['diary-share'], sheet: true, flags: big, note: "the day's share sheet at 200% text" },
   // Today, the diary and the coach in their other states (W2-TODAY).
   { id: 'text200-today-first', route: '/', data: 'empty', flags: big, note: 'Today on day one at 200% text' },
   { id: 'text200-today-past', route: '/', taps: [`today-day-${isoDay(-1)}`], waitFor: 'today-jump-today', flags: big, note: 'Today on yesterday at 200% text' },

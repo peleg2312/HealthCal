@@ -377,6 +377,7 @@ export function Sheet({
   visible,
   onClose,
   title,
+  subtitle,
   children,
   footer,
   accessibilityLabel,
@@ -385,6 +386,12 @@ export function Sheet({
   visible: boolean;
   onClose: () => void;
   title?: string;
+  /**
+   * One short line directly under the title (2 px under it, as a title with its one line), inside the drag zone: a
+   * string is drawn as a secondary caption; an element (its own Text, with its own testID) is drawn as given and is
+   * rendered only while the sheet is, so it may read the store. On the web it describes the dialog.
+   */
+  subtitle?: string | React.ReactElement | null;
   children: React.ReactNode;
   footer?: React.ReactNode;
   /** The dialog's name for a screen reader when the sheet has no title (with a title, the title names it). */
@@ -525,9 +532,22 @@ export function Sheet({
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - open.get()) * (travel + 24) + drag.get() }] }));
   const toastStyle = useAnimatedStyle(() => ({ opacity: open.get() }));
   const titleView = title ? (
-    <Text variant="h2" nativeID={titleId} style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.md }}>
-      {title}
-    </Text>
+    <>
+      <Text variant="h2" nativeID={titleId} style={{ paddingHorizontal: spacing.xl, paddingBottom: subtitle ? 2 : spacing.md }}>
+        {title}
+      </Text>
+      {subtitle ? (
+        <View nativeID={`${titleId}-sub`} style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.md }}>
+          {typeof subtitle === 'string' ? (
+            <Text variant="caption" color="textSecondary">
+              {subtitle}
+            </Text>
+          ) : (
+            subtitle
+          )}
+        </View>
+      ) : null}
+    </>
   ) : null;
   const footerView =
     asking && unsaved ? (
@@ -563,7 +583,7 @@ export function Sheet({
       onRequestClose={requestClose}
       statusBarTranslucent
       // Web: the dialog is named by its title (or the label given), as a screen reader expects of a dialog.
-      {...((title ? { 'aria-labelledby': titleId } : accessibilityLabel ? { 'aria-label': spokenUnits(accessibilityLabel) } : {}) as object)}>
+      {...((title ? { 'aria-labelledby': titleId, ...(subtitle ? { 'aria-describedby': `${titleId}-sub` } : null) } : accessibilityLabel ? { 'aria-label': spokenUnits(accessibilityLabel) } : {}) as object)}>
       <KeyboardAvoidingView
         nativeID={layerId}
         pointerEvents={visible ? 'auto' : 'none'}

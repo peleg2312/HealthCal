@@ -77,21 +77,25 @@ function picks(entries: Parameters<typeof usualFoods>[0], meal: MealType, today:
   return [...usual, ...staples].slice(0, 3);
 }
 
+/** The invite's overline when drawn by itself: the meal and its share of the budget ("Breakfast · around 540 kcal"). */
+function inviteHeading(meal: MealType, budget: number): string {
+  return `${MEAL_LABEL[meal]} · around ${formatNumber(Math.round((budget * MEAL_SHARE[meal]) / 10) * 10)} kcal`;
+}
+
 /**
- * Day one of Today: one obvious first action. The meal for the time of day
- * with its share of the budget, a full-width button that opens food search for
+ * Day one of Today: one obvious first action, in the Now card. The meal for the time of day
+ * with its share of the budget (`inviteHeading`, the card's heading), a full-width button that opens food search for
  * it, and three foods that log in one tap (with Undo). The macro bars and the
  * budget line come back after the first entry. The button is the kit's secondary,
  * not a filled primary: the tab bar's + is the screen's one filled action.
  * `narrow` (a window under 360 px): a 44 px button and the three foods in one row
- * that scrolls sideways, so the water row under the card is in the first view at 320 x 640.
+ * that scrolls sideways. `overline={false}`: the heading is drawn by the card around it.
  */
-export function FirstLogInvite({ meal, date, budget, narrow = false }: { meal: MealType; date: ISODate; budget: number; narrow?: boolean }) {
+export function FirstLogInvite({ meal, date, budget, narrow = false, overline = true }: { meal: MealType; date: ISODate; budget: number; narrow?: boolean; overline?: boolean }) {
   const { colors, spacing } = useTheme();
   const entries = useLive('foodEntries');
   const customFoods = useLive('customFoods');
   const label = MEAL_LABEL[meal];
-  const share = Math.round((budget * MEAL_SHARE[meal]) / 10) * 10;
   const options = picks(entries, meal, date, customFoods);
   const large = useLargeText();
   const chip = (p: Pick) => (
@@ -107,7 +111,7 @@ export function FirstLogInvite({ meal, date, budget, narrow = false }: { meal: M
   );
   return (
     <View testID="today-first-invite" style={{ gap: spacing.md }}>
-      <Text variant="overline">{`${label} · around ${formatNumber(share)} kcal`}</Text>
+      {overline ? <Text variant="overline">{inviteHeading(meal, budget)}</Text> : null}
       <Button
         testID="today-first-log"
         title={`Log ${label.toLowerCase()}`}

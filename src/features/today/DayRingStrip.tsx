@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react-native';
 import React, { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Platform, ScrollView, useWindowDimensions, View, type AccessibilityActionEvent, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type ViewStyle } from 'react-native';
 
@@ -75,7 +75,9 @@ function stripBleed(windowW: number, gutter: number): number {
  * calendar cup at the row's end (`<prefix>-week-pick`), which opens "Choose a week"
  * with every week the strip holds. Each day also offers "Previous week" and "Next
  * week" as accessibility actions. A swipe that starts on the strip pages weeks, never days.
- * `slim` draws it with small cups and tighter gaps (102 px, the same rows and controls), as the diary does.
+ * `slim` draws it with small cups and tighter gaps (102 px, the same rows and controls), as both tabs do, and says the
+ * current week's caption without its lead ("2 full days on budget"). `link` puts a link with its hide X in the
+ * caption's place on the current week (Today's "Your week is ready").
  */
 export function DayRingStrip({
   today,
@@ -88,6 +90,7 @@ export function DayRingStrip({
   latest,
   jumpTestID,
   slim = false,
+  link,
   style,
 }: {
   today: ISODate;
@@ -111,9 +114,16 @@ export function DayRingStrip({
   /**
    * The slim strip: small cups (16 x 20) and tighter gaps, the same letters, dates, caption row, chip, note, accessory
    * and week controls, 102 px in all at every width (the full one is 132). Ignored with large text, where the dates need
-   * the full strip's room. The diary passes it; a screen passes it to start its content 30 px higher.
+   * the full strip's room. Today and the diary pass it, 12 px over their first card.
    */
   slim?: boolean;
+  /**
+   * A link said in the caption's place while the current week is shown, before the note and the caption (Today's
+   * "Your week is ready ›", which opens the check-in): its words in the action ink with a chevron, and beside it a
+   * clear X that hides it (`hide`). It moves nothing: it sits in the caption row. Under 360 px it shows `short` ("Your
+   * week"), named by its whole words, so it keeps one line beside the X, the streak and the week cup.
+   */
+  link?: { label: string; short?: string; hint: string; testID: string; onPress: () => void; hide?: { label: string; testID: string; onPress: () => void } } | null;
   /** Placement only (a margin): the block's own height never changes. */
   style?: StyleProp<ViewStyle>;
 }) {
@@ -204,7 +214,8 @@ export function DayRingStrip({
     const timer = setTimeout(() => setNoteShown(noteText), reduce ? 0 : noteDelay);
     return () => clearTimeout(timer);
   }, [noteText, noteDelay, reduce]);
-  const showNote = noteText !== null && noteShown === noteText && back === 0;
+  const showLink = !!link && back === 0;
+  const showNote = !showLink && noteText !== null && noteShown === noteText && back === 0;
 
   const captionFor = (b: number) =>
     b < 0
@@ -216,7 +227,9 @@ export function DayRingStrip({
           today,
           start,
         );
-  const caption = captionFor(back);
+  // The slim strip says the current week's caption without its lead ("2 full days on budget"): the strip above it is
+  // this week, and the line keeps to one row beside the streak and the week cup. Another week keeps "That week: ".
+  const caption = slim && back === 0 ? sentenceCase(captionFor(back).replace(/^Week so far: /, '')) : captionFor(back);
   // "Choose a week": open while the person picks one of the strip's weeks.
   const [picking, setPicking] = useState(false);
   const weekTitle = (b: number) => {
@@ -361,7 +374,28 @@ export function DayRingStrip({
       {/* Large text (130% and up): the caption takes the whole width and the chip, the streak and the week cup a line
           under it, so neither squeezes the other's words. */}
       <View style={{ flexDirection: 'row', flexWrap: large ? 'wrap' : 'nowrap', alignItems: 'center', gap: spacing.sm, minHeight: CAPTION_ROW_H }}>
-        {showNote ? (
+        {showLink && link ? (
+          <View style={large ? { flexBasis: '100%', flexDirection: 'row', alignItems: 'center', gap: spacing.sm } : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            {/* Its touch area reaches 44 px tall; sideways it stops at its own edge, so the X beside it keeps its own. */}
+            <PressableScale
+              testID={link.testID}
+              onPress={link.onPress}
+              accessibilityLabel={link.label}
+              accessibilityHint={link.hint}
+              hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}
+              style={{ flexShrink: 1, minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+              <Text variant="label" color="actionInk" style={{ flexShrink: 1, fontSize: 13, lineHeight: 17 }}>
+                {narrow && link.short ? link.short : link.label}
+              </Text>
+              <ChevronRight size={16} color={colors.actionInk} strokeWidth={2.2} />
+            </PressableScale>
+            {link.hide ? (
+              <IconButton testID={link.hide.testID} accessibilityLabel={link.hide.label} tone="clear" size={32} onPress={link.hide.onPress}>
+                <X size={18} color={colors.textSecondary} strokeWidth={1.9} />
+              </IconButton>
+            ) : null}
+          </View>
+        ) : showNote ? (
           <FadeUp key={noteText} style={large ? { flexBasis: '100%' } : { flex: 1 }}>
             <Text variant="caption" color="text" numberOfLines={large ? undefined : 2} testID={note?.testID} accessibilityLiveRegion="polite">
               {noteText}

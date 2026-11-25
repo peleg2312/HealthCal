@@ -1039,10 +1039,10 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await page.waitForTimeout(500);
 
   // ------------------------------------------- meals that fit (src/features/today/ideas.ts, FitsSheet)
-  // The demo's five weeks at dinner time, 60% of the budget eaten, in a context of its own: Today's "Ideas that fit" chip
+  // The demo's five weeks at dinner time, 60% of the budget eaten, in a context of its own: the Now card's "What fits"
   // opens What fits with "Meals that fit" above the single foods; one tap logs an idea's foods to dinner with one Undo,
-  // its row turns into a tick and every row stays where it was; Undo takes the foods away. Over the budget the chip is
-  // not there, and What fits (from the coach's ideas answer) shows one neutral line and "Search all foods", with no list at all.
+  // its row turns into a tick and every row stays where it was; Undo takes the foods away. Over the budget the Now card
+  // keeps "What fits", which shows one neutral line and "Search all foods", with no list at all.
   {
     // This file's folder from the command line (the lint setup does not define __dirname).
     const here = require('path').dirname(require('path').resolve(process.argv[1]));
@@ -1072,7 +1072,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
 
     const { ctx, p } = await openIdeas(0.6);
     const chip = await p.getByTestId('today-ideas').first().waitFor({ timeout: 15000 }).then(() => true, () => false);
-    check("ideas: Today shows the \"Ideas that fit\" chip in the energy card", chip && (await itext(p, 'today-ideas')) === 'Ideas that fit');
+    check('ideas: Today\'s Now card offers "What fits"', chip && (await itext(p, 'today-ideas')) === 'What fits' && (await p.locator('[data-testid="today-now"] [data-testid="today-ideas"]').count()) === 1);
     await p.getByTestId('today-ideas').first().click({ timeout: 15000 });
     await p.waitForTimeout(500);
     const block = await p.getByTestId('fits-ideas').first().waitFor({ timeout: 10000 }).then(() => true, () => false);
@@ -1114,10 +1114,8 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     await ctx.close();
 
     const over = await openIdeas(1.1);
-    check('ideas: over the budget Today shows no ideas chip', (await over.p.getByTestId('today-ideas').count()) === 0);
-    // The big number switches between left and eaten; over the budget What fits is reached from the coach's ideas answer.
-    await over.p.goto(`${BASE}/coach?ask=ideas`, { waitUntil: 'networkidle' });
-    await over.p.getByTestId('coach-local-fits').first().click({ timeout: 15000 });
+    // The big number switches between left and eaten; over the budget What fits is still the Now card's last action.
+    await over.p.getByTestId('today-ideas').first().click({ timeout: 15000 });
     await over.p.waitForTimeout(500);
     const line = await over.p.getByTestId('fits-over').first().waitFor({ timeout: 10000 }).then(() => itext(over.p, 'fits-over'), () => '');
     check(
@@ -1394,7 +1392,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   // same tab, scroll and day, with an unsent question kept), no other way in left (Train's link, Profile's row), the two
   // questions answered on the phone (the training answer carries the same minutes as the overview sheet, the ideas answer
   // opens What fits), the overview sheet's "Ask the coach" arriving already answered (?ask=training), Today's "Ask the
-  // coach" beside the coach card's action, the Coach cup as the one accented cup, no "the coach moved" toast in an
+  // coach" in the Now card's corner, the Coach cup as the one accented cup, no "the coach moved" toast in an
   // automated browser that did not ask, a typed question with no backend (the placeholder says typed questions need the
   // app with an account, Send is the outline cup and does nothing, no sign-in is offered, no request to coach-chat), the
   // footer on the faked keyboard under a visible header, and Clear chat (in "What the coach sees") with its Undo. The AI
@@ -1468,25 +1466,25 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     await cp.goto(`${BASE}/`, { waitUntil: 'networkidle' });
     await cp.waitForTimeout(2600);
     check('coach: no "the coach is now at the top" toast in an automated browser that did not ask for it', !/The coach is now at the top/.test(await cp.evaluate(() => document.body.innerText)) && (await cp.evaluate(() => localStorage.getItem('healthcal.coachMovedSaid'))) === null);
-    // Early in the week "Your week is ready" sits above the coach card: mark last week's check-in seen, as the rest of the week reads.
+    // Early in the week "Your week is ready" is the week caption's link: mark last week's check-in seen, as the rest of the week reads.
     await cp.evaluate(() => {
       const d = new Date();
       d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       window.__healthcal.getState().setSettings({ recapSeenWeek: key });
     });
-    await cp.getByTestId('today-coach').first().waitFor({ timeout: 10000 }).catch(() => {});
-    // "Ask the coach" is in the calorie card's action rows (not the coach card): one control, whole in the first view
-    // (360 x 740) with its centre in the window's lower 60%, so the coach has a worded way in within the thumb's reach.
+    await cp.getByTestId('today-now').first().waitFor({ timeout: 10000 }).catch(() => {});
+    // "Ask the coach" is in the Now card's corner: one control, whole in the first view (360 x 740) with its centre in
+    // the window's lower 60%, so the coach has a worded way in within the thumb's reach.
     const ask = await cp.evaluate(() => {
       const all = [...document.querySelectorAll('[data-testid="today-coach-ask"]')].filter((e) => e.getBoundingClientRect().width > 0);
       const e = all[0];
       if (!e) return null;
       const r = e.getBoundingClientRect();
       const bar = document.querySelector('[data-testid="tab-bar"]').getBoundingClientRect();
-      return { count: all.length, inEnergy: !!e.closest('[data-testid="today-actions"]'), inCoachCard: !!e.closest('[data-testid="today-coach"]'), top: Math.round(r.top), bottom: Math.round(r.bottom), cy: Math.round(r.top + r.height / 2), barTop: Math.round(bar.top), h: window.innerHeight, text: e.innerText.trim() };
+      return { count: all.length, inNow: !!e.closest('[data-testid="today-now"]'), inEnergy: !!e.closest('[data-testid="today-energy"]'), top: Math.round(r.top), bottom: Math.round(r.bottom), cy: Math.round(r.top + r.height / 2), barTop: Math.round(bar.top), h: window.innerHeight, text: e.innerText.trim() };
     });
-    check('coach: Today\'s "Ask the coach" is one control in the calorie card\'s action rows', !!ask && ask.count === 1 && ask.inEnergy && !ask.inCoachCard && ask.text === 'Ask the coach', JSON.stringify(ask));
+    check('coach: Today\'s "Ask the coach" is one control, in the Now card', !!ask && ask.count === 1 && ask.inNow && !ask.inEnergy && ask.text === 'Ask the coach', JSON.stringify(ask));
     check('coach: Today\'s "Ask the coach" is whole in the first view, its centre in the lower 60%', !!ask && ask.top >= 0 && ask.bottom <= ask.barTop && ask.cy > 0.4 * ask.h, JSON.stringify(ask));
     if (ask) {
       await ctap('today-coach-ask');
@@ -2949,7 +2947,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   }
 
   // ------------------------------------------- the diary shows more of the day (DayRingStrip's slim, MealCard, src/features/food/mealMacros.ts)
-  // The diary draws the week strip slim (102 px; Today keeps its 132), its rows tight and each filled meal's protein,
+  // The diary draws the week strip slim (102 px, as Today does), its rows tight and each filled meal's protein,
   // carbs and fat under its name, so at 360 x 740 Breakfast and Lunch are whole above the tab bar, and at 320 x 640
   // Lunch's add is in the first view; "Choose a week" is still a tap away.
   {
@@ -2970,7 +2968,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       await p.goto(`${BASE}/diary`, { waitUntil: 'networkidle' });
       await p.getByTestId('meal-macros-lunch').first().waitFor({ timeout: 20000 });
       const [week, bar, breakfast, lunch, add] = [await box(p, 'diary-week'), await box(p, 'tab-bar'), await box(p, 'meal-card-breakfast'), await box(p, 'meal-card-lunch'), await box(p, 'meal-add-lunch')];
-      check(`slim diary (${w}): the diary's strip is 102 px, Today's stays 132`, Math.round(week?.height) === 102 && Math.round(todayWeek?.height) === 132, `${week?.height} / ${todayWeek?.height}`);
+      check(`slim diary (${w}): the diary's strip and Today's are both 102 px`, Math.round(week?.height) === 102 && Math.round(todayWeek?.height) === 102, `${week?.height} / ${todayWeek?.height}`);
       if (w === 360) check('slim diary (360 x 740): Breakfast and Lunch are whole above the tab bar', breakfast && lunch && bar && lunch.y + lunch.height <= bar.y, `lunch ends ${lunch && lunch.y + lunch.height}, tab bar ${bar?.y}`);
       else check("slim diary (320 x 640): Lunch's add is in the first view", add && bar && add.y + add.height <= bar.y, `add ends ${add && add.y + add.height}, tab bar ${bar?.y}`);
       const macros = await p.getByTestId('meal-macros-breakfast').first().evaluate((e) => [e.textContent.replace(/[\u00a0]/g, ' ').replace(/[\u2060\u200e\u2068\u2069]/g, ''), e.getAttribute('aria-label')]);
@@ -2983,6 +2981,101 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
         await p.getByTestId('diary-week-pick').first().tap();
         check('slim diary: "Choose a week" still opens from the strip', await p.getByTestId('diary-week-pick-sheet').first().waitFor({ timeout: 5000 }).then(() => true, () => false));
       }
+      await ctx.close();
+    }
+  }
+
+  // ------------------------------------------- Today: the day card and the Now card (src/features/today/NowCard.tsx, now.ts)
+  // The slim strip, 12 px to one day card (the cup, the macros, water with its glass and no other button), then the Now
+  // card: a heading for the hour, the coach's line, one action of the hour and What fits, "Ask the coach" in its corner;
+  // each action once on the page (the card's Repeat is not in the meal's row, which wears "Now"); Activity, Sleep and
+  // Weight in a card under Meals. In the late evening, once dinner is in, the card wraps the day up with Share. Day one
+  // holds the first-log invite with What fits. The glass is in the first view at 360 x 740 and 320 x 640.
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require.resolve('./seed.mjs')).href);
+    const at = (h, m = 0) => {
+      const d = new Date();
+      d.setHours(h, m, 0, 0);
+      return d;
+    };
+    const openToday = async ({ w = 360, h = 740, when, empty = false }) => {
+      const ctx = await browser.newContext({ viewport: { width: w, height: h }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+      await ctx.addInitScript((value) => {
+        if (!window.sessionStorage.getItem('__seeded')) {
+          window.localStorage.setItem('healthcal-v1', value);
+          window.sessionStorage.setItem('__seeded', '1');
+        }
+      }, JSON.stringify(buildSeed({ onboarded: true, theme: 'blossom', empty })));
+      await ctx.clock.setFixedTime(when);
+      const p = await ctx.newPage();
+      p.on('pageerror', (e) => errors.push(e.message));
+      await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+      await p.getByTestId('today-now').first().waitFor({ timeout: 20000 });
+      return { ctx, p };
+    };
+    const box = (p, id) => p.getByTestId(id).first().boundingBox({ timeout: 10000 }).catch(() => null);
+    const words = (p, id) => p.getByTestId(id).first().evaluate((e) => e.textContent.replace(/\u00a0/g, ' ').replace(/[\u2060\u200e\u2068\u2069]/g, '')).catch(() => '');
+    const inside = (p, id, parent) => p.evaluate(([id, parent]) => [...document.querySelectorAll(`[data-testid="${id}"]`)].filter((e) => e.getBoundingClientRect().width > 0).map((e) => !!e.closest(`[data-testid="${parent}"]`)), [id, parent]);
+
+    // Evening, dinner not logged.
+    {
+      const { ctx, p } = await openToday({ when: at(20, 45) });
+      const [week, energy, now, bar, glass, meals] = [await box(p, 'today-week'), await box(p, 'today-energy'), await box(p, 'today-now'), await box(p, 'tab-bar'), await box(p, 'today-water-250'), await box(p, 'today-meals')];
+      check('Today (360 x 740): the slim strip, 12 px to the day card', Math.round(week?.height) === 102 && Math.round(energy.y - (week.y + week.height)) === 12, `${week?.height}, gap ${energy && week && energy.y - week.y - week.height}`);
+      check('Today (360 x 740): the glass is in the day card, whole in the first view', (await inside(p, 'today-water-250', 'today-energy')).join() === 'true' && glass.y + glass.height <= bar.y);
+      check('Today (360 x 740): the Now card is whole in the first view, under the day card', now && bar && now.y > energy.y + energy.height && now.y + now.height <= bar.y, `now ${now?.y}-${now && now.y + now.height}, tab bar ${bar?.y}`);
+      check('Today: Meals start under 760 px at 360 x 740 (the demo)', meals && meals.y < 760, `${meals?.y}`);
+      check('Today: the day card holds no button but the number and the glass', (await p.locator('[data-testid="today-energy"] [role="button"]').count()) === 3, `${await p.locator('[data-testid="today-energy"] [role="button"]').count()} (the number, Water, the glass)`);
+      check('Today: no share, ideas chip or action row in the day card any more', (await p.getByTestId('today-actions').count()) === 0 && (await p.getByTestId('today-share').count()) === 0);
+      check('Today: the Now card is about dinner, with Repeat and What fits', /^Dinner · now$/.test(await words(p, 'today-now-heading')) && (await p.getByTestId('today-now-repeat').count()) === 1 && (await inside(p, 'today-ideas', 'today-now')).join() === 'true', await words(p, 'today-now-heading'));
+      check('Today: the card says what Repeat adds and its calories', /^Repeat · [\d,]+ kcal$/.test(await words(p, 'today-now-repeat')) && /^Yesterday: /.test(await words(p, 'today-now-foods')), `${await words(p, 'today-now-repeat')} | ${await words(p, 'today-now-foods')}`);
+      check("Today: dinner's row wears \"Now\" and has no Repeat of its own (each action once)", (await p.getByTestId('today-repeat-dinner').count()) === 0 && /^Dinner, Now, /.test((await p.getByTestId('today-meal-dinner').first().getAttribute('aria-label')) || ''));
+      check('Today: Activity, Sleep and Weight are a card of their own under Meals', (await box(p, 'today-rail')).y > meals.y + meals.height && (await inside(p, 'today-activity', 'today-rail')).join() === 'true');
+      check('Today: "Ask the coach" sits in the Now card, its heading row', (await inside(p, 'today-coach-ask', 'today-now')).join() === 'true' && Math.abs((await box(p, 'today-coach-ask')).y + 18 - ((await box(p, 'today-now-heading')).y + 7)) <= 4);
+      // Repeat logs yesterday's dinner, and the card moves on: dinner is in, so the line no longer offers it.
+      const before = Object.values((await p.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())))).foodEntries).filter((e) => !e.deleted && e.meal === 'dinner').length;
+      await p.getByTestId('today-now-repeat').first().click();
+      await p.waitForTimeout(600);
+      const after = Object.values((await p.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())))).foodEntries).filter((e) => !e.deleted && e.meal === 'dinner').length;
+      check("Today: the Now card's Repeat logs yesterday's dinner", after > before && (await p.getByTestId('today-now-repeat').count()) === 0, `${before} -> ${after}`);
+      await ctx.close();
+    }
+    // Late evening with dinner in: the wrap-up, Share and What fits.
+    {
+      const { ctx, p } = await openToday({ when: at(22, 0) });
+      if (await p.getByTestId('today-now-repeat').count()) {
+        await p.getByTestId('today-now-repeat').first().click();
+        await p.waitForTimeout(600);
+      }
+      check('Today (late evening, dinner in): "Your day · wrap-up" with Share and What fits', (await words(p, 'today-now-heading')) === 'Your day · wrap-up' && (await words(p, 'today-share')) === 'Share' && (await inside(p, 'today-share', 'today-now')).join() === 'true', await words(p, 'today-now-heading'));
+      await p.getByTestId('today-share').first().click();
+      check("Today: the Now card's Share opens the day's share sheet", await p.getByTestId('share-day-sheet').first().waitFor({ timeout: 8000 }).then(() => true, () => false));
+      await ctx.close();
+    }
+    // 320 x 640: the glass and the Now card's heading in the first view.
+    {
+      const { ctx, p } = await openToday({ w: 320, h: 640, when: at(20, 45) });
+      const [bar, glass, heading] = [await box(p, 'tab-bar'), await box(p, 'today-water-250'), await box(p, 'today-now-heading')];
+      check('Today (320 x 640): the glass and the Now card\'s heading are in the first view', glass.y + glass.height <= bar.y && heading.y + heading.height <= bar.y, `glass ${glass.y + glass.height}, heading ${heading.y + heading.height}, bar ${bar.y}`);
+      await ctx.close();
+    }
+    // Day one: the invite in the Now card with What fits; the glass in the first view at both sizes.
+    for (const [w, h] of [[360, 740], [320, 640]]) {
+      const { ctx, p } = await openToday({ w, h, when: at(8, 40), empty: true });
+      const [bar, glass] = [await box(p, 'tab-bar'), await box(p, 'today-water-250')];
+      check(`Today day one (${w} x ${h}): the invite and What fits in the Now card, no "Ask the coach", the glass in view`,
+        (await inside(p, 'today-first-invite', 'today-now')).join() === 'true' && (await inside(p, 'today-ideas', 'today-now')).join() === 'true' && (await p.getByTestId('today-coach-ask').count()) === 0 && glass.y + glass.height <= bar.y);
+      await ctx.close();
+    }
+    // "Your week is ready" is the caption's link early in the week (Monday to Wednesday); its X hides it with Undo.
+    {
+      const { ctx, p } = await openToday({ when: at(12, 0) });
+      if (await p.getByTestId('today-recap-open').count()) {
+        check('Today: "Your week is ready" is in the week strip\'s caption row', (await inside(p, 'today-recap-open', 'today-week')).join() === 'true');
+        await p.getByTestId('today-recap-dismiss').first().click();
+        await p.waitForTimeout(500);
+        check('Today: its X hides it, with a toast', (await p.getByTestId('today-recap-open').count()) === 0 && /Check-in hidden/.test(await words(p, 'toast')));
+      } else check('Today: no "Your week is ready" later in the week (or nothing to show)', (await p.getByTestId('today-recap-ready').count()) === 0);
       await ctx.close();
     }
   }

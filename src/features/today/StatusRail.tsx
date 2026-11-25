@@ -75,25 +75,118 @@ export function addWater(date: ISODate, ml: number, units: 'metric' | 'imperial'
   else show();
 }
 
+/** One calm line when a goal to reach is crossed on screen; it belongs to the day it was said for. */
+function useReachedNote(date: ISODate) {
+  // Haptics only for the screen in front: the tab stays mounted while water is added elsewhere.
+  const focused = useIsFocused();
+  const [note, setNote] = useState<{ date: ISODate; text: string } | null>(null);
+  const reached = (text: string) => {
+    if (focused) haptic.success();
+    setNote({ date, text });
+  };
+  return { note: note && note.date === date ? note.text : null, reached };
+}
+
+function ReachedNote({ text, testID }: { text: string | null; testID: string }) {
+  const { colors } = useTheme();
+  if (!text) return null;
+  return (
+    <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginTop: 12, paddingTop: 10 }}>
+      <Text variant="caption" color="textSecondary" testID={testID}>
+        {text}
+      </Text>
+    </View>
+  );
+}
+
 /**
- * Water, activity, sleep and weight (or the running fast) in one card, so
- * every pillar is visible in the first screen of Today. Water leads, with its
- * level bar and the one-tap glass; the other three share a row below a divider.
- * Water and the week's activity minutes are goals to reach: past the goal the
- * bar wears the brim tick, never amber, and crossing it on screen adds one
- * calm line at the foot of the card.
+ * Water in Today's day card, under the macros: the key and "Water", the day's amount of its goal ("1.23 of 3.3 L",
+ * on one line with them where it fits, else under them) and the one-tap glass ("+ 250 ml") at the row's end, then the
+ * level bar. Water is a goal to reach: past the goal the bar wears the brim tick, never amber, and crossing it on
+ * screen adds one calm line under the bar. A quick second tap on the glass (within ONE_TAP_GUARD_MS) logs nothing.
  */
-export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; isToday: boolean; /** First day: the glass is a ghost button so the first-log button is the only filled one. */ quiet?: boolean }) {
+export function WaterRow({ day, isToday, quiet = false }: { day: DaySummary; isToday: boolean; /** First day: the glass is a ghost button so the first-log button is the only filled one. */ quiet?: boolean }) {
   const { colors, spacing } = useTheme();
-  const { width: screenW } = useWindowDimensions();
-  const narrow = screenW < 360;
-  // Large text (130% and up): the water row may put its glass under the amount, and the three cells stack as rows,
-  // so every label and value keeps its words whole (`useLargeText`, `@/theme`).
+  // Large text (130% and up): the glass may go under the amount, and every word stays whole (`useLargeText`, `@/theme`).
   const large = useLargeText();
   const profile = useProfile();
   const units = profile.units;
   const presets = useStore((s) => s.settings.waterPresets);
   const glass = defaultGlass(presets);
+  // One tap, one glass: a quick second tap on "+ 250 ml" (within ONE_TAP_GUARD_MS) does not log a second one.
+  const oneTap = useOneTap();
+  const { note, reached } = useReachedNote(day.date);
+
+  const goal = formatVolume(day.waterGoalMl, units);
+  const [goalValue, goalUnit] = split(goal);
+  const waterUnit = volumeUnitFor(day.waterMl, units);
+  // "1.23 of 3.3 L": the unit is said once when both amounts share it ("250 ml of 2.55 L" otherwise).
+  const sameUnit = goalUnit === waterUnit;
+  const dateQuery = isToday ? '' : `?date=${day.date}`;
+  // The water figure as drawn: "1.23 of 3.3 L", "250 ml of 2.55 L".
+  const waterShown = `${volumeNumber(day.waterMl, day.waterMl, units)}${!sameUnit ? ` ${waterUnit}` : ''} of ${goalValue} ${goalUnit}`;
+
+  return (
+    <View testID="today-rail-water">
+      <View style={{ flexDirection: 'row', flexWrap: large ? 'wrap' : 'nowrap', alignItems: 'center', gap: spacing.md }}>
+        <PressableScale
+          testID="today-water"
+          onPress={() => router.push(`/water${dateQuery}` as never)}
+          accessibilityLabel={`Water, ${waterShown}`}
+          scaleTo={0.98}
+          // As tall as the glass beside it, 44 to touch; the key and its word, then the amount on the same line where both
+          // fit, else under them (a narrow phone, fl oz).
+          hitSlop={4}
+          style={{ flex: 1, minWidth: large ? 150 : 0, minHeight: 36, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 10 }}>
+          <KeyLabel color={colors.water} label="Water" />
+          <AnimatedNumber
+            variant="numM"
+            numberOfLines={large ? undefined : 1}
+            value={day.waterMl}
+            format={(ml) => volumeNumber(ml, day.waterMl, units)}
+            accessibilityLabel={spokenUnits(`${formatVolume(day.waterMl, units)} of ${goal}`)}>
+            <Text variant="unit">{`${!sameUnit ? ` ${waterUnit}` : ''} of ${goalValue} ${goalUnit}`}</Text>
+          </AnimatedNumber>
+        </PressableScale>
+        <Button
+          testID={`today-water-${glass}`}
+          title={formatVolume(glass, units)}
+          // The glass's words as drawn ("250 ml"; label in name), then what it does.
+          accessibilityLabel={`Add ${formatVolume(glass, units)} of water`}
+          variant={quiet ? 'ghost' : 'secondary'}
+          tint={quiet ? undefined : colors.water}
+          size="sm"
+          full={false}
+          icon={<Plus size={18} color={quiet ? colors.text : colors.water} strokeWidth={2.2} />}
+          onPress={oneTap(() => addWater(day.date, glass, units, day.waterGoalMl))}
+        />
+      </View>
+      <ProgressBar
+        progress={day.waterGoalMl > 0 ? day.waterMl / day.waterGoalMl : 0}
+        color={colors.water}
+        goalKind="reach"
+        memoryKey={`rail-water-${day.date}`}
+        onReached={() => reached(isToday ? 'Water goal reached for today.' : 'Water goal reached for the day.')}
+        style={{ marginTop: 8 }}
+      />
+      <ReachedNote text={note} testID="today-rail-reached" />
+    </View>
+  );
+}
+
+/**
+ * Activity, sleep and weight (or the running fast) in one card of their own, under Meals: three cells on one row
+ * (stacked rows with large text), each opening its screen. The week's activity minutes are a goal to reach: past the
+ * guideline its bar wears the brim tick, never amber, and crossing it on screen adds one calm line at the card's foot.
+ */
+export function PillarsCard({ day, isToday }: { day: DaySummary; isToday: boolean }) {
+  const { colors, spacing } = useTheme();
+  const { width: screenW } = useWindowDimensions();
+  const narrow = screenW < 360;
+  // Large text (130% and up): the three cells stack as rows, so every label and value keeps its words whole.
+  const large = useLargeText();
+  const profile = useProfile();
+  const units = profile.units;
   const sleep = useLive('sleep');
   const night = sleep.find((s) => s.date === day.date);
   // Last night in hours and minutes: the minutes under the hours in the narrow cell (see the sleep cell).
@@ -110,23 +203,8 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
   const friends = useFriends((s) => s.overview);
   const now = useNow();
   const cheers = isToday ? recentCheerCount(friendsStatus, friends, now.getTime()) : 0;
-  // Haptics only for the screen in front: the tab stays mounted while water is added elsewhere.
-  const focused = useIsFocused();
-  // One tap, one glass: a quick second tap on "+ 250 ml" (within ONE_TAP_GUARD_MS) does not log a second one.
-  const oneTap = useOneTap();
+  const { note, reached } = useReachedNote(day.date);
 
-  // One calm line when a goal to reach is crossed on screen; it belongs to the day it was said for.
-  const [note, setNote] = useState<{ date: ISODate; text: string } | null>(null);
-  const reached = (text: string) => {
-    if (focused) haptic.success();
-    setNote({ date: day.date, text });
-  };
-
-  const goal = formatVolume(day.waterGoalMl, units);
-  const [goalValue, goalUnit] = split(goal);
-  const waterUnit = volumeUnitFor(day.waterMl, units);
-  // "1.23 of 3.3 L": the unit is said once when both amounts share it ("250 ml of 2.55 L" otherwise).
-  const sameUnit = goalUnit === waterUnit;
   const dateQuery = isToday ? '' : `?date=${day.date}`;
   // With guideline minutes this week the cell is the week's: "Activity" over the week's minutes, the
   // bar toward the guideline and one short caption that says whose minutes they are and the day's
@@ -149,55 +227,9 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
   ]
     .filter(Boolean)
     .join('. ');
-  // The water figure as drawn: "1.23 of 3.3 L", "250 ml of 2.55 L".
-  const waterShown = `${volumeNumber(day.waterMl, day.waterMl, units)}${!sameUnit ? ` ${waterUnit}` : ''} of ${goalValue} ${goalUnit}`;
 
   return (
     <Card testID="today-rail" padding={0}>
-      {/* 8 px over the water row on a narrow phone (14 otherwise), so the row and its "+ 250 ml" are in the first view at
-          320 x 640, clear of the toast a glass raises. */}
-      <View style={{ paddingTop: narrow ? 8 : 14, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
-        <View style={{ flexDirection: 'row', flexWrap: large ? 'wrap' : 'nowrap', alignItems: 'center', gap: spacing.md }}>
-          <PressableScale
-            testID="today-water"
-            onPress={() => router.push(`/water${dateQuery}` as never)}
-            accessibilityLabel={`Water, ${waterShown}`}
-            scaleTo={0.98}
-            style={{ flex: 1, minWidth: large ? 150 : 0, minHeight: 44 }}>
-            <KeyLabel color={colors.water} label="Water" />
-            <AnimatedNumber
-              variant="numM"
-              numberOfLines={large ? undefined : 1}
-              style={{ marginTop: 3 }}
-              value={day.waterMl}
-              format={(ml) => volumeNumber(ml, day.waterMl, units)}
-              accessibilityLabel={spokenUnits(`${formatVolume(day.waterMl, units)} of ${goal}`)}>
-              <Text variant="unit">{`${!sameUnit ? ` ${waterUnit}` : ''} of ${goalValue} ${goalUnit}`}</Text>
-            </AnimatedNumber>
-          </PressableScale>
-          <Button
-            testID={`today-water-${glass}`}
-            title={formatVolume(glass, units)}
-            // The glass's words as drawn ("250 ml"; label in name), then what it does.
-            accessibilityLabel={`Add ${formatVolume(glass, units)} of water`}
-            variant={quiet ? 'ghost' : 'secondary'}
-            tint={quiet ? undefined : colors.water}
-            size="sm"
-            full={false}
-            icon={<Plus size={18} color={quiet ? colors.text : colors.water} strokeWidth={2.2} />}
-            onPress={oneTap(() => addWater(day.date, glass, units, day.waterGoalMl))}
-          />
-        </View>
-        <ProgressBar
-          progress={day.waterGoalMl > 0 ? day.waterMl / day.waterGoalMl : 0}
-          color={colors.water}
-          goalKind="reach"
-          memoryKey={`rail-water-${day.date}`}
-          onReached={() => reached(isToday ? 'Water goal reached for today.' : 'Water goal reached for the day.')}
-          style={{ marginTop: 10 }}
-        />
-      </View>
-      <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: spacing.lg }} />
       <View style={{ flexDirection: large ? 'column' : 'row', paddingHorizontal: narrow ? spacing.md : spacing.lg, paddingTop: 12, paddingBottom: 14, gap: narrow ? 8 : 12 }}>
         <Cell
           testID="today-activity"
@@ -271,11 +303,9 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
           />
         )}
       </View>
-      {note && note.date === day.date ? (
-        <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginHorizontal: spacing.lg, paddingTop: 10, paddingBottom: 12 }}>
-          <Text variant="caption" color="textSecondary" testID="today-rail-reached">
-            {note.text}
-          </Text>
+      {note ? (
+        <View style={{ marginHorizontal: spacing.lg, marginTop: -12, paddingBottom: 12 }}>
+          <ReachedNote text={note} testID="today-rail-week-reached" />
         </View>
       ) : null}
     </Card>

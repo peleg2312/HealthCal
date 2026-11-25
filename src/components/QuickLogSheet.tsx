@@ -469,9 +469,9 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   );
 
   return (
-    <Sheet visible={visible} onClose={close} title={quickSheetTitle(mealName, logDate, todayDate)}>
+    // The day line sits under the title as its one line (the kit Sheet's `subtitle`, 2 px under it).
+    <Sheet visible={visible} onClose={close} title={quickSheetTitle(mealName, logDate, todayDate)} subtitle={<DayLine date={logDate} today={todayDate} />}>
       {/* One view, nothing pinned: the blocks 12 apart (the sheet body's own gap). */}
-      <DayLine date={logDate} today={todayDate} />
       {big ? (
         <>
           {searchRow}
@@ -495,8 +495,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
 
 /**
  * The line under the title: the day and what is left of its budget ("Today · 941 kcal left"), in food search's
- * header words. Its own component, so the day is worked out only while the sheet is open (a sheet that is not
- * visible draws none of its content).
+ * header words, passed as the sheet's `subtitle`. Its own component, so the day is worked out only while the sheet
+ * is open (a sheet that is not visible draws none of its content).
  */
 function DayLine({ date, today }: { date: ISODate; today: ISODate }) {
   const remaining = useDay(date).remaining;

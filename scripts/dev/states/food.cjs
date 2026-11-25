@@ -42,23 +42,25 @@ module.exports = [
   { id: 'today-figure-eaten-imperial', route: '/', imperial: true, taps: ['today-figure', { wait: 300 }], waitFor: 'today-figure', note: 'eaten, imperial units' },
   { id: 'today-figure-eaten-stress', route: '/', data: 'stress', taps: ['today-figure', { wait: 300 }], waitFor: 'today-figure', note: 'eaten with long content' },
   { id: 'today-figure-feast', route: '/', data: 'stress', taps: [`today-day-${isoDay(-2)}`, 'today-figure', { wait: 300 }], waitFor: 'today-figure', note: 'the 11,480 kcal day as eaten: a six-figure number whole beside its unit and the mark' },
-  { id: 'today-fits-sheet', route: '/', taps: ['today-ideas'], sheet: true, note: 'the "What fits" sheet from the "Ideas that fit" chip' },
+  { id: 'today-fits-sheet', route: '/', taps: ['today-ideas'], sheet: true, note: 'the "What fits" sheet from the Now card' },
   { id: 'today-fits-stress', route: '/', data: 'stress', taps: ['today-ideas'], sheet: true, note: 'What fits with long food names' },
   // Day one has no "Ideas that fit" chip (its invite is the one thing to do): What fits from the coach's ideas answer.
   { id: 'today-fits-empty', route: '/coach?ask=ideas', data: 'empty', now: todayAt(19, 0), taps: ['coach-local-fits'], sheet: true, note: 'What fits with no food history (a fixed clock, so its meal and plates repeat)' },
   // Meals that fit (src/features/today/ideas.ts), at dinner time: the demo's own dinners and saved meals, else plates.
-  { id: 'today-ideas-chip', route: '/', values: { eaten: 0.6 }, now: todayAt(19, 0), waitFor: 'today-ideas', note: 'Today: the "Ideas that fit" chip under the eaten line' },
-  { id: 'today-ideas-chip-low', route: '/', values: { eaten: 0.15 }, now: todayAt(19, 0), waitFor: 'today-ideas', note: 'Today early in the day: the chip under an eaten line near the base of the cup' },
-  { id: 'today-ideas-sheet', route: '/', values: { eaten: 0.6 }, now: todayAt(19, 0), taps: ['today-ideas'], sheet: true, waitFor: 'fits-ideas', note: 'What fits from the chip: Meals that fit above the single foods' },
+  { id: 'today-ideas-chip', route: '/', values: { eaten: 0.6 }, now: todayAt(19, 0), waitFor: 'today-ideas', note: 'Today: "What fits", the Now card\'s last action' },
+  { id: 'today-ideas-chip-low', route: '/', values: { eaten: 0.15 }, now: todayAt(19, 0), waitFor: 'today-ideas', note: 'Today early in the day: the eaten line near the base of the cup, What fits in the Now card' },
+  { id: 'today-ideas-sheet', route: '/', values: { eaten: 0.6 }, now: todayAt(19, 0), taps: ['today-ideas'], sheet: true, waitFor: 'fits-ideas', note: 'What fits from the Now card: Meals that fit above the single foods' },
   { id: 'today-ideas-stress', route: '/', data: 'stress', now: todayAt(19, 0), taps: ['today-ideas'], sheet: true, note: 'What fits with long names: ideas and single foods' },
-  { id: 'today-ideas-empty', route: '/coach?ask=ideas', data: 'empty', now: todayAt(19, 0), taps: ['coach-local-fits'], sheet: true, waitFor: 'fits-ideas', note: 'no food history: three plates and the cooking-oil note (from the coach: day one has no chip)' },
+  { id: 'today-ideas-empty', route: '/coach?ask=ideas', data: 'empty', now: todayAt(19, 0), taps: ['coach-local-fits'], sheet: true, waitFor: 'fits-ideas', note: 'no food history: three plates and the cooking-oil note (from the coach; on Today, day one opens it from the Now card\'s corner)' },
   { id: 'today-ideas-few', route: '/', values: { eaten: 0.95 }, now: todayAt(19, 0), taps: ['today-ideas'], sheet: true, note: 'under 150 kcal left: no meal ideas, only own foods that fit' },
-  { id: 'today-ideas-over', route: '/coach?ask=ideas', values: { eaten: 1.1 }, now: todayAt(19, 0), taps: ['coach-local-fits'], sheet: true, waitFor: 'fits-over', note: 'over the budget (no chip on Today; from the coach\'s ideas answer): one neutral line and Search all foods, no list' },
+  { id: 'today-ideas-over', route: '/', values: { eaten: 1.1 }, now: todayAt(19, 0), taps: ['today-ideas'], sheet: true, waitFor: 'fits-over', note: 'over the budget (What fits stays in the Now card): one neutral line and Search all foods, no list' },
   { id: 'today-ideas-added', route: '/', values: { eaten: 0.6 }, now: todayAt(19, 0), taps: ['today-ideas', 'fits-idea-add-0', { wait: 300 }], sheet: true, note: 'an idea added: its tick, the rows in place, a row that no longer fits dimmed, the toast' },
-  { id: 'today-share-sheet', route: '/', taps: ['today-share'], sheet: true, note: 'the share sheet, default choices' },
-  { id: 'today-share-all', route: '/', data: 'stress', taps: ['today-share', 'share-choice-kcal', 'share-choice-foods'], sheet: true, note: 'every choice on, long food names on the card' },
-  { id: 'today-share-none', route: '/', taps: ['today-share', 'share-choice-water', 'share-choice-activity', 'share-choice-streak', 'share-choice-week'], sheet: true, note: 'every choice off: the bare cup' },
-  { id: 'today-share-past', route: '/', data: 'stress', taps: [`today-day-${isoDay(-2)}`, 'today-share', 'share-choice-kcal'], sheet: true, note: 'sharing the over-budget day with numbers' },
+  // The day's share sheet, opened from the diary, where Share is at every hour (Today offers it in the late evening only:
+  // tabs.cjs's today-now-late).
+  { id: 'today-share-sheet', route: '/diary', taps: ['diary-share'], sheet: true, note: 'the share sheet, default choices' },
+  { id: 'today-share-all', route: '/diary', data: 'stress', taps: ['diary-share', 'share-choice-kcal', 'share-choice-foods'], sheet: true, note: 'every choice on, long food names on the card' },
+  { id: 'today-share-none', route: '/diary', taps: ['diary-share', 'share-choice-water', 'share-choice-activity', 'share-choice-streak', 'share-choice-week'], sheet: true, note: 'every choice off: the bare cup' },
+  { id: 'today-share-past', route: `/diary?date=${isoDay(-2)}`, data: 'stress', taps: ['diary-share', 'share-choice-kcal'], sheet: true, note: 'sharing the over-budget day with numbers' },
 
   // ---------------------------------------------------------------- the + sheet
   { id: 'quick-sheet', route: '/', taps: ['tab-add'], sheet: true, note: 'the + sheet with usual foods' },

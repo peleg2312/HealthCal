@@ -116,12 +116,28 @@ export function closedWithinBudget(d: ClosedDay | null | undefined): boolean {
   return !!d && d.budget > 0 && isCompleteDay(d.eaten, d.budget) && d.eaten <= d.budget;
 }
 
+/**
+ * Late evening: the usual dinner time is 90 minutes gone, the moment the coach's meal of the hour becomes a snack
+ * (the same rule as the first-log tip below). Today's Now card offers the day's share from here on.
+ */
+export function isLateEvening(now: Date, rhythm: CoachRhythm = DEFAULT_RHYTHM): boolean {
+  const { rel } = dayClock(rhythm);
+  const dinner = rel(hoursOf(rhythm.meals.dinner) ?? hoursOf(DEFAULT_RHYTHM.meals.dinner)!);
+  return rel(now.getHours() + now.getMinutes() / 60) > dinner + 1.5;
+}
+
+/** `water: false` leaves the water tip out (Today's Now card sits right under the glass, which says the same). */
+export interface CoachTipOptions {
+  water?: boolean;
+}
+
 export function coachTip(
   day: DaySummary,
   units: UnitSystem,
   now: Date = new Date(),
   rhythm: CoachRhythm = DEFAULT_RHYTHM,
   yesterday?: ClosedDay | null,
+  options: CoachTipOptions = {},
 ): CoachTip {
   const hour = now.getHours() + now.getMinutes() / 60;
   const { length, rel, awakeSoFar } = dayClock(rhythm);
@@ -173,7 +189,7 @@ export function coachTip(
   }
 
   const waterGap = waterPaceFraction(awakeToday, length) * day.waterGoalMl - day.waterMl;
-  if (awakeToday >= 3 && waterGap > 500 && day.waterRemainingMl > 0) {
+  if (options.water !== false && awakeToday >= 3 && waterGap > 500 && day.waterRemainingMl > 0) {
     return {
       id: 'water',
       emoji: '💧',
