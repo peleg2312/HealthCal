@@ -29,7 +29,7 @@ import { useSaveMealStep } from './SaveMealSheet';
 import { SAVE_HINT_NOT_NOW, SAVE_HINT_NOT_NOW_A11Y, saveHintA11y, saveHintLabel } from './saveWords';
 import { currentKcal } from './usuals';
 import { removedToday } from './restore';
-import { FadeRow, Unfold, useLeavingRows } from './rowMotion';
+import { FadeRow, Unfold, useComeBack, useLeavingRows } from './rowMotion';
 
 /** Whether the summary's details (the day as a trough, the target, workouts and macros) are open: kept for the session, so paging days keeps it. */
 let summaryOpen = false;
@@ -318,8 +318,23 @@ export function MealCard({
   const allEntries = useStore((s) => s.foodEntries);
   const todayDate = useToday();
   const removed = useMemo(() => removedToday(allEntries, date, meal, todayDate), [allEntries, date, meal, todayDate]);
-  // Rows already there when the card mounted are drawn at once; one that a delete brings unfolds with the fold.
-  const [shownAtMount] = useState(() => new Set(removed.map((e) => `${date}:${e.id}`)));
+  // An Undo or a Restore: the row that comes back unfolds in step with its Restore row folding out (`useComeBack`).
+  const { back, restores } = useComeBack(
+    entries.map((e) => e.id),
+    removed,
+  );
+  // Restore rows already there when the card first drew this day are drawn at once; one that a delete brings
+  // unfolds with the fold. Kept per day, so paging to another day draws its Restore rows at once too.
+  const [drawn, setDrawn] = useState(() => ({ date, ids: new Set(removed.map((e) => e.id)) }));
+  if (drawn.date !== date) setDrawn({ date, ids: new Set(removed.map((e) => e.id)) });
+  const atOnce = (id: string) => drawn.date === date && drawn.ids.has(id);
+  // The Restore rows' frame (its divider and padding) opens and closes as a whole, with the first row that comes
+  // and the last that goes; a row that joins or leaves a frame already drawn unfolds or folds on its own. The ids
+  // the frame was drawn with are kept, so those rows open with the frame and not a second time inside it.
+  const [frameIds, setFrameIds] = useState<ReadonlySet<string> | null>(() => (restores.length ? new Set(restores.map((r) => r.item.id)) : null));
+  if (!restores.length && frameIds) setFrameIds(null);
+  if (restores.length && !frameIds) setFrameIds(new Set(restores.map((r) => r.item.id)));
+  const allLeaving = restores.every((r) => r.leaving);
   const mealWord = label.toLowerCase();
   // One add per meal: an empty meal's add is its dashed slot (`meal-add-<meal>`), with no "+" cup and no "..." in its
   // header (the menu's one action for an empty meal, copying the last one, is the Repeat under the slot).
@@ -362,7 +377,7 @@ export function MealCard({
       <View style={{ marginTop: rows.length ? (tight ? 4 : 6) : 0 }}>
         <AnimatedList key={date}>
           {rows.map(({ item: e, leaving }, i) => (
-            <FadeRow key={e.id} leaving={leaving}>
+            <FadeRow key={e.id} leaving={leaving} back={back.has(e.id)}>
               {i > 0 ? <Divider inset={TEXT_INSET} /> : null}
               <EntryRow entry={e} inWater={waterEntries ? (waterFor(waterEntries, e.id)?.water ?? null) : null} />
             </FadeRow>
@@ -370,22 +385,25 @@ export function MealCard({
         </AnimatedList>
       </View>
       {hint && rows.length > 0 ? <SaveHintRow meal={meal} onSave={hint.onSave} onClose={hint.onClose} /> : null}
-      {removed.length ? (
-        <View testID={`meal-removed-${meal}`}>
-          {/* Each row brings its own room (and the first its divider), so nothing appears at once around them. */}
-          {removed.map((e, i) => (
-            <Unfold key={e.id} animate={!shownAtMount.has(`${date}:${e.id}`)}>
-              {i === 0 && filled ? <Divider inset={ROW_PAD} /> : null}
-              <View style={{ paddingLeft: ROW_PAD, paddingRight: 8, paddingTop: i === 0 ? (filled ? 2 : 8) : 0, paddingBottom: i === removed.length - 1 && filled ? 6 : 0 }}>
-                <RestoreRow
-                  testID={`entry-restore-${e.id}`}
-                  label={`${isolateRtl(foodNameHead(displayFoodName(e)))} removed from ${mealWord}`}
-                  onRestore={() => useStore.getState().restore('foodEntries', e.id)}
-                />
-              </View>
-            </Unfold>
-          ))}
-        </View>
+      {restores.length ? (
+        // The frame opens with the first Restore row a delete brings (after the leaving row's fade, as it folds)
+        // and folds out with the last one that comes back (at once, as that row unfolds), so nothing snaps.
+        <Unfold key={date} animate={!restores.every((r) => atOnce(r.item.id))} open={!allLeaving}>
+          <View testID={`meal-removed-${meal}`}>
+            {filled ? <Divider inset={ROW_PAD} /> : null}
+            <View style={{ paddingLeft: ROW_PAD, paddingRight: 8, paddingTop: filled ? 2 : 8, paddingBottom: filled ? 6 : 0 }}>
+              {restores.map(({ item: e, leaving }) => (
+                <Unfold key={e.id} animate={!atOnce(e.id) && !(frameIds?.has(e.id) ?? true)} open={!leaving || allLeaving}>
+                  <RestoreRow
+                    testID={`entry-restore-${e.id}`}
+                    label={`${isolateRtl(foodNameHead(displayFoodName(e)))} removed from ${mealWord}`}
+                    onRestore={() => useStore.getState().restore('foodEntries', e.id)}
+                  />
+                </Unfold>
+              ))}
+            </View>
+          </View>
+        </Unfold>
       ) : null}
       {filled ? null : (
         <View style={{ marginTop: spacing.md, gap: spacing.md, paddingHorizontal: ROW_PAD }}>

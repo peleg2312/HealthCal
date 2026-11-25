@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import Animated, { FadeIn, Keyframe, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { motion, useReducedMotion } from '@/theme';
 import { ease } from '@/ui';
+
+import { cameBack, withReturning, type LogLists } from './rowMotionRules';
 
 const { duration: D, distance: X } = motion;
 /** How long a removed row takes to fold its height away once it has faded (D1-05: the space closes, never snaps). */
@@ -31,7 +33,7 @@ const rowEnter =
  *
  * Returns the current items with the ones just removed still in place, marked `leaving`, for
  * `motion.duration.rowExit` + `ROW_FOLD_MS` ms. Under reduced motion a removed row goes at once.
- * An item that comes back while it fades or folds (Undo) simply stays.
+ * An item that comes back while it fades or folds (Undo) stays, and its `FadeRow` opens back from where it was.
  */
 export function useLeavingRows<T extends { id: string }>(items: T[]): { item: T; leaving: boolean }[] {
   const reduce = useReducedMotion();
@@ -58,30 +60,73 @@ export function useLeavingRows<T extends { id: string }>(items: T[]): { item: T;
 }
 
 /**
+ * A log card's way back after a delete, both ways in step (the owner's ruling, D1-05): `live` the ids of the
+ * list's live rows now, `removed` its Restore rows now (the items removed on this visit, not yet restored).
+ * Returns `back`, the ids of rows that just came back (an Undo or a Restore), whose `FadeRow` unfolds its
+ * height and then fades in (the reverse of the fold), and `restores`, the Restore rows to draw: the removed
+ * items, plus each one that just came back, `leaving`, while its `Unfold` folds out over the same
+ * `ROW_FOLD_MS` as the row opens, so the rows and the cards below move together and nothing snaps.
+ * Both are kept for the unfold's length, then dropped, so a later draw (another day) is at once. Under reduced
+ * motion nothing comes back animated: the row is drawn at once and its Restore row goes at once.
+ */
+export function useComeBack<T extends { id: string }>(live: readonly string[], removed: readonly T[]): { back: ReadonlySet<string>; restores: { item: T; leaving: boolean }[] } {
+  const reduce = useReducedMotion();
+  // Compared by ids, so a list rebuilt on every render (a slice, a filter) is not a change.
+  const key = `${live.join('|')}#${removed.map((r) => r.id).join('|')}`;
+  const [prev, setPrev] = useState<{ key: string; lists: LogLists<T> }>({ key, lists: { live, removed } });
+  const [returning, setReturning] = useState<{ item: T; index: number }[]>([]);
+  if (prev.key !== key) {
+    setPrev({ key, lists: { live, removed } });
+    const came = reduce ? [] : cameBack(prev.lists, { live, removed });
+    if (came.length) setReturning([...returning.filter((r) => !came.some((c) => c.item.id === r.item.id)), ...came]);
+  }
+  useEffect(() => {
+    if (!returning.length) return;
+    const timer = setTimeout(() => setReturning([]), ROW_FOLD_MS + D.rowExit);
+    return () => clearTimeout(timer);
+  }, [returning]);
+  return { back: new Set(returning.map((r) => r.item.id)), restores: withReturning(removed, returning) };
+}
+
+/**
  * One log row: it fades and slides in when added (not when the list mounts: wrap the list in the kit's
  * `AnimatedList`); while `leaving` it fades out in place and then folds its height to 0 over `ROW_FOLD_MS`,
- * clipped, so what is below it moves up with the fold. The fold is the one height animation in the app,
- * kept to a row that is leaving; reduced motion makes every change instant.
+ * clipped, so what is below it moves up with the fold. A row that comes back (`back` as it mounts, from
+ * `useComeBack`, or `leaving` turned off before its fold ended) does the reverse: its height unfolds from
+ * where it is over `ROW_FOLD_MS`, clipped, and then it fades in, so the rows below move down with it. The
+ * fold is the one height animation in the app, kept to a row that is leaving or coming back; reduced motion
+ * makes every change instant.
  */
-export function FadeRow({ children, leaving, testID }: { children: React.ReactNode; leaving: boolean; testID?: string }) {
+export function FadeRow({ children, leaving, back = false, testID }: { children: React.ReactNode; leaving: boolean; back?: boolean; testID?: string }) {
   const reduce = useReducedMotion();
-  const fade = useSharedValue(1);
-  // 1 whole, 0 folded away; the row's height as last laid out while whole.
-  const fold = useSharedValue(1);
+  // Read once, as the row mounts: a row that came back opens from nothing.
+  const [opening] = useState(() => back && !reduce);
+  const fade = useSharedValue(opening ? 0 : 1);
+  // 1 whole, 0 folded away; the row's own height (its content's, measured whole).
+  const fold = useSharedValue(opening ? 0 : 1);
   const height = useSharedValue(0);
+  const wasLeaving = useRef(false);
   useEffect(() => {
-    if (leaving && !reduce) {
-      fade.set(withTiming(0, { duration: D.rowExit, easing: ease.exit }));
-      fold.set(withDelay(D.rowExit, withTiming(0, { duration: ROW_FOLD_MS, easing: ease.move })));
-    } else {
+    if (reduce) {
       fade.set(1);
       fold.set(1);
+      return;
     }
-  }, [leaving, reduce, fade, fold]);
+    if (leaving) {
+      wasLeaving.current = true;
+      fade.set(withTiming(0, { duration: D.rowExit, easing: ease.exit }));
+      fold.set(withDelay(D.rowExit, withTiming(0, { duration: ROW_FOLD_MS, easing: ease.move })));
+    } else if (wasLeaving.current || opening) {
+      // The reverse of the fold: the space opens first, from wherever the fold had reached, then the row fades in.
+      wasLeaving.current = false;
+      fold.set(withTiming(1, { duration: ROW_FOLD_MS, easing: ease.move }));
+      fade.set(withDelay(ROW_FOLD_MS, withTiming(1, { duration: D.rowExit, easing: ease.enter })));
+    }
+  }, [leaving, reduce, opening, fade, fold]);
   const style = useAnimatedStyle(() => ({ opacity: fade.get(), transform: [{ scale: 0.98 + 0.02 * fade.get() }] }));
   const folding = useAnimatedStyle(() => {
     const f = fold.get();
-    const on = f < 1 && height.get() > 0;
+    const on = f < 1;
     return { height: on ? height.get() * f : 'auto', overflow: on ? 'hidden' : 'visible' };
   });
   return (
@@ -92,14 +137,14 @@ export function FadeRow({ children, leaving, testID }: { children: React.ReactNo
       pointerEvents={leaving ? 'none' : 'auto'}
       accessibilityElementsHidden={leaving}
       importantForAccessibility={leaving ? 'no-hide-descendants' : 'auto'}
-      entering={reduce ? undefined : rowEnter}>
-      {/* The fold and the leaving fade on views of their own: on the web the entrance animates the outer view's opacity. */}
-      <Animated.View
-        style={folding}
-        onLayout={(e) => {
-          if (!leaving) height.set(e.nativeEvent.layout.height);
-        }}>
-        <Animated.View style={style}>{children}</Animated.View>
+      // A row that came back opens by its own unfold, not the entrance.
+      entering={reduce || opening ? undefined : rowEnter}>
+      {/* The fold and the fades on views of their own: on the web the entrance animates the outer view's opacity.
+          The height is the content's own, measured on the inner view, which keeps it while the outer one clips. */}
+      <Animated.View style={folding}>
+        <Animated.View style={style} onLayout={(e) => height.set(e.nativeEvent.layout.height)}>
+          {children}
+        </Animated.View>
       </Animated.View>
     </Animated.View>
   );
@@ -110,24 +155,33 @@ export function FadeRow({ children, leaving, testID }: { children: React.ReactNo
  * it unfolds its height from 0 while the leaving row folds (starting after `delay`, the leaving row's fade),
  * fading in, so the card and the cards below move smoothly instead of jumping by the row's height.
  * `animate` false (a row already there when the card mounted) and reduced motion draw it at once.
+ * `open` false folds it out again, at once and over the same `ROW_FOLD_MS` (its row came back, `useComeBack`:
+ * in step with that row's unfold); under reduced motion it is gone at once.
  */
-export function Unfold({ children, animate, delay = D.rowExit }: { children: React.ReactNode; animate: boolean; delay?: number }) {
+export function Unfold({ children, animate, delay = D.rowExit, open = true }: { children: React.ReactNode; animate: boolean; delay?: number; open?: boolean }) {
   const reduce = useReducedMotion();
   const run = animate && !reduce;
-  const open = useSharedValue(run ? 0 : 1);
+  const v = useSharedValue(run && open ? 0 : 1);
   const height = useSharedValue(0);
+  const lastOpen = useRef(open);
   useEffect(() => {
-    if (run) open.set(withDelay(delay, withTiming(1, { duration: ROW_FOLD_MS, easing: ease.move })));
+    if (run && open) v.set(withDelay(delay, withTiming(1, { duration: ROW_FOLD_MS, easing: ease.move })));
     // Run once, on mount: a row that is already open stays open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    // The mount's own run is above; from then on a change of `open` folds the row out or back in.
+    if (lastOpen.current === open) return;
+    lastOpen.current = open;
+    v.set(reduce ? (open ? 1 : 0) : withTiming(open ? 1 : 0, { duration: ROW_FOLD_MS, easing: ease.move }));
+  }, [open, reduce, v]);
   const style = useAnimatedStyle(() => {
-    const v = open.get();
-    const on = v < 1;
-    return { height: on ? height.get() * v : 'auto', overflow: on ? 'hidden' : 'visible', opacity: v };
+    const k = v.get();
+    const on = k < 1;
+    return { height: on ? height.get() * k : 'auto', overflow: on ? 'hidden' : 'visible', opacity: k };
   });
   return (
-    <Animated.View style={style}>
+    <Animated.View style={style} pointerEvents={open ? 'auto' : 'none'} accessibilityElementsHidden={!open} importantForAccessibility={open ? 'auto' : 'no-hide-descendants'}>
       <Animated.View onLayout={(e) => height.set(e.nativeEvent.layout.height)}>{children}</Animated.View>
     </Animated.View>
   );

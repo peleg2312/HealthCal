@@ -123,7 +123,9 @@ describe('coachTip', () => {
     });
     const tip = coachTip(d, 'metric', at(22));
     expect(tip.id).toBe('over');
-    expect(tip.title).toBe("Over today's budget");
+    expect(tip.title).toBe("Above today's budget");
+    // One word for the state on one screen: the cup says "kcal above", so the card never says "over".
+    expect(`${tip.title} ${tip.body}`).not.toMatch(/\bover\b/i);
     expect(`${tip.title} ${tip.body}`).not.toMatch(/fail|bad|cheat|guilt|!/i);
   });
 

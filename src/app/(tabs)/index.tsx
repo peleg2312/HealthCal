@@ -750,7 +750,7 @@ function MealsSection({ day }: { day: DaySummary }) {
                   </Text>
                 </PressableScale>
                 {prev && !large ? <RepeatButton meal={m.id} date={day.date} prev={prev} /> : null}
-                <IconButton testID={`today-add-${m.id}`} accessibilityLabel={`Add food to ${m.label}`} onPress={() => open(m.id)}>
+                <IconButton testID={`today-add-${m.id}`} accessibilityLabel={`Add food to ${m.label.toLowerCase()}`} onPress={() => open(m.id)}>
                   <Plus size={20} color={colors.text} strokeWidth={2.2} />
                 </IconButton>
               </View>

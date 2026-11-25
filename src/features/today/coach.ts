@@ -202,7 +202,7 @@ export function coachTip(
     return {
       id: 'over',
       emoji: '🧭',
-      title: "Over today's budget",
+      title: "Above today's budget",
       body: 'One day does not move the trend much.',
       action: { label: 'See your week', href: '/progress' },
       tone: 'neutral',
