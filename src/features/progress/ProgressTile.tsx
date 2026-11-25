@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { MeasureWidth } from '@/features/today/MeasureWidth';
 import type { Direction } from '@/lib/insights';
 import { useLargeText, useTheme } from '@/theme';
 import { CupKey, FadeUp, PressableScale, Text, useGrownText } from '@/ui';
 
+import { allFit, lineFits, wrapFits } from './grownFit';
 import { TrendMark } from './parts';
+import { WrapProbe } from './Probe';
 
 /**
  * One cell of the overview card: a cup key and title, one large value with
@@ -35,6 +38,8 @@ export function ProgressTile({
   borderRight,
   borderTop,
   index = 0,
+  oneColumn: oneColumnGiven,
+  probe,
 }: {
   testID: string;
   title: string;
@@ -63,13 +68,24 @@ export function ProgressTile({
   borderTop?: boolean;
   /** Position in the grid: tiles fade up in reading order. */
   index?: number;
+  /** One tile a row (the grid decides for all its tiles); with large text by default. */
+  oneColumn?: boolean;
+  /**
+   * With text grown, under very large text: the tile's words are measured as drawn two a row, in `room` (the
+   * room inside a tile two a row), and whether they fit is reported to `onFit` (`TileProbe`). `key` mounts the
+   * probe again when the screen comes back into focus (`useMeasureKey`).
+   */
+  probe?: { room: number; key: string; onFit: (fits: boolean | null) => void };
 }) {
   const { colors, spacing } = useTheme();
   // At 320 px a tile is about 108 px wide: the number steps down instead of being cut.
   const narrow = useWindowDimensions().width < 360;
-  // Above 115% text a tile takes the card's whole width (one column, a hairline between tiles), so a number
-  // and its unit stay inside it and its line may take a second line.
-  const oneColumn = useLargeText();
+  // A tile takes the card's whole width (one column, a hairline between tiles) where the grid says so: with very
+  // large text, or through the common steps where one tile's words, measured two a row, do not fit (OverviewGrid),
+  // so a number and its unit stay inside it and its line may take more lines.
+  const largeText = useLargeText();
+  const oneColumn = oneColumnGiven ?? largeText;
+  const twoUpLine = narrow && captionShort ? captionShort : caption;
   const line = narrow && captionShort && !oneColumn ? captionShort : caption;
   // Grown text or a reader's own text spacing (`useGrownText`): the line wraps rather than be cut.
   const grown = useGrownText();
@@ -113,6 +129,109 @@ export function ProgressTile({
         </Text>
       ) : null}
     </PressableScale>
+    {probe && probe.room > 0 ? (
+      <TileProbe
+        key={probe.key}
+        room={probe.room}
+        title={title}
+        color={color}
+        keyVariant={keyVariant}
+        value={value}
+        unit={unit}
+        valueColor={valueColor}
+        narrow={narrow}
+        trend={trend}
+        period={period}
+        line={twoUpLine}
+        onFit={probe.onFit}
+      />
+    ) : null}
     </FadeUp>
+  );
+}
+
+/** A tile's caption may take three lines with text grown, as it is drawn (numberOfLines). */
+const CAPTION_LINES_GROWN = 3;
+
+/**
+ * A tile's words drawn unseen as they would be two a row, in `room`: the title line (its key, the title on one line),
+ * the number line (the number with its unit and the mark beside it, on one line) and the caption wrapped in the room
+ * (no word wider than it, three lines at most). Whether all of them fit goes to `onFit` (null until measured).
+ */
+function TileProbe({
+  room,
+  title,
+  color,
+  keyVariant,
+  value,
+  unit,
+  valueColor,
+  narrow,
+  trend,
+  period,
+  line,
+  onFit,
+}: {
+  room: number;
+  title: string;
+  color: string;
+  keyVariant?: 'filled' | 'outline';
+  value: string | null;
+  unit?: string;
+  valueColor: 'text' | 'caloriesInk';
+  narrow: boolean;
+  trend?: Direction | null;
+  period?: string;
+  line?: string;
+  onFit: (fits: boolean | null) => void;
+}) {
+  const [titleW, setTitleW] = useState(0);
+  const [valueW, setValueW] = useState(0);
+  const [cap, setCap] = useState({ width: 0, height: 0 });
+  const [lineH, setLineH] = useState(0);
+  const fits = allFit([
+    lineFits(titleW, room),
+    lineFits(valueW, room),
+    line ? wrapFits({ ...cap, lineHeight: lineH, room, maxLines: CAPTION_LINES_GROWN }) : true,
+  ]);
+  useEffect(() => {
+    onFit(fits);
+  }, [fits, onFit]);
+  return (
+    <>
+      <MeasureWidth onWidth={setTitleW}>
+        <CupKey color={color} size={10} variant={keyVariant} />
+        <View style={{ width: 7 }} />
+        <Text variant="label" color="textSecondary" numberOfLines={1} style={{ fontSize: 13.5 }}>
+          {title}
+        </Text>
+      </MeasureWidth>
+      <MeasureWidth onWidth={setValueW}>
+        <Text variant="numL" color={value === null ? 'textTertiary' : valueColor} numberOfLines={1} style={narrow ? { fontSize: 24, lineHeight: 28 } : null}>
+          {value ?? '–'}
+          {unit && value !== null ? <Text variant="unit">{` ${unit}`}</Text> : null}
+        </Text>
+        {value !== null && trend ? (
+          <>
+            <View style={{ width: 6 }} />
+            <TrendMark trend={trend} period={period} />
+          </>
+        ) : null}
+      </MeasureWidth>
+      {line ? (
+        <>
+          <WrapProbe room={room} onSize={(width, height) => setCap({ width, height })}>
+            <Text variant="caption" color="textSecondary">
+              {line}
+            </Text>
+          </WrapProbe>
+          <WrapProbe room={room} onSize={(_w, h) => setLineH(h)}>
+            <Text variant="caption" color="textSecondary">
+              x
+            </Text>
+          </WrapProbe>
+        </>
+      ) : null}
+    </>
   );
 }

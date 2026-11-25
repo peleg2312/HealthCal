@@ -30,6 +30,8 @@ vi.mock('./supabase', () => ({
       server.onCall?.(fn);
       const queue = server.answers[fn] ?? [];
       const data = queue.length > 1 ? queue.shift() : queue[0];
+      // { __error } stands for an error answer (as supabase-js gives a PostgREST error).
+      if (data && typeof data === 'object' && '__error' in data) return { data: null, error: (data as { __error: unknown }).__error };
       return { data: data ?? null, error: null };
     },
   },
@@ -41,7 +43,25 @@ vi.mock('./sync', async () => {
 });
 
 const { cleanSharedMealItems } = await import('./friendsWire');
-const { cheerMeal, publishMeals, publishSummary, refreshFriends, respondToRequest, setFriendMealPrefs, showMeal, stopMeal, undoDecline, useFriends } = await import('./friends');
+const {
+  cheerFriend,
+  cheerMeal,
+  isMissingFunction,
+  publishMeals,
+  publishSummary,
+  refreshFriends,
+  respondToRequest,
+  setFriendMealPrefs,
+  setMealAudience,
+  setMealSettings,
+  showMeal,
+  stopAllMeals,
+  stopMeal,
+  undoDecline,
+  updateMeal,
+  useFriends,
+} = await import('./friends');
+const { MEALS_NOT_YET } = await import('@/features/friends/words');
 
 const card = (key: string) => ({ code: 'ABCD2345', display_name: 'Alex', avatar: '', sharing: { workouts: true, streak: true, minutes: true }, share_key: key });
 const overview = (key: string) => ({ me: card(key), friends: [], incoming: [{ user_id: 'tess', display_name: 'Tess', avatar: '', created_at: '2026-11-14T08:00:00Z' }], outgoing: [], cheers: [] });
@@ -189,6 +209,23 @@ describe('meals shown to friends', () => {
     server.calls = [];
   });
 
+  it('reads meal cheers from meal_cheers into the one cheers list, newest first (cheers keeps workouts and days for older apps)', async () => {
+    const at = (h: number) => `2026-11-25T${String(h).padStart(2, '0')}:00:00.123456+00:00`;
+    server.answers = {
+      friends_overview: [
+        mealsOverview({
+          cheers: [{ from_user: 'ben', display_name: 'Ben', avatar: '', ref: `day:${today()}`, created_at: at(9) }],
+          meal_cheers: [
+            { from_user: 'ben', display_name: 'Ben', avatar: '', ref: `meal:${FISH_REF}`, created_at: at(11) },
+            { from_user: 'ben', display_name: 'Ben', avatar: '', ref: 7, created_at: at(8) },
+          ],
+        }),
+      ],
+    };
+    await refreshFriends();
+    expect(useFriends.getState().overview!.cheers.map((c) => c.ref)).toEqual([`meal:${FISH_REF}`, `day:${today()}`, '']);
+  });
+
   it('reads the meal parts of the overview', () => {
     const o = useFriends.getState().overview!;
     expect(o.me).toMatchObject({ mealsAllowed: true, audience: ['ben'], mealSettings: { auto: [], kcal: false, see: true } });
@@ -301,5 +338,148 @@ describe('meals shown to friends', () => {
     server.calls = [];
     await publishMeals();
     expect(server.calls).toEqual([]);
+  });
+});
+
+// ------------------------------------------------------------------ a server without meals
+
+/** PostgREST's answer to a function its schema cache does not hold, as supabase-js hands it over. */
+const missing = (fn: string) => ({
+  __error: { code: 'PGRST202', details: `Searched for the function public.${fn} ...`, hint: null, message: `Could not find the function public.${fn}(p_ref) in the schema cache` },
+});
+const RUN_REF = '12'.repeat(16);
+const SWIM_REF = '34'.repeat(16);
+/** friends_overview as the server answers before 20261201000000_friends_meals.sql: no feed, no meal fields. */
+const oldOverview = () => ({
+  me: card('key'),
+  friends: [
+    {
+      user_id: 'ben',
+      display_name: 'Ben',
+      avatar: '',
+      since: null,
+      summary: {
+        workouts: [
+          { id: SWIM_REF, name: 'Swimming', emoji: '🏊', minutes: 40, date: today() },
+          { id: RUN_REF, name: 'Running', emoji: '🏃', minutes: 30, date: today(), distanceKm: 5 },
+          { id: 'not-a-ref', name: 'Yoga', emoji: '', minutes: 20, date: today() },
+        ],
+      },
+      summary_updated_at: null,
+      cheered: [SWIM_REF],
+    },
+  ],
+  incoming: [],
+  outgoing: [],
+  cheers: [{ from_user: 'ben', display_name: 'Ben', avatar: '', ref: `day:${today()}`, created_at: '2026-11-25T08:00:00Z' }],
+});
+
+describe('a server without meals (the app update arrives before the migration)', () => {
+  beforeEach(async () => {
+    server.answers = { friends_overview: [oldOverview()] };
+    useStore.setState({ ownerId: 'user-a', foodEntries: { rice: entry('rice', 'Rice', 'lunch') } });
+    await refreshFriends();
+    server.calls = [];
+  });
+
+  it('reads the older overview: no meal allowed, nothing shown, and the feed holds friends’ workouts in the server’s order', () => {
+    const o = useFriends.getState().overview!;
+    expect(o.mealsAvailable).toBe(false);
+    expect(o.me).toMatchObject({ code: 'ABCD2345', mealsAllowed: false, audience: [], mealSettings: { auto: [], kcal: false, see: true } });
+    expect(o.myMeals).toEqual([]);
+    expect(o.feed).toEqual([
+      { kind: 'workout', userId: 'ben', displayName: 'Ben', avatar: '', ref: SWIM_REF, day: today(), name: 'Swimming', emoji: '🏊', minutes: 40, cheered: true },
+      { kind: 'workout', userId: 'ben', displayName: 'Ben', avatar: '', ref: RUN_REF, day: today(), name: 'Running', emoji: '🏃', minutes: 30, cheered: false, distanceKm: 5 },
+    ]);
+    expect(o.cheers).toHaveLength(1);
+  });
+
+  it('sends no meal call at all, and says plainly that meals are not here yet', async () => {
+    const before = JSON.stringify(useFriends.getState().overview);
+    const notYet = { ok: false, reason: 'failed', code: 'not_yet', message: MEALS_NOT_YET };
+    expect(await showMeal({ day: today(), meal: 'lunch', items: [{ name: 'Rice', portion: '1 cup', source: 'builtin' }], showKcal: false, viewers: ['ben'] })).toEqual(notYet);
+    expect(await updateMeal(FISH_REF, [])).toEqual(notYet);
+    expect(await stopMeal(FISH_REF)).toEqual(notYet);
+    expect(await stopAllMeals()).toEqual(notYet);
+    expect(await setMealSettings({ kcal: true })).toEqual(notYet);
+    expect(await setMealAudience(['ben'])).toEqual(notYet);
+    expect(await setFriendMealPrefs('ben', { seeMeals: false })).toEqual(notYet);
+    expect(await cheerMeal('ben', MEAL_REF)).toEqual(notYet);
+    await publishMeals();
+    expect(server.calls).toEqual([]);
+    expect(JSON.stringify(useFriends.getState().overview)).toBe(before);
+    expect(MEALS_NOT_YET).not.toMatch(/function|schema|PGRST|error/i);
+  });
+
+  it('cheers a workout from the feed as before', async () => {
+    server.answers.send_cheer = ['ok'];
+    expect((await cheerFriend('ben', RUN_REF)).ok).toBe(true);
+    expect(server.calls).toEqual([{ fn: 'send_cheer', args: { p_to: 'ben', p_ref: RUN_REF } }]);
+    const o = useFriends.getState().overview!;
+    expect(o.feed!.find((i) => i.ref === RUN_REF)!.cheered).toBe(true);
+    expect(o.friends[0].cheered).toContain(RUN_REF);
+  });
+
+  it('reads meals again once the server has them', async () => {
+    server.answers.friends_overview = [mealsOverview()];
+    await refreshFriends();
+    expect(useFriends.getState().overview).toMatchObject({ mealsAvailable: true, me: { mealsAllowed: true } });
+  });
+});
+
+describe('a meal function that is missing although the overview has meals (a schema cache still reloading)', () => {
+  beforeEach(async () => {
+    server.answers = { friends_overview: [mealsOverview()] };
+    useStore.setState({ ownerId: 'user-a', foodEntries: {} });
+    await refreshFriends();
+    server.calls = [];
+  });
+
+  it('tells a missing function from any other error', () => {
+    expect(isMissingFunction(missing('meal_show').__error)).toBe(true);
+    expect(isMissingFunction({ code: '42883', message: 'function public.meal_show(text) does not exist' })).toBe(true);
+    expect(isMissingFunction({ code: '22023', message: 'summary is not valid' })).toBe(false);
+    expect(isMissingFunction({ message: 'Failed to fetch' })).toBe(false);
+    expect(isMissingFunction(null)).toBe(false);
+  });
+
+  it('says meals are not here yet in plain words, hides every meal control, and asks again only after a reload', async () => {
+    server.answers.meal_show = [missing('meal_show')];
+    const res = await showMeal({ day: today(), meal: 'dinner', items: [{ name: 'Fish', portion: '1 fillet', source: 'builtin' }], showKcal: false, viewers: ['ben'] });
+    expect(res).toEqual({ ok: false, reason: 'failed', code: 'not_yet', message: MEALS_NOT_YET });
+    const o = useFriends.getState().overview!;
+    expect(o.mealsAvailable).toBe(false);
+    expect(o.me?.mealsAllowed).toBe(false);
+    expect(o.feed!.some((i) => i.kind === 'meal')).toBe(false);
+    expect(o.myMeals).toEqual([]);
+    server.calls = [];
+    expect(await stopMeal(FISH_REF)).toMatchObject({ ok: false, code: 'not_yet' });
+    expect(server.calls).toEqual([]);
+  });
+
+  it('a sync round meets it quietly: one call, no error, and no second call', async () => {
+    const rice = entry('rice', 'Rice', 'lunch');
+    useStore.setState({ foodEntries: { [rice.id]: rice } });
+    server.answers.meal_update = [missing('meal_update')];
+    await expect(publishMeals()).resolves.toBeUndefined();
+    expect(server.calls.map((c) => c.fn)).toEqual(['meal_update']);
+    expect(useFriends.getState().overview!.mealsAvailable).toBe(false);
+    server.calls = [];
+    await publishMeals();
+    expect(server.calls).toEqual([]);
+  });
+
+  it('takes a meal cheer back when the server refuses it as missing or by the cheers’ older check', async () => {
+    server.answers.send_cheer = [{ __error: { code: '23514', message: 'new row for relation "cheers" violates check constraint "cheers_ref_check"' } }];
+    const res = await cheerMeal('ben', MEAL_REF);
+    expect(res).toMatchObject({ ok: false, code: 'not_yet', message: MEALS_NOT_YET });
+    expect(useFriends.getState().overview!.friends[0].cheered).not.toContain(`meal:${MEAL_REF}`);
+  });
+
+  it('a workout cheer refused by such a check keeps its own words', async () => {
+    server.answers.send_cheer = [{ __error: { code: '23514', message: 'check' } }];
+    const res = await cheerFriend('ben', RUN_REF);
+    expect(res).toMatchObject({ ok: false, message: 'check' });
+    expect(useFriends.getState().overview!.mealsAvailable).toBe(true);
   });
 });

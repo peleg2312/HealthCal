@@ -11,6 +11,11 @@
  *   node scripts/dev/e2e-backend.cjs [--url=http://localhost:8090] [--api=http://localhost:54321] [--shots=<dir>]
  *
  * Plans: the stand-in starts with plans off; the "plans" block turns them on (POST /__billing) and off again.
+ *
+ * A server without meals: the "friends without meals" block turns the stand-in's meals off (POST /__meals, as
+ * `mock-backend.cjs --no-meals` starts it) and runs the app as it would meet the live server before
+ * supabase/migrations/20261201000000_friends_meals.sql is applied, then puts the switch back as it found it.
+ * `--only=no-meals` runs that block alone (against a stand-in started with --no-meals, or with meals on).
  */
 const { chromium } = require('playwright');
 const path = require('node:path');
@@ -77,9 +82,290 @@ async function device(browser, seedJson) {
   return d;
 }
 
+// ------------------------------------------------------------- friends without meals
+// The new app on a server without 20261201000000_friends_meals.sql (the update can reach phones before the
+// migration is applied): the stand-in answers as that server does (no feed or meal fields in the overview,
+// every meal function a 404 PGRST202, a meal cheer 'invalid'). Two people on two devices. The Friends screen,
+// a friend's page, Friends settings, the diary's meal menu and a sync round must stay calm: workouts and
+// their cheers work as before, no meal control shows, nothing asks the server for a meal on its own, no
+// error reaches the screen, and nothing is written to the store on the way.
+async function friendsWithoutMeals(browser, buildSeed) {
+  const switchMeals = (on) => fetch(`${API}/__meals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ on }) }).then((r) => r.json());
+  const wasOn = (await server()).mealsOn !== false;
+  await switchMeals(false);
+  const NOT_YET = /not available yet/i;
+  try {
+    const api = (d, fn, ...args) =>
+      d.page.evaluate(async ([f, a]) => JSON.parse(JSON.stringify((await window.__healthcalFriendsApi[f](...a)) ?? null)), [fn, args]);
+    const overviewOf = (d) => d.page.evaluate(() => JSON.parse(JSON.stringify(window.__healthcalFriends.getState().overview)));
+    const waitFor = (d, id, timeout = 20000) => d.page.waitForSelector(`[data-testid="${id}"]`, { timeout }).then(() => true).catch(() => false);
+    const signUp = async (email) => {
+      const d = await device(browser, JSON.stringify(buildSeed()));
+      await d.go('/auth?mode=signup');
+      await d.fill('auth-email-input', email);
+      await d.fill('auth-password-input', PASSWORD);
+      await d.tap('auth-submit');
+      const ok = await d.untilPath('/');
+      await d.page.waitForTimeout(2500);
+      return { d, ok, id: (await server()).users.find((u) => u.email === email.toLowerCase())?.id };
+    };
+    const kai = await signUp(`kai+${Date.now()}@example.com`);
+    const lea = await signUp(`lea+${Date.now()}@example.com`);
+    const K = kai.d;
+    const L = lea.d;
+    // What Kai's device asks the server, and every refusal it gets back.
+    const calls = [];
+    const refusals = [];
+    K.page.on('request', (r) => {
+      if (/\/rest\/v1\/rpc\//.test(r.url())) calls.push(r.url().split('/rpc/')[1].split('?')[0]);
+    });
+    K.page.on('response', (r) => {
+      if (/\/rest\/v1\/rpc\//.test(r.url()) && r.status() >= 400) refusals.push(`${r.status()} ${r.url().split('/rpc/')[1].split('?')[0]}`);
+    });
+    const mealCalls = () => calls.filter((c) => /^meal_|^friend_prefs_set$/.test(c));
+    // No line names meals where they cannot work: the header says "Workouts and cheers", and the remove and leave
+    // words, their toasts and the set-up's note leave meals out (settings' "not available yet" card says why).
+    const MEAL_WORD = /\bmeals?\b/i;
+    const sheetText = async (d) => {
+      const body = d.page.locator('[data-testid="sheet-body"]:visible').last();
+      return (await body.count()) ? (await body.innerText()).replace(/\u00A0/g, ' ').replace(/[\u2060\u200E\u2068\u2069]/g, '').trim() : '';
+    };
+
+    // Turning friends on: the set-up form, on a server without meals, says nothing of meals.
+    await K.go('/friends');
+    const setupShown = await waitFor(K, 'friends-setup');
+    const setupText = setupShown ? await K.text('friends-screen') : '';
+    check(
+      'no meals: the set-up form and its header name no meal (“Workouts and cheers”)',
+      setupShown && /Workouts and cheers/.test(setupText) && !MEAL_WORD.test(setupText),
+      setupText.replace(/\s+/g, ' ').slice(0, 140),
+    );
+
+    await api(K, 'setupSocial', { displayName: 'Kai', avatar: '', sharing: { workouts: true, streak: true, minutes: true } });
+    await api(L, 'setupSocial', { displayName: 'Lea', avatar: '', sharing: { workouts: true, streak: true, minutes: true } });
+    await api(K, 'refreshFriends');
+    const kaiCode = (await overviewOf(K))?.me?.code;
+    const asked = await api(L, 'requestFriend', kaiCode);
+    const answered = await api(K, 'respondToRequest', lea.id, true);
+    await api(L, 'publishSummary', { force: true });
+    let srv = await server();
+    const leaWorkouts = srv.social[lea.id]?.summary?.workouts || [];
+    check('no meals: two people sign up and become friends on a server without meals', kai.ok && lea.ok && asked?.ok && answered?.ok && srv.mealsOn === false && leaWorkouts.length > 0, `${leaWorkouts.length} workouts shared`);
+    const overview = await overviewOf(K);
+    check(
+      'no meals: the overview reads as a server without meals: no meal allowed, nothing shown, and the feed holds the friend’s workouts',
+      overview?.mealsAvailable === false && overview?.me?.mealsAllowed === false && (overview?.myMeals || []).length === 0 && (overview?.feed || []).length > 0 && overview.feed.every((i) => i.kind === 'workout' && i.userId === lea.id),
+      `${(overview?.feed || []).length} feed items`,
+    );
+
+    const snapshot = () =>
+      K.page.evaluate(() => {
+        const s = window.__healthcal.getState();
+        // Keys in a fixed order: a page load reads the records back in an order of its own.
+        const sorted = (v) => (Array.isArray(v) ? v.map(sorted) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sorted(v[k])])) : v);
+        return JSON.stringify([...Object.keys(s.dirty).sort().map((c) => [c, sorted(s[c])]), ['profile', sorted(s.profile)], ['settings', sorted(s.settings)]]);
+      });
+    const before = await snapshot();
+    calls.length = 0;
+
+    // Friends: the feed shows the friend's workouts, cheered as before; no meal card, no meal words, no error.
+    await K.go('/friends');
+    const feedShown = await waitFor(K, 'friends-feed-workout-0');
+    const aboutYou = (await K.has('friends-about-you')) ? await K.text('friends-about-you') : '';
+    check(
+      'no meals: Friends shows the friend’s workouts in the feed, no meal card or meal action, and no error',
+      feedShown && !(await K.has('friends-feed-meal-0')) && !(await K.has('friends-error-banner')) && !(await K.has('friends-error')) && !/meal/i.test(aboutYou),
+      aboutYou.replace(/\s+/g, ' ').slice(0, 90),
+    );
+    const friendsHeader = await K.text('friends-screen').then((t) => t.split('\n').slice(0, 3).join(' · '));
+    check('no meals: the Friends header says “Workouts and cheers”, never “Meals, workouts and cheers”', /Workouts and cheers/.test(friendsHeader) && !MEAL_WORD.test(friendsHeader), friendsHeader);
+    await K.shot('friends-no-meals');
+    await K.tap('friends-feed-workout-0-cheer');
+    await K.page.waitForTimeout(1200);
+    srv = await server();
+    const feedRef = (await overviewOf(K))?.feed?.[0]?.ref;
+    check(
+      'no meals: cheering a workout from the feed shows at once and is stored, as before',
+      (await K.text('friends-feed-workout-0-cheer')) === 'Cheered' && srv.cheers.some((c) => c.from_user === kai.id && c.to_user === lea.id && c.ref === feedRef),
+    );
+    await api(L, 'refreshFriends');
+    const leaSees = await overviewOf(L);
+    check('no meals: the friend sees the cheer on their workout', (leaSees?.cheers || []).some((c) => c.fromUserId === kai.id && c.ref === feedRef));
+
+    // A friend's page: their week and workouts, the day's cheer; no meals and no "Between you" switches.
+    await K.go(`/friends/friend?id=${lea.id}`);
+    await waitFor(K, 'friend-workouts');
+    check(
+      'no meals: a friend’s page shows their week and workouts, without meal switches or meals',
+      (await K.has('friend-workouts')) && (await K.has('friend-week')) && !(await K.has('friend-between')) && !(await K.has('friend-share-meals')) && !(await K.has('friend-meals')),
+    );
+    await K.tap('friends-cheer-day');
+    await K.page.waitForTimeout(1000);
+    srv = await server();
+    check('no meals: cheering the friend’s day works as before', srv.cheers.some((c) => c.from_user === kai.id && c.to_user === lea.id && /^day:/.test(c.ref)));
+    const friendPage = await K.text('friend-screen');
+    await K.tap('friends-remove');
+    const removeAsk = await sheetText(K);
+    await K.tap('confirm-no');
+    await K.page.waitForTimeout(500);
+    check(
+      'no meals: a friend’s page and its Remove question name no meal',
+      !MEAL_WORD.test(friendPage) && /is not told/.test(friendPage) && /each other’s week, and the cheers/.test(removeAsk) && !MEAL_WORD.test(removeAsk),
+      `${removeAsk.replace(/\s+/g, ' ').slice(0, 120)}`,
+    );
+
+    // Friends settings: the week's switches work; meals say plainly they are not here yet (never "under 18").
+    await K.go('/friends/settings');
+    await waitFor(K, 'friends-settings-week');
+    const notYet = (await K.has('friends-settings-meals-not-yet')) ? await K.text('friends-settings-meals-not-yet') : '';
+    check(
+      'no meals: Friends settings says meals are not available yet, with no meal control and no age note',
+      NOT_YET.test(notYet) && !(await K.has('friends-settings-meals')) && !(await K.has('friends-settings-showing')) && !(await K.has('friends-settings-see')) && !(await K.has('friends-settings-under-18')),
+      notYet,
+    );
+    await K.shot('friends-settings-no-meals');
+    const leaveCard = await K.text('friends-settings-leave');
+    await K.tap('friends-leave');
+    const leaveAsk = await sheetText(K);
+    await K.tap('confirm-no');
+    await K.page.waitForTimeout(500);
+    check(
+      'no meals: “Turn friends off” and its question name no meal (only the “not available yet” card speaks of meals)',
+      /every friendship and every cheer/.test(leaveCard) && !MEAL_WORD.test(leaveCard) && /every friendship and every cheer, for you and for them/.test(leaveAsk) && !MEAL_WORD.test(leaveAsk),
+      `${leaveCard.replace(/\s+/g, ' ').slice(0, 80)} | ${leaveAsk.replace(/\s+/g, ' ').slice(0, 80)}`,
+    );
+    await K.tap('friends-share-streak');
+    await K.page.waitForTimeout(1500);
+    const streakOff = (await server()).social[kai.id]?.sharing?.streak === false;
+    await K.tap('friends-share-streak');
+    await K.page.waitForTimeout(1500);
+    check('no meals: the week’s switches still save on the server', streakOff && (await server()).social[kai.id]?.sharing?.streak === true);
+
+    // The diary: a meal's menu has no "Show to friends" and no meal shows as shown.
+    await K.go('/diary');
+    let menuMeal = null;
+    for (const m of ['breakfast', 'lunch', 'dinner', 'snack']) {
+      if (await K.has(`meal-menu-${m}`)) {
+        menuMeal = m;
+        break;
+      }
+    }
+    let menuOpen = false;
+    let showRow = true;
+    if (menuMeal) {
+      await K.tap(`meal-menu-${menuMeal}`);
+      menuOpen = await waitFor(K, 'meal-menu-save', 8000).then(async (ok) => ok || waitFor(K, 'meal-menu-copy-to', 2000));
+      showRow = await K.has('meal-menu-show');
+      await K.shot('diary-menu-no-meals');
+      await K.page.keyboard.press('Escape');
+      await K.page.waitForTimeout(600);
+    }
+    check('no meals: a diary meal’s menu opens without "Show to friends", and no meal is marked as shown', !!menuMeal && menuOpen && !showRow && !(await K.has(`meal-shown-${menuMeal}`)), menuMeal || 'no meal with food');
+
+    const after = await snapshot();
+    const changed = (() => {
+      const a = Object.fromEntries(JSON.parse(before));
+      const b = Object.fromEntries(JSON.parse(after));
+      return Object.keys({ ...a, ...b }).filter((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k])).map((k) => {
+        if (!a[k] || !b[k] || typeof a[k] !== 'object') return k;
+        const keys = Object.keys({ ...a[k], ...b[k] }).filter((x) => JSON.stringify(a[k][x]) !== JSON.stringify(b[k][x]));
+        return `${k}: ${keys.slice(0, 3).map((x) => `${x} ${JSON.stringify(a[k][x])?.slice(0, 80)} -> ${JSON.stringify(b[k][x])?.slice(0, 80)}`).join('; ')}`;
+      });
+    })();
+    check('no meals: going through Friends, a friend, settings and the diary wrote nothing to the store', changed.length === 0, changed.join(' | '));
+    check('no meals: no screen asked the server for a meal by itself, and nothing was refused', mealCalls().length === 0 && refusals.length === 0, [...mealCalls(), ...refusals].join(', '));
+
+    // A sync round (publishMeals runs after each one): an entry is uploaded, then the device is left alone.
+    calls.length = 0;
+    const entryId = await K.page.evaluate(() => {
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return window.__healthcal.getState().upsert('foodEntries', {
+        date: today, meal: 'lunch', name: 'Banana, raw', emoji: '🍌', foodId: 'b_banana', source: 'builtin', verified: true,
+        servingLabel: '1 medium', quantity: 1, grams: 118, nutrients: { kcal: 105, protein: 1.3, carbs: 27, fat: 0.4 }, loggedAt: new Date().toISOString(),
+      })?.id ?? null;
+    });
+    await K.page.waitForTimeout(7000);
+    srv = await server();
+    const uploaded = srv.records.some((r) => r.user_id === kai.id && (entryId ? r.id === entryId : r.data?.name === 'Banana, raw'));
+    const overviews = calls.filter((c) => c === 'friends_overview').length;
+    check(
+      'no meals: after a sync round nothing asks for a meal, no toast shows, and nothing loops',
+      uploaded && mealCalls().length === 0 && refusals.length === 0 && !(await K.has('toast')) && overviews <= 2,
+      `${calls.length} calls: ${[...new Set(calls)].join(', ')}`,
+    );
+
+    // The meal calls themselves, asked directly: each says plainly meals are not here yet, and none is sent.
+    calls.length = 0;
+    const answers = [
+      await api(K, 'showMeal', { day: '2026-11-25', meal: 'lunch', items: [{ name: 'Rice', portion: '1 cup', source: 'builtin' }], showKcal: false, viewers: [lea.id] }),
+      await api(K, 'stopMeal', 'ab'.repeat(16)),
+      await api(K, 'stopAllMeals'),
+      await api(K, 'setMealSettings', { kcal: true }),
+      await api(K, 'setFriendMealPrefs', lea.id, { seeMeals: false }),
+      await api(K, 'cheerMeal', lea.id, 'cd'.repeat(16)),
+    ];
+    await api(K, 'publishMeals');
+    check(
+      'no meals: every meal call answers "not available yet" in plain words and sends nothing',
+      answers.every((a) => a && a.ok === false && a.code === 'not_yet' && NOT_YET.test(a.message) && !/function|schema|PGRST/i.test(a.message)) && calls.length === 0,
+      answers.map((a) => a?.code).join(','),
+    );
+
+    // The overview claims meals but the function is missing (PostgREST's schema cache reloading): the 404 is met
+    // calmly, the meal controls hide, and the next reload reads the server as it is.
+    await K.page.evaluate(() => {
+      const f = window.__healthcalFriends;
+      const o = f.getState().overview;
+      f.setState({ overview: { ...o, mealsAvailable: true, me: { ...o.me, mealsAllowed: true } } });
+    });
+    const missing = await api(K, 'showMeal', { day: '2026-11-25', meal: 'lunch', items: [{ name: 'Rice', portion: '1 cup', source: 'builtin' }], showKcal: false, viewers: [lea.id] });
+    const afterMissing = await overviewOf(K);
+    check(
+      'no meals: a 404 for a missing meal function says "not available yet" and hides the meal controls',
+      missing?.code === 'not_yet' && NOT_YET.test(missing?.message || '') && refusals.join() === '404 meal_show' && afterMissing?.mealsAvailable === false && afterMissing?.me?.mealsAllowed === false,
+      `${refusals.join()} ${missing?.message}`,
+    );
+
+    // Removing the friend and turning friends off through the screens: their toasts name no meal.
+    await K.go(`/friends/friend?id=${lea.id}`);
+    await waitFor(K, 'friends-remove');
+    await K.tap('friends-remove');
+    await K.tap('confirm-yes');
+    const removedSaid = (await waitFor(K, 'toast', 8000)) ? await K.text('toast') : '';
+    srv = await server();
+    check(
+      'no meals: removing a friend works as before, and its toast names no meal',
+      /Lea is no longer a friend\. Cheers between you were removed too\./.test(removedSaid) && !MEAL_WORD.test(removedSaid) && !srv.friendships.some((f) => [f.requester, f.addressee].includes(kai.id) && [f.requester, f.addressee].includes(lea.id)),
+      removedSaid,
+    );
+    await K.go('/friends/settings');
+    await waitFor(K, 'friends-leave');
+    await K.tap('friends-leave');
+    await K.tap('confirm-yes');
+    const leftSaid = (await waitFor(K, 'toast', 8000)) ? await K.text('toast') : '';
+    check('no meals: turning friends off says what went, with no meal', /Friends turned off\. Your card, friendships and cheers were removed\./.test(leftSaid) && !MEAL_WORD.test(leftSaid), leftSaid);
+    await api(L, 'leaveSocial');
+    srv = await server();
+    check('no meals: turning friends off works as before', !srv.social[kai.id] && !srv.social[lea.id]);
+    check('no meals: no runtime errors on either device', K.errors.length === 0 && L.errors.length === 0, [...K.errors, ...L.errors].join(' | ').slice(0, 200));
+    await K.page.context().close();
+    await L.page.context().close();
+  } finally {
+    await switchMeals(wasOn);
+  }
+}
+
 (async () => {
   const { buildSeed } = await import('./seed.mjs');
   const browser = await chromium.launch();
+  if (flags.only === 'no-meals') {
+    await friendsWithoutMeals(browser, buildSeed);
+    await browser.close();
+    const failed = results.filter((r) => !r.ok).length;
+    console.log(`\n${results.length - failed} of ${results.length} checks passed`);
+    process.exit(failed ? 1 : 0);
+  }
 
   // ---------------------------------------------- device A: guest with history
   const A = await device(browser, JSON.stringify(buildSeed()));
@@ -478,6 +764,9 @@ async function device(browser, seedJson) {
     await M.page.context().close();
     await N.page.context().close();
   }
+
+  // The same app against the server before meals (the block above this IIFE).
+  await friendsWithoutMeals(browser, buildSeed);
 
   // ------------------------------------------------------------- friends
   // A second person (Sam) on another device. Both turn friends on, Sam adds Alex by code, Alex accepts.

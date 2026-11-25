@@ -16,6 +16,8 @@ import { cheerTarget, dayLabel } from './week';
 
 export const SCREEN_TITLE = 'Friends';
 export const SCREEN_SUBTITLE = 'Meals, workouts and cheers';
+/** The header's line where meals cannot work for this person (`mealsInWords` in ./overview: an older server, or under 18). */
+export const SCREEN_SUBTITLE_WORKOUTS = 'Workouts and cheers';
 export const SETTINGS_TITLE = 'Friends settings';
 export const SETTINGS_SUBTITLE = 'What friends see';
 export const SETTINGS_OPEN = 'Friends settings and privacy';
@@ -25,6 +27,8 @@ export const RECENT = 'Recent';
 export const RECENT_SPAN = 'Last 7 days';
 export const FEED_EMPTY_TITLE = 'Nothing here yet';
 export const FEED_EMPTY = 'When a friend shows a meal or logs a workout, it appears here.';
+/** The empty feed while the server has no meals yet. */
+export const FEED_EMPTY_WORKOUTS = 'When a friend logs a workout, it appears here.';
 export const CHEER = 'Cheer';
 export const CHEERED = 'Cheered';
 export const ADD_TO_DIARY = 'Add to my diary';
@@ -81,10 +85,19 @@ export const NEVER_SHARED = 'Never shared, whatever you choose here: your weight
 export const LEAVE_TITLE = 'Turn friends off';
 export const LEAVE_NOTE = 'Removes your card, every friendship, every cheer and every meal you show. Your own data on this phone is not touched.';
 export const LEAVE_CONFIRM = 'This removes your card and code, every friendship, every cheer and every meal you show, for you and for them. It cannot be undone, though you can turn friends on again later with a new code.';
+/** "Turn friends off"'s note: the meal clause only where meals work for this person (`mealsInWords`). */
+export const leaveNote = (meals: boolean) => (meals ? LEAVE_NOTE : 'Removes your card, every friendship and every cheer. Your own data on this phone is not touched.');
+/** Its confirmation, the same way. */
+export const leaveConfirm = (meals: boolean) =>
+  meals ? LEAVE_CONFIRM : 'This removes your card and code, every friendship and every cheer, for you and for them. It cannot be undone, though you can turn friends on again later with a new code.';
+/** The toast once friends are off. */
+export const leftToast = (meals: boolean) => `Friends turned off. Your card, friendships${meals ? ', cheers and meals' : ' and cheers'} were removed.`;
 export const AUDIENCE_TITLE = 'Who sees your meals';
 export const AUDIENCE_NOTE = 'Picked here for the next meal you show. A meal already shown keeps its own people until you change it.';
 export const AUDIENCE_SAVE = 'Save';
 export const UNDER_18 = 'Showing and seeing meals is for people aged 18 and over. Workouts and cheers work as before.';
+/** Friends settings, and a meal call's answer, while the server has no meals yet (an app update can arrive before it). */
+export const MEALS_NOT_YET = 'Showing meals to friends is not available yet. Workouts and cheers work as before.';
 export const SIGNED_OUT_LINE = 'See each other’s workouts, cheer them, and the meals you choose to show. Your weight and your day’s total stay private.';
 
 /** "Lunch", "Snacks" for the four meal chips. */
@@ -223,8 +236,18 @@ export const seesMyMealsLine = (name: string) => `Off: ${isolateRtl(name)} is le
 export const theirMealsTitle = (name: string) => `${isolateRtl(name)}’s meals in my feed`;
 export const THEIR_MEALS_OFF = 'Off: their workouts and cheers';
 
-/** Under Remove friend. */
-export const removeNote = (name: string) => `${isolateRtl(name)} is not told. Meals between you stop showing at once.`;
+/** Under Remove friend; the meal sentence only where meals work for this person (`mealsInWords`). */
+export const removeNote = (name: string, meals = true) => `${isolateRtl(name)} is not told.${meals ? ' Meals between you stop showing at once.' : ''}`;
+
+/** Remove friend's confirmation. */
+export const removeConfirm = (meals: boolean) =>
+  `You stop seeing each other’s week${meals ? ' and meals' : ''}, and the cheers between you are removed. They are not told, and you can add each other again with a code.`;
+
+/** The toast once a friend is removed ("Maya is no longer a friend. Cheers between you were removed too."). */
+export const removedToast = (name: string, meals: boolean) => `${name} is no longer a friend. ${meals ? 'Cheers and meals' : 'Cheers'} between you were removed too.`;
+
+/** The line under the set-up's switches: what is never shared, and when a meal leaves the phone (only where meals work). */
+export const neverSharedLine = (meals: boolean) => `Your weight and your day’s total are never shared, whatever you choose here.${meals ? ' A meal leaves the phone when you show it.' : ''}`;
 
 /** The add step's line: "From Maya's lunch". */
 export const addFrom = (name: string, meal: MealType) => `From ${friendMealTitle(name, meal)}`;

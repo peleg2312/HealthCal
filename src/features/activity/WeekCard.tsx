@@ -6,15 +6,19 @@ import { formatDuration, weekdayShort } from '@/lib/dates';
 import { OVERVIEW_ABOUT, type TrainingOverview } from '@/lib/trainingLoad';
 import { spokenUnits } from '@/lib/spokenUnits';
 import { formatNumber } from '@/lib/units';
-import { cup, fonts, LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
+import { cupHeightFor } from '@/features/today/fit';
+import { SizeProbe, useMeasureKey } from '@/features/today/MeasureWidth';
+import { cup, fonts, useDrawnFontSize, useTextGrowth, useTheme, useVeryLargeText } from '@/theme';
 import { useProfile } from '@/store/selectors';
 import type { ISODate } from '@/types';
-import { Card, CupKey, figure, IconButton, MiniCup, PressableScale, Text, Vessel, type VesselLabel } from '@/ui';
+import { Card, CupKey, figure, IconButton, MiniCup, PressableScale, Text, useGrownText, Vessel, type VesselLabel } from '@/ui';
 
 import { WHO_WEEKLY_MINUTES, type WeekSummary } from './build';
 import { weekStripLabel } from './history';
 import { LoadMark } from './LoadMark';
+import { MeasureEach } from './MeasureEach';
 import { TrainingLoadSheet } from './TrainingLoadSheet';
+import { stripColumnMin } from './trainFit';
 
 const VESSEL_H = 168;
 /**
@@ -80,12 +84,47 @@ export function WeekCard({
     `${formatNumber(minutes)} active minutes this week, of the ${WHO_WEEKLY_MINUTES} minutes a week guideline. ${status}. ` +
       `${week.sessions === 1 ? '1 session' : `${formatNumber(week.sessions)} sessions`}, ${totalTime} in all. ${addedSpoken}.`,
   );
-  // Above 115% text the labels placed at their levels would run into each other (they are 20, 40 and 44 px tall).
+  // With very large text (150% and up, `VERY_LARGE_TEXT`) the labels leave their levels for a column beside the cup.
+  // Through the phone's common steps (the app's 115% and 130%, Android's 1.15 and 1.3) and under a reader's own text
+  // spacing (`fit`) they stay at their levels: each in a box measured from the words drawn in it (`SizeProbe`), wrapping
+  // at its words, and the cup grows only when the boxes need more height than it has (`cupHeightFor`). At the designed
+  // size they are the designed boxes (20, 40 and 44 px tall).
   const grow = useTextGrowth();
-  const stacked = grow > LARGE_TEXT;
-  // The week strip: a column per day, at least 22 px per 100% of text above 115%; it scrolls when seven do not fit.
-  const colMin = stacked ? 22 * grow : 0;
-  const scrollStrip = colMin > (Math.min(screenW, 560) - 40 - 36) / 7;
+  const stacked = useVeryLargeText();
+  const fit = useGrownText() && !stacked;
+  const drawn = useDrawnFontSize();
+  // Every measuring part mounts again as Train comes back into focus (a size changed meanwhile is measured again).
+  const measureKey = useMeasureKey();
+  const [boxes, setBoxes] = useState<Record<string, number>>({});
+  const measureBox = (name: string) => (_w: number, height: number) => {
+    const h = Math.ceil(height);
+    if (Math.abs((boxes[name] ?? 0) - h) >= 1) setBoxes((b) => ({ ...b, [name]: h }));
+  };
+  // A box's height: as measured, at first the designed box grown as its text is drawn; the designed box at 100%.
+  const boxH = (name: string, designed: number, size: number) => (fit ? (boxes[name] ?? Math.ceil((designed * drawn(size)) / size)) : designed);
+  const guideH = boxH('guide', 20, 12.5);
+  const doneH = boxH('done', 40, 40);
+  const statusH = boxH('status', 44, 13);
+  const boxed = (name: string, node: React.ReactNode) =>
+    fit ? (
+      <View>
+        <SizeProbe key={`${name}-${measureKey}`} onSize={measureBox(name)} />
+        {node}
+      </View>
+    ) : (
+      node
+    );
+  // The cup holds its label boxes beside it, 2 px apart as designed: taller only when grown text needs it.
+  const cupH = fit ? cupHeightFor(vesselH, [guideH, doneH, statusH], 2) : vesselH;
+  // The week strip: a column per day, with very large text at least 22 px per 100% of text; it scrolls when seven do
+  // not fit. Through the common steps the seven columns share the row, as designed, while the widest day number as
+  // drawn keeps its room from the next (`stripColumnMin`); else each column is that wide and the strip scrolls.
+  const [stripNumbers, setStripNumbers] = useState<Record<string, number>>({});
+  const [stripW, setStripW] = useState(0);
+  const dayWords = (d: ISODate) => (d > today ? '' : week.byDate[d].minutes ? `${week.byDate[d].minutes}` : '–');
+  const fitColumn = fit ? stripColumnMin(Math.max(0, ...dates.filter((d) => dayWords(d)).map((d) => stripNumbers[d] ?? 0)), stripW) : 0;
+  const colMin = stacked ? 22 * grow : fitColumn;
+  const scrollStrip = stacked ? colMin > (Math.min(screenW, 560) - 40 - 36) / 7 : fitColumn > 0;
   const wrapStrip = (columns: React.ReactNode) =>
     scrollStrip ? (
       <ScrollView horizontal testID="train-week-strip" contentContainerStyle={{ flexDirection: 'row' }}>
@@ -100,39 +139,43 @@ export function WeekCard({
     {
       key: 'guide',
       at: WHO_WEEKLY_MINUTES,
-      height: 20,
+      height: guideH,
       // The guideline is the brim; once it is reached the brim line marks it, and a tick there would run into it.
       tick: reached ? undefined : colors.borderStrong,
-      content: (
-        <Text variant="caption" color="textSecondary" numberOfLines={1}>
+      content: boxed(
+        'guide',
+        <Text variant="caption" color="textSecondary" numberOfLines={fit ? undefined : 1}>
           {`${WHO_WEEKLY_MINUTES} min guideline`}
-        </Text>
+        </Text>,
       ),
     },
     {
       key: 'done',
       at: Math.min(minutes, max),
-      height: 40,
+      height: doneH,
       tick: minutes > 0 ? colors.rim : undefined,
-      content: (
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5 }}>
+      content: boxed(
+        'done',
+        // With text grown the unit goes under the number where the two do not fit the column, never cut.
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5, ...(fit ? { flexWrap: 'wrap' as const } : null) }}>
           <Text variant="numXL" testID="train-guideline-minutes" style={{ fontSize: 40, lineHeight: 42, letterSpacing: -1.2 }}>
             {formatNumber(minutes)}
           </Text>
           <Text variant="unit" style={{ fontSize: 14 }}>
             active min
           </Text>
-        </View>
+        </View>,
       ),
     },
     {
       key: 'status',
       at: 0,
-      height: 44,
-      content: (
-        <Text variant="label" color="textSecondary" numberOfLines={2}>
+      height: statusH,
+      content: boxed(
+        'status',
+        <Text variant="label" color="textSecondary" numberOfLines={fit ? undefined : 2}>
           {status}
-        </Text>
+        </Text>,
       ),
     },
   ];
@@ -181,7 +224,7 @@ export function WeekCard({
           memoryKey={`train-week-${dates[0]}`}
           color={colors.exercise}
           width={vesselW}
-          height={vesselH}
+          height={cupH}
           labels={[...labels].sort((x, y) => y.at - x.at)}
           labelGap={narrow ? 14 : 16}
           accessibilityLabel={`${minutes} active minutes this week, of the ${WHO_WEEKLY_MINUTES} minutes a week guideline`}
@@ -207,6 +250,25 @@ export function WeekCard({
           seven values (`weekStripLabel`), and what it draws is hidden. */}
       <View testID="train-week-minutes" accessible accessibilityRole="image" accessibilityLabel={weekStripLabel(dates, week.byDate, today)}>
         <View aria-hidden importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+          {fit ? (
+            <>
+              <SizeProbe key={`strip-${measureKey}`} onSize={(w) => setStripW(Math.floor(w))} />
+              <MeasureEach
+                key={`days-${measureKey}-${dates[0]}`}
+                onWidths={setStripNumbers}
+                items={dates
+                  .filter((d) => dayWords(d))
+                  .map((d) => ({
+                    key: d,
+                    node: (
+                      <Text variant="numM" style={DAY_NUMBER}>
+                        {dayWords(d)}
+                      </Text>
+                    ),
+                  }))}
+              />
+            </>
+          ) : null}
           {wrapStrip(
             dates.map((d) => {
               const day = week.byDate[d];
@@ -229,8 +291,8 @@ export function WeekCard({
                       borderWidth: isToday ? 1.5 : 0,
                       borderColor: colors.text,
                     }}>
-                    <Text variant="numM" color={future ? 'textTertiary' : day.minutes ? 'text' : 'textSecondary'} style={{ fontSize: 13, lineHeight: 18, letterSpacing: 0 }}>
-                      {future ? '' : day.minutes ? `${day.minutes}` : '–'}
+                    <Text variant="numM" color={future ? 'textTertiary' : day.minutes ? 'text' : 'textSecondary'} style={DAY_NUMBER}>
+                      {dayWords(d)}
                     </Text>
                   </View>
                 </View>
@@ -256,10 +318,10 @@ export function WeekCard({
           {/* The cup above counts Monday to Sunday; this line counts the last 7 days, and says so. */}
           {/* Its name is the button's too; on the web a named box carries a role (inside the button it is presentational). */}
           <View testID="train-load" accessibilityLabel={overview.cardLabel ?? undefined} {...(Platform.OS === 'web' && overview.cardLabel ? ({ role: 'img' } as const) : null)} style={{ flex: 1, minWidth: 0 }}>
-            <Text variant="caption" color="textSecondary" numberOfLines={1} testID="train-load-span">
+            <Text variant="caption" color="textSecondary" numberOfLines={fit ? undefined : 1} testID="train-load-span">
               Last 7 days
             </Text>
-            <Text variant="label" color="text" numberOfLines={2} testID="train-load-title">
+            <Text variant="label" color="text" numberOfLines={fit ? undefined : 2} testID="train-load-title">
               {load.title}
             </Text>
           </View>
@@ -267,7 +329,7 @@ export function WeekCard({
         </PressableScale>
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm, marginBottom: -spacing.sm }}>
-          <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flex: 1 }} testID="train-guideline-line">
+          <Text variant="caption" color="textSecondary" numberOfLines={fit ? undefined : 1} style={{ flex: 1 }} testID="train-guideline-line">
             Hard minutes count double
           </Text>
           <IconButton size={36} tone="clear" testID="train-guideline-help" accessibilityLabel="How minutes count toward the guideline" onPress={() => setHelp(true)}>
@@ -280,13 +342,19 @@ export function WeekCard({
   );
 }
 
+/** A day's number in the week strip. */
+const DAY_NUMBER = { fontSize: 13, lineHeight: 18, letterSpacing: 0 } as const;
+
 function Mini({ label, value, unit, color, testID, spoken }: { label: string; value: string; unit?: string; color?: string; testID?: string; spoken?: string }) {
-  // The narrowest a total may be grows with the text, so its label never splits inside a word.
+  // With very large text the narrowest a total may be grows with the text. Through the common steps it is the
+  // designed 64 px: each total is as wide as its words as drawn anyway (they never shrink), so the row wraps only
+  // where the three, as drawn, do not fit.
   const grow = useTextGrowth();
+  const least = useVeryLargeText() ? 64 * grow : 64;
   return (
     // No shrinking below the number's own width (its spaces do not break): each total is as wide as its number,
     // at least 64 px, and the row wraps instead of cutting one ("20 h 40 min" is wider than a third of the card).
-    <View style={{ flexGrow: 1, flexBasis: 'auto', minWidth: 64 * grow }} testID={testID} {...figure(spoken)}>
+    <View style={{ flexGrow: 1, flexBasis: 'auto', minWidth: least }} testID={testID} {...figure(spoken)}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         {color ? <CupKey color={color} /> : null}
         <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>

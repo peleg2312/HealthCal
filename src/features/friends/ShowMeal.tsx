@@ -14,7 +14,7 @@ import { View } from 'react-native';
 import { withoutMarks } from '@/lib/bidi';
 import { cleanSharedMealItems, refreshFriends, showMeal, stopMeal, useFriends } from '@/services/friends';
 import { useToday } from '@/store/clock';
-import { fonts, useTheme } from '@/theme';
+import { fonts, useTextGrowth, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
 import { Button, Chip, ChipWrap, decorative, Divider, haptic, ListRow, Text, toast, Toggle } from '@/ui';
 
@@ -222,18 +222,30 @@ export function useShowMealStep({ open, meal, date, entries, onClose }: { open: 
 }
 
 /**
+ * The meal of this day shown to friends now, for someone whose meals are allowed; null otherwise. The diary's
+ * meal card asks it to put `MealShownCaption` in its macros line's place while the meal is shown.
+ */
+export function useShownMeal(meal: MealType, date: ISODate): MySharedMeal | null {
+  const overview = useFriends((s) => s.overview);
+  const { me, myMeals } = mealsOverview(overview);
+  return me?.mealsAllowed ? shownNow(myMeals, date, meal) : null;
+}
+
+/**
  * The line a shown meal carries in the diary under its name ("Shown to Maya and Sam"), for the diary's meal
  * card to place (`meal-shown-<meal>`). Nothing when the meal is not shown now or meals are not allowed.
  */
 export function MealShownCaption({ meal, date }: { meal: MealType; date: ISODate }) {
-  const { colors } = useTheme();
-  const overview = useFriends((s) => s.overview);
-  const { me, myMeals } = mealsOverview(overview);
-  const shown = me?.mealsAllowed ? shownNow(myMeals, date, meal) : null;
+  const { colors, typography } = useTheme();
+  const growth = useTextGrowth();
+  const shown = useShownMeal(meal, date);
   if (!shown) return null;
   return (
-    <View testID={`meal-shown-${meal}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      {decorative(<Users size={14} color={colors.textSecondary} strokeWidth={1.9} />)}
+    <View testID={`meal-shown-${meal}`} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+      {/* The people mark keeps its 14 px and sits on the words' first line when they wrap with large text. */}
+      <View style={{ height: Math.round(typography.caption.lineHeight * growth), justifyContent: 'center', flexShrink: 0 }}>
+        {decorative(<Users size={14} color={colors.textSecondary} strokeWidth={1.9} />)}
+      </View>
       <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
         {shownTo(shown.viewers.map((v) => v.displayName))}
       </Text>

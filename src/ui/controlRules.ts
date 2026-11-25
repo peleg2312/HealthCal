@@ -122,6 +122,30 @@ export function rovingIndex(key: string, index: number, count: number): number |
   return null;
 }
 
+/** The most a width measured on the web is under the drawn one (react-native-web reads whole pixels). */
+export const SEGMENT_SLACK = 1;
+/** The least room between two labels side by side: two pieces of text are never closer than 8 px. */
+export const SEGMENT_GAP = 8;
+
+/**
+ * How a row of segments (`Segmented`, and Progress's section tabs) lays out its labels with text grown, through the
+ * phone's common text steps (under `VERY_LARGE_TEXT`; past it the segments wrap as they always did). `labelWidths`
+ * are the labels as drawn, in their wider (selected) weight, each counted `SEGMENT_SLACK` more; `pad` is a
+ * segment's side room on each side, and a label takes at least `SEGMENT_GAP` of room beside it in all, so two labels
+ * are never closer than that (Progress's tabs at 320 px have 1 px each side). 'equal' while every label fits an equal
+ * share of the row, so the row is drawn as at the designed size; 'row' while the labels side by side fit the row,
+ * each segment as wide as its label and the room left shared; 'wrap' (a second row) only where they do not fit one
+ * row. 'equal' until every label and the row are measured: the designed shape is drawn first.
+ */
+export function segmentLayout(labelWidths: readonly number[], rowWidth: number, pad: number): 'equal' | 'row' | 'wrap' {
+  const n = labelWidths.length;
+  if (!n || !(rowWidth > 0) || labelWidths.some((w) => !(w > 0))) return 'equal';
+  const need = labelWidths.map((w) => w + SEGMENT_SLACK + Math.max(2 * pad, SEGMENT_GAP));
+  if (Math.max(...need) <= rowWidth / n) return 'equal';
+  if (need.reduce((a, w) => a + w, 0) <= rowWidth) return 'row';
+  return 'wrap';
+}
+
 /**
  * The value a stepper's key gives (the WAI-ARIA spin button pattern): Up and Right one step up,
  * Down and Left one step down, Page Up and Page Down ten steps, Home and End the limits when

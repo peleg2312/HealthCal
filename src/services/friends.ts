@@ -8,13 +8,14 @@
 import { create } from 'zustand';
 
 import { buildSharedMeal } from '@/features/friends/meals';
+import { MEALS_NOT_YET } from '@/features/friends/words';
 import { buildFriendSummary, cleanFriendSummary, DEFAULT_SHARING, normalizeCode, summarySignature, type FriendSummary, type SocialSharing } from '@/features/friends/summary';
 import { today } from '@/lib/dates';
 import { useStore } from '@/store';
 import { live } from '@/store/selectors';
 import type { FeedItem, ISODate, MealSettings, MealType, MySharedMeal, SharedMealItem } from '@/types';
 
-import { cleanMealSettings, cleanSharedMealItems, DEFAULT_MEAL_SETTINGS, mealCheerRef, mealItemsSignature, toFeed, toMyMeals, workoutFeedOf } from './friendsWire';
+import { cleanMealSettings, cleanSharedMealItems, DEFAULT_MEAL_SETTINGS, mealCheerRef, mealItemsSignature, mergeCheers, toFeed, toMyMeals, workoutFeedOf } from './friendsWire';
 import { isBackendConfigured, supabase } from './supabase';
 import { useSyncState } from './sync';
 
@@ -81,7 +82,7 @@ export interface FriendsOverview {
   friends: Friend[];
   incoming: FriendRequest[];
   outgoing: FriendRequest[];
-  /** Cheers received in the last two weeks, newest first ('meal:<ref>' for a meal). */
+  /** Cheers received in the last two weeks, newest first ('meal:<ref>' for a meal: the server sends those under meal_cheers). */
   cheers: CheerReceived[];
   /**
    * What friends chose to show me: their meals I may see now and their shared workouts of the last
@@ -144,6 +145,8 @@ function toSharing(v: unknown): SocialSharing {
   return { workouts: o.workouts !== false, streak: o.streak !== false, minutes: o.minutes !== false };
 }
 
+const toCheer = (c: Json): CheerReceived => ({ fromUserId: str(c.from_user), displayName: str(c.display_name), avatar: str(c.avatar), ref: str(c.ref), createdAt: str(c.created_at) });
+
 /** The database's answer in the app's own shape. Anything unexpected is dropped rather than trusted. */
 export function toOverview(raw: unknown): FriendsOverview {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Json;
@@ -176,7 +179,8 @@ export function toOverview(raw: unknown): FriendsOverview {
     friends,
     incoming: list(o.incoming).map((r) => ({ ...person(r), createdAt: str(r.created_at) })),
     outgoing: list(o.outgoing).map((r) => ({ ...person(r), createdAt: str(r.created_at) })),
-    cheers: list(o.cheers).map((c) => ({ fromUserId: str(c.from_user), displayName: str(c.display_name), avatar: str(c.avatar), ref: str(c.ref), createdAt: str(c.created_at) })),
+    // Workout and day cheers under `cheers` (all an older app reads), a shown meal's under `meal_cheers`: one list here.
+    cheers: mergeCheers(list(o.cheers).map(toCheer), list(o.meal_cheers).map(toCheer)),
     feed: mealsAvailable ? toFeed(o.feed) : workoutFeedOf(friends),
     myMeals: mealsAvailable ? toMyMeals(o.my_meals) : [],
     mealsAvailable,
@@ -279,6 +283,8 @@ export async function removeFriend(userId: string): Promise<FriendsResult> {
 export async function cheerFriend(userId: string, ref: string): Promise<FriendsResult> {
   const session = await signedInClient();
   if (!session.ok) return session;
+  const forMeal = ref.startsWith('meal:');
+  if (forMeal && mealsMissing()) return refused('not_yet');
   const mark = (on: boolean) =>
     useFriends.setState((s) =>
       s.overview
@@ -297,6 +303,8 @@ export async function cheerFriend(userId: string, ref: string): Promise<FriendsR
   const { data, error } = await session.client.rpc('send_cheer', { p_to: userId, p_ref: ref });
   if (error || data !== 'ok') {
     mark(false);
+    // A server without meals keeps the cheers' older check (23514, check_violation) if a meal cheer ever reaches it.
+    if (error && forMeal && (isMissingFunction(error) || error.code === '23514')) return mealsNotYet();
     if (error) return failure(error.message);
     return {
       ok: false,
@@ -333,6 +341,7 @@ const MEAL_MESSAGES: Record<string, string> = {
   limit: 'That is a lot of meals shown for one day. Try again tomorrow.',
   gone: 'That meal is not showing any more.',
   not_found: 'That meal is not showing any more.',
+  not_yet: MEALS_NOT_YET,
 };
 
 function refused(code: string): { ok: false; reason: FriendsFailure; message: string; code: string } {
@@ -345,6 +354,31 @@ function patchOverview(change: (o: FriendsOverview) => FriendsOverview): void {
 }
 
 /**
+ * A function the server does not have. Before 20261201000000_friends_meals.sql is applied every meal function is
+ * missing, and PostgREST answers 404 with PGRST202 ("Could not find the function public.meal_show(...) in the
+ * schema cache"); for a moment after it is applied, while PostgREST reloads its schema cache, it can answer the
+ * same. 42883 (undefined_function) is PostgreSQL's own answer when the cache still lists one that is gone.
+ */
+export function isMissingFunction(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  return error.code === 'PGRST202' || error.code === '42883' || /could not find the function/i.test(error.message ?? '');
+}
+
+/** The overview held says this server has no meals yet: a meal call is not sent at all. */
+function mealsMissing(): boolean {
+  return useFriends.getState().overview?.mealsAvailable === false;
+}
+
+/**
+ * A meal function was missing: every meal control hides until the next reload of the overview says otherwise, and
+ * the call says so in plain words (code 'not_yet'). Workouts and cheers on them are untouched.
+ */
+function mealsNotYet(): { ok: false; reason: FriendsFailure; message: string; code: string } {
+  patchOverview((o) => ({ ...o, mealsAvailable: false, me: o.me ? { ...o.me, mealsAllowed: false } : o.me, feed: (o.feed ?? []).filter((i) => i.kind !== 'meal'), myMeals: [] }));
+  return refused('not_yet');
+}
+
+/**
  * Show one meal to the friends picked (the "Show to friends" button). `items` come from
  * `buildSharedMeal`; the server keeps only what friends may see, makes the reference, and
  * remembers `viewers` as the audience offered next time. Showing the same day and meal again
@@ -353,6 +387,7 @@ function patchOverview(change: (o: FriendsOverview) => FriendsOverview): void {
 export async function showMeal(input: { day: ISODate; meal: MealType; items: SharedMealItem[]; showKcal: boolean; viewers: string[] }): Promise<FriendsResult<{ ref: string; expiresAt: string }>> {
   const session = await signedInClient();
   if (!session.ok) return session;
+  if (mealsMissing()) return refused('not_yet');
   const { data, error } = await session.client.rpc('meal_show', {
     p_day: input.day,
     p_meal: input.meal,
@@ -360,7 +395,7 @@ export async function showMeal(input: { day: ISODate; meal: MealType; items: Sha
     p_show_kcal: input.showKcal,
     p_viewers: [...new Set(input.viewers)],
   });
-  if (error) return failure(error.message);
+  if (error) return isMissingFunction(error) ? mealsNotYet() : failure(error.message);
   const o = (data && typeof data === 'object' ? data : {}) as Json;
   if (o.status !== 'ok' || typeof o.ref !== 'string') {
     if (o.status === 'not_friends' || o.status === 'no_card') await refreshFriends();
@@ -379,8 +414,9 @@ export async function showMeal(input: { day: ISODate; meal: MealType; items: Sha
 export async function updateMeal(ref: string, items: SharedMealItem[]): Promise<FriendsResult<'ok' | 'stopped'>> {
   const session = await signedInClient();
   if (!session.ok) return session;
+  if (mealsMissing()) return refused('not_yet');
   const { data, error } = await session.client.rpc('meal_update', { p_ref: ref, p_items: items });
-  if (error) return failure(error.message);
+  if (error) return isMissingFunction(error) ? mealsNotYet() : failure(error.message);
   if (data === 'ok' || data === 'stopped') return { ok: true, value: data };
   return refused(str(data));
 }
@@ -389,12 +425,13 @@ export async function updateMeal(ref: string, items: SharedMealItem[]): Promise<
 export async function stopMeal(ref: string): Promise<FriendsResult> {
   const session = await signedInClient();
   if (!session.ok) return session;
+  if (mealsMissing()) return refused('not_yet');
   const removed = useFriends.getState().overview?.myMeals?.find((m) => m.ref === ref);
   patchOverview((o) => ({ ...o, myMeals: (o.myMeals ?? []).filter((m) => m.ref !== ref) }));
   const { data, error } = await session.client.rpc('meal_stop', { p_ref: ref });
   if (error) {
     if (removed) patchOverview((o) => ({ ...o, myMeals: [removed, ...(o.myMeals ?? []).filter((m) => m.ref !== ref)] }));
-    return failure(error.message);
+    return isMissingFunction(error) ? mealsNotYet() : failure(error.message);
   }
   lastSentMeal.delete(ref);
   await refreshFriends();
@@ -406,8 +443,9 @@ export async function stopMeal(ref: string): Promise<FriendsResult> {
 export async function stopAllMeals(): Promise<FriendsResult<number>> {
   const session = await signedInClient();
   if (!session.ok) return session;
+  if (mealsMissing()) return refused('not_yet');
   const { data, error } = await session.client.rpc('meal_stop_all');
-  if (error) return failure(error.message);
+  if (error) return isMissingFunction(error) ? mealsNotYet() : failure(error.message);
   lastSentMeal.clear();
   await refreshFriends();
   return { ok: true, value: typeof data === 'number' ? data : 0 };
@@ -417,12 +455,13 @@ export async function stopAllMeals(): Promise<FriendsResult<number>> {
 export async function setMealSettings(patch: Partial<MealSettings>): Promise<FriendsResult<MealSettings>> {
   const session = await signedInClient();
   if (!session.ok) return session;
+  if (mealsMissing()) return refused('not_yet');
   const before = useFriends.getState().overview?.me?.mealSettings;
   patchOverview((o) => (o.me ? { ...o, me: { ...o.me, mealSettings: { ...DEFAULT_MEAL_SETTINGS, ...o.me.mealSettings, ...patch } } } : o));
   const { data, error } = await session.client.rpc('meal_settings_set', { p_settings: patch });
   if (error || !data) {
     patchOverview((o) => (o.me ? { ...o, me: { ...o.me, mealSettings: before ?? DEFAULT_MEAL_SETTINGS } } : o));
-    if (error) return failure(error.message);
+    if (error) return isMissingFunction(error) ? mealsNotYet() : failure(error.message);
     await refreshFriends();
     return refused('no_card');
   }
@@ -434,8 +473,9 @@ export async function setMealSettings(patch: Partial<MealSettings>): Promise<Fri
 export async function setMealAudience(userIds: string[]): Promise<FriendsResult<string[]>> {
   const session = await signedInClient();
   if (!session.ok) return session;
+  if (mealsMissing()) return refused('not_yet');
   const { data, error } = await session.client.rpc('meal_audience_set', { p_viewers: [...new Set(userIds)] });
-  if (error) return failure(error.message);
+  if (error) return isMissingFunction(error) ? mealsNotYet() : failure(error.message);
   await refreshFriends();
   if (!Array.isArray(data)) return refused('no_card');
   return { ok: true, value: data.filter((id): id is string => typeof id === 'string') };
@@ -449,6 +489,7 @@ export async function setMealAudience(userIds: string[]): Promise<FriendsResult<
 export async function setFriendMealPrefs(userId: string, prefs: { shareMeals?: boolean; seeMeals?: boolean }): Promise<FriendsResult> {
   const session = await signedInClient();
   if (!session.ok) return session;
+  if (mealsMissing()) return refused('not_yet');
   const apply = (o: FriendsOverview, p: { shareMeals?: boolean; seeMeals?: boolean }) => ({
     ...o,
     friends: o.friends.map((f) => (f.userId === userId ? { ...f, ...(p.shareMeals === undefined ? null : { shareMeals: p.shareMeals }), ...(p.seeMeals === undefined ? null : { seeMeals: p.seeMeals }) } : f)),
@@ -458,7 +499,7 @@ export async function setFriendMealPrefs(userId: string, prefs: { shareMeals?: b
   const { data, error } = await session.client.rpc('friend_prefs_set', { p_friend: userId, p_share_meals: prefs.shareMeals ?? null, p_see_meals: prefs.seeMeals ?? null });
   if (error || data !== 'ok') {
     if (friend) patchOverview((o) => apply(o, { shareMeals: friend.shareMeals, seeMeals: friend.seeMeals }));
-    if (error) return failure(error.message);
+    if (error) return isMissingFunction(error) ? mealsNotYet() : failure(error.message);
     await refreshFriends();
     return refused(str(data));
   }
@@ -474,14 +515,15 @@ const lastSentMeal = new Map<string, string>();
  * (friends see the edit), one whose foods are all gone stops, and today's meals of a type in
  * "Always show these meals" are shown to the remembered audience. Never shows a meal the person
  * stopped, never a past day by itself, never changes who sees a meal. Does nothing for someone
- * under 18 or without friends on.
+ * under 18 or without friends on, nor against a server without meals; never raises an error.
  */
 export async function publishMeals(): Promise<void> {
   const session = await signedInClient();
   if (!session.ok) return;
   const overview = useFriends.getState().overview;
   const me = overview?.me;
-  if (!me || !me.mealsAllowed) return;
+  // A server without meals (mealsAllowed is then false too) is asked nothing.
+  if (!me || !me.mealsAllowed || overview.mealsAvailable === false) return;
   const s = useStore.getState();
   if (s.ownerId !== session.userId) return;
   const entries = live(s.foodEntries);
@@ -491,7 +533,11 @@ export async function publishMeals(): Promise<void> {
     const signature = mealItemsSignature(items);
     if (signature === mealItemsSignature(shown.items) || signature === lastSentMeal.get(shown.ref)) continue;
     const { data, error } = await session.client.rpc('meal_update', { p_ref: shown.ref, p_items: items });
-    if (error) return;
+    if (error) {
+      // Quietly: a sync never raises a meal error. A missing function hides the meal controls instead.
+      if (isMissingFunction(error)) mealsNotYet();
+      return;
+    }
     if (data === 'ok') lastSentMeal.set(shown.ref, signature);
     changed = true;
   }
@@ -505,7 +551,10 @@ export async function publishMeals(): Promise<void> {
       const signature = `auto:${day}:${meal}:${mealItemsSignature(items)}`;
       if (lastSentMeal.get(`auto:${day}:${meal}`) === signature) continue;
       const { data, error } = await session.client.rpc('meal_show_auto', { p_day: day, p_meal: meal, p_items: items });
-      if (error) return;
+      if (error) {
+        if (isMissingFunction(error)) mealsNotYet();
+        return;
+      }
       lastSentMeal.set(`auto:${day}:${meal}`, signature);
       if (data && typeof data === 'object' && (data as Json).status === 'ok') changed = true;
     }
@@ -595,11 +644,13 @@ if (typeof __DEV__ !== 'undefined' && (__DEV__ || process.env.EXPO_PUBLIC_E2E ==
     cheerMeal,
     leaveSocial,
     publishMeals,
+    publishSummary,
     refreshFriends,
     removeFriend,
     requestFriend,
     respondToRequest,
     setFriendMealPrefs,
+    setMealAudience,
     setMealSettings,
     setupSocial,
     showMeal,

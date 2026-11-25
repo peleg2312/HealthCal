@@ -55,4 +55,45 @@ for (const [steps, tag] of [
     { id: `text${tag}-water-reached`, route: '/', taps: [...toWater, 'water-add-3', 'water-add-3', 'water-add-3', 'water-add-3', 'water-add-3'], waitFor: 'water-goal-reached', note: `Water at ${tag}% text, the goal reached: the brim line and the line under the cup` },
   );
 }
+// Train at the same steps (GTRAIN): the week card's words at their levels in boxes measured as drawn (the cup grows
+// only if they need it), Log activity and Workout side by side while their words as drawn fit (halves, then each its
+// own width, then 14 px side room), and each History row's figure beside its name wherever the two, as drawn, fit.
+for (const [steps, tag] of [
+  [1, '115'],
+  [2, '130'],
+]) {
+  const up = sized('train', steps);
+  states.push(
+    { id: `text${tag}-train`, route: '/train', taps: up, waitFor: 'train-week-card', note: `Train at ${tag}% text: the week card, the two actions, History` },
+    { id: `text${tag}-train-spread`, route: '/train', values: { spread: 1 }, taps: up, waitFor: 'train-week-card', note: `Train at ${tag}% text on "Over 7 days": figures under their names, breaking only before "over 7 days"` },
+    { id: `text${tag}-train-off`, route: '/train', values: { eatBack: 0 }, taps: up, waitFor: 'train-week-card', note: `Train at ${tag}% text with workouts not added` },
+    { id: `text${tag}-train-stress`, route: '/train', data: 'stress', taps: up, waitFor: 'train-week-card', note: `Train at ${tag}% text with long content: three-figure days in the strip, big totals` },
+    { id: `text${tag}-train-empty`, route: '/train', data: 'empty', taps: up, waitFor: 'train-week-card', note: `Train on day one at ${tag}% text` },
+  );
+}
+// Progress and the kit's Segmented at the same steps (GPROG): the section tabs on one row while their labels, measured
+// as drawn in bold, fit it (equal shares, else each as wide as its label, 8 px apart at least; `segmentLayout`), the
+// overview tiles two a row while every tile's title, number and caption, measured two a row, fit, the reached
+// milestones two a row and each "Up next" share beside its title while their titles fit (src/features/progress/grownFit.ts).
+// The size is set on Profile over the Progress tab, so the tabs and tiles measure again when Progress comes back. The
+// Segmented screens are opened from Profile after the size is set.
+for (const [steps, tag] of [
+  [1, '115'],
+  [2, '130'],
+]) {
+  const up = sized('progress', steps);
+  const onProfile = ['progress-profile', ...Array(steps).fill('profile-text-size-larger')];
+  states.push(
+    { id: `text${tag}-progress`, route: '/progress', taps: up, waitFor: 'progress-overview-grid', note: `Progress at ${tag}% text: the tabs, the overview tiles, the milestones` },
+    { id: `text${tag}-progress-nutrition`, route: '/progress', taps: [...up, 'progress-segment-nutrition'], waitFor: 'progress-calories', note: `Progress, Nutrition at ${tag}% text` },
+    { id: `text${tag}-progress-body`, route: '/progress', taps: [...up, 'progress-segment-body'], waitFor: 'progress-weight', note: `Progress, Body at ${tag}% text` },
+    { id: `text${tag}-progress-habits`, route: '/progress', taps: [...up, 'progress-segment-habits'], waitFor: 'progress-habits', note: `Progress, Habits at ${tag}% text` },
+    { id: `text${tag}-progress-stress`, route: '/progress', data: 'stress', taps: up, waitFor: 'progress-overview-grid', note: `Progress at ${tag}% text with long content: 11,480 kcal days, 142.6 kg` },
+    { id: `text${tag}-profile-units`, route: '/progress', taps: onProfile, waitFor: 'profile-units-metric', note: `Profile at ${tag}% text: the units choice (Segmented)` },
+    { id: `text${tag}-goals`, route: '/progress', taps: [...onProfile, 'profile-goals'], waitFor: 'goals-exercise-spread-day', note: `Goals at ${tag}% text: five Segmented choices` },
+    { id: `text${tag}-reminders`, route: '/progress', taps: [...onProfile, 'profile-reminders'], note: `Reminders at ${tag}% text: the interval (Segmented)` },
+    { id: `text${tag}-fasting`, route: '/progress', taps: [...onProfile, 'profile-fasting'], note: `Fasting at ${tag}% text: the goal (Segmented, five choices)` },
+    { id: `text${tag}-sleep`, route: '/progress', taps: [...onProfile, 'profile-sleep'], note: `Sleep at ${tag}% text: the range (Segmented)` },
+  );
+}
 module.exports = states;

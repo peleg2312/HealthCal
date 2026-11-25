@@ -73,6 +73,7 @@ src/data/searchNames.ts	SEARCH_NAMES	const
 src/data/searchNames.ts	SearchNames	interface
 src/features/activity/BringIn.tsx	BringIn	component
 src/features/activity/LoadMark.tsx	LoadMark	component
+src/features/activity/MeasureEach.tsx	MeasureEach	component
 src/features/activity/RoutineCards.tsx	RoutineCards	component
 src/features/activity/RoutineCards.tsx	useRoutineTemplates	function
 src/features/activity/SpreadHint.tsx	SpreadHint	component
@@ -121,17 +122,25 @@ src/features/activity/exercises.ts	searchExercises	function
 src/features/activity/history.ts	FIGURE_CHAR_PX	const
 src/features/activity/history.ts	FIGURE_GAP	const
 src/features/activity/history.ts	FIGURE_WORDS_CHAR_PX	const
+src/features/activity/history.ts	FigureMeasure	interface
 src/features/activity/history.ts	HistoryWeek	interface
 src/features/activity/history.ts	META_CHAR_PX	const
 src/features/activity/history.ts	MIN_NAME_ROOM	const
+src/features/activity/history.ts	MIN_NAME_WORD	const
+src/features/activity/history.ts	MetaMeasure	interface
 src/features/activity/history.ts	NAME_CHAR_PX	const
 src/features/activity/history.ts	WEEKS_PER_PAGE	const
 src/features/activity/history.ts	deleteSessionLabel	function
+src/features/activity/history.ts	figureFitsBeside	function
+src/features/activity/history.ts	figureWordsHold	function
 src/features/activity/history.ts	historyDaySpoken	function
 src/features/activity/history.ts	historyDayWord	function
 src/features/activity/history.ts	historyFigureBeside	function
+src/features/activity/history.ts	historyFigureBesideMeasured	function
 src/features/activity/history.ts	historyFigureWords	function
+src/features/activity/history.ts	historyMetaLine	function
 src/features/activity/history.ts	historyMetaLines	function
+src/features/activity/history.ts	historyNamePieces	function
 src/features/activity/history.ts	historyWeekLabel	function
 src/features/activity/history.ts	historyWeekTitle	function
 src/features/activity/history.ts	historyWeeks	function
@@ -202,6 +211,15 @@ src/features/activity/strengthDraft.ts	restRemainingMs	function
 src/features/activity/strengthDraft.ts	useStrengthDrafts	const
 src/features/activity/strengthFormat.ts	formatLiftWeight	function
 src/features/activity/strengthFormat.ts	formatPreviousSets	function
+src/features/activity/trainFit.ts	ACTION_PAD	const
+src/features/activity/trainFit.ts	ACTION_PAD_TIGHT	const
+src/features/activity/trainFit.ts	STRIP_BOX_CHROME	const
+src/features/activity/trainFit.ts	STRIP_BOX_MIN	const
+src/features/activity/trainFit.ts	STRIP_NUMBER_ROOM	const
+src/features/activity/trainFit.ts	actionChrome	function
+src/features/activity/trainFit.ts	actionsLayout	function
+src/features/activity/trainFit.ts	stripColumnMin	function
+src/features/activity/trainFit.ts	weekRangeShort	function
 src/features/ai/AddMissingItem.tsx	AddMissingItem	component
 src/features/ai/AiConsentAbout.tsx	AiConsentAbout	component
 src/features/ai/AiConsentSheet.tsx	AI_CONSENT_PARTS	const
@@ -1201,6 +1219,7 @@ src/features/friends/SetupForm.tsx	SetupForm	component
 src/features/friends/ShowMeal.tsx	MealShownCaption	component
 src/features/friends/ShowMeal.tsx	ShowToFriendsRow	component
 src/features/friends/ShowMeal.tsx	useShowMealStep	function
+src/features/friends/ShowMeal.tsx	useShownMeal	function
 src/features/friends/attention.ts	FRIENDS_SEEN_KEY	const
 src/features/friends/attention.ts	RECENT_CHEER_MS	const
 src/features/friends/attention.ts	friendsAttention	function
@@ -1268,6 +1287,7 @@ src/features/friends/meals.ts	ownMealsByRef	function
 src/features/friends/meals.ts	sameItems	function
 src/features/friends/overview.ts	MealsMe	interface
 src/features/friends/overview.ts	MealsOverview	interface
+src/features/friends/overview.ts	mealsInWords	function
 src/features/friends/overview.ts	mealsOverview	function
 src/features/friends/pendingInvite.ts	PENDING_INVITE_KEY	const
 src/features/friends/pendingInvite.ts	PENDING_INVITE_MAX_AGE_MS	const
@@ -1333,6 +1353,7 @@ src/features/friends/words.ts	CHEERED	const
 src/features/friends/words.ts	CHEERS_TITLE	const
 src/features/friends/words.ts	FEED_EMPTY	const
 src/features/friends/words.ts	FEED_EMPTY_TITLE	const
+src/features/friends/words.ts	FEED_EMPTY_WORKOUTS	const
 src/features/friends/words.ts	FIND	const
 src/features/friends/words.ts	KCAL_HIDDEN	const
 src/features/friends/words.ts	KCAL_WITH_MEALS	const
@@ -1340,6 +1361,7 @@ src/features/friends/words.ts	LEAVE_CONFIRM	const
 src/features/friends/words.ts	LEAVE_NOTE	const
 src/features/friends/words.ts	LEAVE_TITLE	const
 src/features/friends/words.ts	MEALS_INTRO	const
+src/features/friends/words.ts	MEALS_NOT_YET	const
 src/features/friends/words.ts	MENU_SHOW	const
 src/features/friends/words.ts	MENU_SHOW_LINE	const
 src/features/friends/words.ts	MENU_SHOW_NONE	const
@@ -1355,6 +1377,7 @@ src/features/friends/words.ts	RECENT_SPAN	const
 src/features/friends/words.ts	RECENT_WORKOUTS	const
 src/features/friends/words.ts	REMOVE_FRIEND	const
 src/features/friends/words.ts	SCREEN_SUBTITLE	const
+src/features/friends/words.ts	SCREEN_SUBTITLE_WORKOUTS	const
 src/features/friends/words.ts	SCREEN_TITLE	const
 src/features/friends/words.ts	SEE_MEALS	const
 src/features/friends/words.ts	SEE_MEALS_OFF	const
@@ -1397,6 +1420,9 @@ src/features/friends/words.ts	friendMealTitle	const
 src/features/friends/words.ts	friendSourceLabel	function
 src/features/friends/words.ts	friendsSince	const
 src/features/friends/words.ts	itemCaption	function
+src/features/friends/words.ts	leaveConfirm	const
+src/features/friends/words.ts	leaveNote	const
+src/features/friends/words.ts	leftToast	const
 src/features/friends/words.ts	mealCheerTarget	function
 src/features/friends/words.ts	mealChip	const
 src/features/friends/words.ts	mealMeta	function
@@ -1404,7 +1430,10 @@ src/features/friends/words.ts	mealsTheyShow	const
 src/features/friends/words.ts	myMealLine	function
 src/features/friends/words.ts	myMealTitle	const
 src/features/friends/words.ts	namesLine	function
+src/features/friends/words.ts	neverSharedLine	const
+src/features/friends/words.ts	removeConfirm	const
 src/features/friends/words.ts	removeNote	const
+src/features/friends/words.ts	removedToast	const
 src/features/friends/words.ts	seesMyMealsLine	const
 src/features/friends/words.ts	seesMyMealsTitle	const
 src/features/friends/words.ts	showButton	function
@@ -2608,6 +2637,7 @@ src/features/progress/MilestonesCard.tsx	MilestonesCard	component
 src/features/progress/MilestonesCard.tsx	milestoneDomain	function
 src/features/progress/OverviewGrid.tsx	OverviewGrid	component
 src/features/progress/OverviewGrid.tsx	ProgressSegment	type
+src/features/progress/Probe.tsx	WrapProbe	component
 src/features/progress/ProgressTile.tsx	ProgressTile	component
 src/features/progress/RecapCard.tsx	RecapCard	component
 src/features/progress/RecapCups.tsx	RecapCups	component
@@ -2658,6 +2688,13 @@ src/features/progress/goalDate.ts	trendGoalLine	function
 src/features/progress/goalDate.ts	trendMonth	function
 src/features/progress/goalDate.ts	trendMonthParts	function
 src/features/progress/goalDate.ts	weeklyRateText	function
+src/features/progress/grownFit.ts	allFit	function
+src/features/progress/grownFit.ts	besideRoom	function
+src/features/progress/grownFit.ts	keepsShape	function
+src/features/progress/grownFit.ts	lineFits	function
+src/features/progress/grownFit.ts	milestoneRoom	function
+src/features/progress/grownFit.ts	tileRoom	function
+src/features/progress/grownFit.ts	wrapFits	function
 src/features/progress/insightMark.ts	ABOVE_LIMIT_INSIGHTS	const
 src/features/progress/insightMark.ts	InsightMark	type
 src/features/progress/insightMark.ts	insightMark	function
@@ -3745,6 +3782,7 @@ src/services/friends.ts	SocialSharing	re-export	src/features/friends/summary.ts:
 src/services/friends.ts	cheerFriend	function
 src/services/friends.ts	cheerMeal	function
 src/services/friends.ts	cleanSharedMealItems	re-export	src/services/friendsWire.ts:cleanSharedMealItems
+src/services/friends.ts	isMissingFunction	function
 src/services/friends.ts	leaveSocial	function
 src/services/friends.ts	mealItemsSignature	re-export	src/services/friendsWire.ts:mealItemsSignature
 src/services/friends.ts	publishMeals	function
@@ -3766,6 +3804,7 @@ src/services/friends.ts	undoDecline	function
 src/services/friends.ts	updateMeal	function
 src/services/friends.ts	useFriends	const
 src/services/friendsWire.ts	DEFAULT_MEAL_SETTINGS	const
+src/services/friendsWire.ts	FeedFriend	interface
 src/services/friendsWire.ts	MAX_SHARED_FOODS	const
 src/services/friendsWire.ts	SHARED_MEAL_DAYS	const
 src/services/friendsWire.ts	cleanMealSettings	function
@@ -3775,9 +3814,11 @@ src/services/friendsWire.ts	isCalendarDay	function
 src/services/friendsWire.ts	mealCheerRef	const
 src/services/friendsWire.ts	mealItemsSignature	function
 src/services/friendsWire.ts	mealOfCheer	function
+src/services/friendsWire.ts	mergeCheers	function
 src/services/friendsWire.ts	sharedMealRef	function
 src/services/friendsWire.ts	toFeed	function
 src/services/friendsWire.ts	toMyMeals	function
+src/services/friendsWire.ts	workoutFeedOf	function
 src/services/notifications.ts	PlannedReminder	re-export	src/features/settings/reminderPlanner.ts:PlannedReminder
 src/services/notifications.ts	PlannerInput	re-export	src/features/settings/reminderPlanner.ts:PlannerInput
 src/services/notifications.ts	ReminderKind	re-export	src/features/settings/reminderPlanner.ts:ReminderKind
@@ -4081,6 +4122,7 @@ src/ui/Chip.tsx	ChipRow	component
 src/ui/Chip.tsx	ChipWrap	component
 src/ui/Chip.tsx	CupKey	component
 src/ui/Chip.tsx	Segmented	component
+src/ui/Chip.tsx	useSegmentFit	function
 src/ui/Field.tsx	NumberField	component
 src/ui/Field.tsx	NumberFieldProps	interface
 src/ui/Field.tsx	Stepper	component
@@ -4142,6 +4184,8 @@ src/ui/announce.ts	sayOnWeb	function
 src/ui/controlRules.ts	ANDROID_TARGET	const
 src/ui/controlRules.ts	NO_MINUS	const
 src/ui/controlRules.ts	ROW_WORD_ROOM	const
+src/ui/controlRules.ts	SEGMENT_GAP	const
+src/ui/controlRules.ts	SEGMENT_SLACK	const
 src/ui/controlRules.ts	SHORT_WINDOW	const
 src/ui/controlRules.ts	SlopInsets	type
 src/ui/controlRules.ts	StateIn	interface
@@ -4154,6 +4198,7 @@ src/ui/controlRules.ts	pressesOnSpace	function
 src/ui/controlRules.ts	rovingIndex	function
 src/ui/controlRules.ts	rowStacks	function
 src/ui/controlRules.ts	scrubKey	function
+src/ui/controlRules.ts	segmentLayout	function
 src/ui/controlRules.ts	slopToReach	function
 src/ui/controlRules.ts	spokenFieldName	function
 src/ui/controlRules.ts	stepperKey	function

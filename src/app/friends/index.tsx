@@ -25,9 +25,11 @@ import {
   cheerWhat,
   FEED_EMPTY,
   FEED_EMPTY_TITLE,
+  FEED_EMPTY_WORKOUTS,
   RECENT,
   RECENT_SPAN,
   SCREEN_SUBTITLE,
+  SCREEN_SUBTITLE_WORKOUTS,
   SCREEN_TITLE,
   SETTINGS_OPEN,
   SIGNED_OUT_LINE,
@@ -69,7 +71,8 @@ export default function FriendsScreen() {
     }, []),
   );
 
-  const { me, friends, feed, myMeals } = mealsOverview(overview);
+  // mealWords: meals are named only where they work for this person (never on a server without them, nor under 18).
+  const { me, friends, feed, myMeals, mealWords } = mealsOverview(overview);
   const shown = useMemo(() => localFeed({ feed, today, seeMeals: !!me?.mealsAllowed && !!me?.mealSettings.see, friends }), [feed, today, me, friends]);
   // What this screen shows is no longer new: the count on the tab headers' Friends button clears, and the feed's keys are kept for the next look.
   const ready = status === 'ready' && !!me;
@@ -142,7 +145,7 @@ export default function FriendsScreen() {
     </IconButton>
   ) : null;
 
-  const header = <Header title={SCREEN_TITLE} subtitle={SCREEN_SUBTITLE} right={headerRight} />;
+  const header = <Header title={SCREEN_TITLE} subtitle={mealWords ? SCREEN_SUBTITLE : SCREEN_SUBTITLE_WORKOUTS} right={headerRight} />;
   const scrollProps = Platform.OS === 'web' ? undefined : { refreshControl: <RefreshControl refreshing={refreshing} onRefresh={pull} tintColor={colors.textSecondary} /> };
 
   // ------------------------------------------------ states without a card
@@ -188,6 +191,7 @@ export default function FriendsScreen() {
       <SetupForm
         header={header}
         defaultName={profile.name}
+        meals={mealWords}
         onDone={() => {
           // Arrived from an invite link before turning friends on: go on to add that person.
           if (invite) router.replace(invitePath(invite) as never);
@@ -266,7 +270,7 @@ export default function FriendsScreen() {
             </View>
           ) : (
             <Card testID="friends-feed-empty">
-              <EmptyState title={FEED_EMPTY_TITLE} message={FEED_EMPTY} action={me.mealsAllowed ? 'Show a meal from the diary' : undefined} onAction={me.mealsAllowed ? () => router.push('/diary' as never) : undefined} />
+              <EmptyState title={FEED_EMPTY_TITLE} message={mealWords ? FEED_EMPTY : FEED_EMPTY_WORKOUTS} action={me.mealsAllowed ? 'Show a meal from the diary' : undefined} onAction={me.mealsAllowed ? () => router.push('/diary' as never) : undefined} />
             </Card>
           )}
         </View>

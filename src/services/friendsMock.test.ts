@@ -147,14 +147,21 @@ describe('stand-in backend: meals shown to friends', () => {
     expect(await ben.rpc('send_cheer', { p_to: ana.id, p_ref: `meal:${'b'.repeat(32)}` })).toBe('invalid');
     expect(await ben.rpc('send_cheer', { p_to: ana.id, p_ref: `meal:${ref}` })).toBe('ok');
     expect((await feedMeals(ben))[0].cheered).toBe(true);
+    expect(await ben.rpc('send_cheer', { p_to: ana.id, p_ref: `day:${day(0)}` })).toBe('ok');
     const o = await ana.rpc('friends_overview');
     expect(o.my_meals[0].cheers).toBe(1);
-    expect(o.cheers.map((c: { ref: string }) => c.ref)).toContain(`meal:${ref}`);
+    // A meal's cheer under meal_cheers, in the same shape; cheers keeps the workouts and days an older app can name.
+    const refs = (l: { ref: string }[]) => l.map((c) => c.ref);
+    expect(refs(o.meal_cheers)).toEqual([`meal:${ref}`]);
+    expect(refs(o.cheers)).toEqual([`day:${day(0)}`]);
+    expect(Object.keys(o.meal_cheers[0]).sort()).toEqual(Object.keys(o.cheers[0]).sort());
 
     expect(await ana.rpc('meal_stop', { p_ref: ref })).toBe('stopped');
     expect(await ana.rpc('meal_stop', { p_ref: ref })).toBe('not_found');
     expect(await feedMeals(ben)).toEqual([]);
-    expect((await ana.rpc('friends_overview')).cheers).toEqual([]);
+    const after = await ana.rpc('friends_overview');
+    expect(after.meal_cheers).toEqual([]);
+    expect(refs(after.cheers)).toEqual([`day:${day(0)}`]);
     expect(await ben.rpc('send_cheer', { p_to: ana.id, p_ref: `meal:${ref}` })).toBe('invalid');
   });
 
@@ -281,5 +288,56 @@ describe('stand-in backend: meals shown to friends', () => {
     gus.code = card.code;
     await befriend(ben, gus);
     expect((await show(gus, [ben])).status).toBe('limit');
+  });
+});
+
+describe('stand-in backend: the server before meals (--no-meals, POST /__meals)', () => {
+  const meals = (on: boolean) => fetch(`${base}/__meals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ on }) }).then((r) => r.json());
+
+  it('answers as 20261116000000_friends_hardening.sql does: no meal function, no meal field, no meal cheer', async () => {
+    const ana = await person('Ana');
+    const ben = await person('Ben');
+    await befriend(ben, ana);
+    await ben.rpc('social_publish', { p_summary: { workouts: [{ id: 'ab'.repeat(16), name: 'Running', emoji: '', minutes: 30, date: day(0) }] }, p_share_key: ben.key });
+    expect(await meals(false)).toEqual({ on: false });
+    try {
+      const o = await ana.rpc('friends_overview');
+      expect(Object.keys(o).sort()).toEqual(['cheers', 'friends', 'incoming', 'me', 'outgoing']);
+      expect(Object.keys(o.me).sort()).toEqual(['avatar', 'code', 'display_name', 'share_key', 'sharing']);
+      expect(Object.keys(o.friends[0]).sort()).toEqual(['avatar', 'cheered', 'display_name', 'since', 'summary', 'summary_updated_at', 'user_id']);
+      expect(o.friends[0].summary.workouts).toHaveLength(1);
+
+      // PostgREST's own answer to a function it does not hold: PGRST202, in its words (with status 404, below).
+      for (const [fn, body] of [
+        ['meal_show', { p_day: day(0), p_meal: 'lunch', p_items: RICE, p_show_kcal: false, p_viewers: [ben.id] }],
+        ['meal_show_auto', { p_day: day(0), p_meal: 'lunch', p_items: RICE }],
+        ['meal_update', { p_ref: 'ab'.repeat(16), p_items: RICE }],
+        ['meal_stop', { p_ref: 'ab'.repeat(16) }],
+        ['meal_stop_all', {}],
+        ['meal_settings_set', { p_settings: { kcal: true } }],
+        ['meal_audience_set', { p_viewers: [ben.id] }],
+        ['friend_prefs_set', { p_friend: ben.id, p_share_meals: null, p_see_meals: false }],
+      ] as const) {
+        const answer = await ana.rpc(fn, body);
+        expect(answer.code).toBe('PGRST202');
+        expect(answer.hint).toBeNull();
+        const args = Object.keys(body).sort().join(', ');
+        expect(answer.message).toBe(args ? `Could not find the function public.${fn}(${args}) in the schema cache` : `Could not find the function public.${fn} without parameters in the schema cache`);
+      }
+      const signup = await fetch(`${base}/auth/v1/signup`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: `probe-${Date.now()}@example.com`, password: 'secret123' }) }).then((r) => r.json());
+      const probe = await fetch(`${base}/rest/v1/rpc/meal_stop_all`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${signup.access_token}` }, body: '{}' });
+      expect(probe.status).toBe(404);
+      expect((await probe.json()).code).toBe('PGRST202');
+      expect(await ana.rpc('send_cheer', { p_to: ben.id, p_ref: `meal:${'cd'.repeat(16)}` })).toBe('invalid');
+      expect(await ana.rpc('send_cheer', { p_to: ben.id, p_ref: 'ab'.repeat(16) })).toBe('ok');
+      expect(await ana.rpc('send_cheer', { p_to: ben.id, p_ref: `day:${day(0)}` })).toBe('ok');
+      expect((await ben.rpc('friends_overview')).cheers).toHaveLength(2);
+      expect(await ana.rpc('friend_remove', { p_user: ben.id })).toBeNull();
+      expect(await ana.rpc('social_leave')).toBeNull();
+      expect((await ana.rpc('friends_overview')).me).toBeNull();
+    } finally {
+      expect(await meals(true)).toEqual({ on: true });
+    }
+    expect(Object.keys(await ben.rpc('friends_overview'))).toContain('feed');
   });
 });

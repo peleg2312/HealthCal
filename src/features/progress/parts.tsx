@@ -3,9 +3,9 @@ import { ChevronRight, Triangle } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { fonts, useLargeText, useTheme } from '@/theme';
+import { fonts, useLargeText, useTheme, useVeryLargeText } from '@/theme';
 import type { Direction } from '@/lib/insights';
-import { Button, Card, Chip, CupKey, PressableScale, Sheet, Text, useGrownText } from '@/ui';
+import { Button, Card, Chip, CupKey, PressableScale, Sheet, Text, useGrownText, useSegmentFit } from '@/ui';
 
 import type { RangeDays } from './useProgressData';
 
@@ -238,12 +238,24 @@ export function SegmentSwitch<T extends string>({
   const { colors } = useTheme();
   // At 320 px four tabs get about 70 px each: the labels step down so the selected (bold) one is never cut.
   const narrow = useWindowDimensions().width < 360;
-  // Above 115% text four labels no longer fit on one line: the tabs go two to a row, so none is cut.
-  // As soon as text grows at all, the app's size, the phone's or a reader's own text spacing (`useGrownText`),
-  // the tabs also go two to a row and a label wraps rather than be cut; at the designed size and spacing
-  // they stay one row of one-line labels, as before.
+  // As soon as text grows at all, the app's size, the phone's or a reader's own text spacing (`useGrownText`), a
+  // label wraps rather than be cut. Through the phone's common text steps (under `VERY_LARGE_TEXT`) the tabs keep one
+  // row while their labels, measured as drawn in bold, fit it, as the kit's Segmented does (`useSegmentFit`,
+  // `segmentLayout`): equal shares while the widest fits its share, else each as wide as its label; only where they
+  // do not fit one row do they go two to a row. With very large text they go two to a row, so none is cut. At the
+  // designed size and spacing they stay one row of one-line labels, as before.
   const grown = useGrownText();
-  const twoRows = (useLargeText() || grown) && options.length > 2;
+  const large = useLargeText();
+  const veryLarge = useVeryLargeText();
+  const pad = narrow ? 1 : 4;
+  const measured = grown && !veryLarge && options.length > 2;
+  const fit = useSegmentFit(
+    options.map((o) => o.label),
+    measured,
+    pad,
+  );
+  const layout = !(large || grown) || options.length <= 2 ? 'equal' : measured ? fit.layout : 'wrap';
+  const twoRows = layout === 'wrap';
   return (
     <View accessibilityRole="tablist" style={{ flexDirection: 'row', flexWrap: twoRows ? 'wrap' : 'nowrap', borderBottomWidth: 1, borderBottomColor: colors.border }}>
       {options.map((o) => {
@@ -260,7 +272,10 @@ export function SegmentSwitch<T extends string>({
             // react-native-web reads the aria prop, not accessibilityState.
             {...({ 'aria-selected': active } as object)}
             accessibilityLabel={o.label}
-            style={[twoRows ? { width: '50%' } : { flex: 1 }, { minWidth: 0, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: narrow ? 1 : 4 }]}>
+            style={[
+              twoRows ? { width: '50%' } : layout === 'row' ? { flexGrow: 1, flexShrink: 0, flexBasis: 'auto' } : { flex: 1 },
+              { minWidth: 0, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: pad },
+            ]}>
             <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={grown ? undefined : 1} align="center" style={{ fontSize: narrow ? 13 : 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
               {o.label}
             </Text>
@@ -268,6 +283,7 @@ export function SegmentSwitch<T extends string>({
           </PressableScale>
         );
       })}
+      {measured ? fit.probes({ fontSize: narrow ? 13 : 14.5, lineHeight: 20, fontFamily: fonts.bold }) : null}
     </View>
   );
 }

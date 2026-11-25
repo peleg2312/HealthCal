@@ -12,7 +12,7 @@ import { DEFAULT_SHARING } from './summary';
  * Turning friends on: the name friends will see (prefilled from the profile),
  * what is shared, and one primary action pinned in the footer. Friends see your initials.
  */
-export function SetupForm({ header, defaultName, onDone }: { header: React.ReactNode; defaultName: string; onDone: () => void }) {
+export function SetupForm({ header, defaultName, onDone, meals = true }: { header: React.ReactNode; defaultName: string; onDone: () => void; meals?: boolean }) {
   const { spacing } = useTheme();
   const [name, setName] = useState(defaultName);
   const [sharing, setSharing] = useState<SocialSharing>(DEFAULT_SHARING);
@@ -53,7 +53,7 @@ export function SetupForm({ header, defaultName, onDone }: { header: React.React
       <Card testID="friends-setup">
         <View style={{ gap: spacing.xl }}>
           <NameField testID="friends-setup-name" value={name} onChange={setName} />
-          <SharingSwitches sharing={sharing} onChange={(key, on) => setSharing((s) => ({ ...s, [key]: on }))} />
+          <SharingSwitches sharing={sharing} meals={meals} onChange={(key, on) => setSharing((s) => ({ ...s, [key]: on }))} />
         </View>
       </Card>
     </Screen>

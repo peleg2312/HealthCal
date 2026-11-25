@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ANDROID_TARGET, ariaFromState, fixedSize, NO_MINUS, numberTextProblem, numberTextValue, pressesOnSpace, rovingIndex, rowStacks, scrubKey, slopToReach, spokenFieldName, stepperKey, wantsAndroidTarget, webAutoComplete } from './controlRules';
+import { ANDROID_TARGET, ariaFromState, fixedSize, NO_MINUS, numberTextProblem, numberTextValue, pressesOnSpace, rovingIndex, rowStacks, scrubKey, SEGMENT_GAP, SEGMENT_SLACK, segmentLayout, slopToReach, spokenFieldName, stepperKey, wantsAndroidTarget, webAutoComplete } from './controlRules';
 
 describe('slopToReach (48 dp on Android)', () => {
   it('grows a 44 px cup to 48 on both axes', () => {
@@ -145,6 +145,37 @@ describe('rowStacks (a list row at large text)', () => {
   });
   it('waits for the row to be measured', () => {
     expect(rowStacks({ rowWidth: 0, sideWidth: 0, growth: 2 })).toBe(false);
+  });
+});
+
+describe('segmentLayout (a row of segments with text grown)', () => {
+  it('draws the designed shape until every label and the row are measured', () => {
+    expect(segmentLayout([], 340, 4)).toBe('equal');
+    expect(segmentLayout([80, 0, 40, 50], 340, 4)).toBe('equal');
+    expect(segmentLayout([80, 90, 40, 50], 0, 4)).toBe('equal');
+  });
+  it('keeps equal shares while the widest label fits its share', () => {
+    // Goals' "Lose | Maintain | Gain" at 115% on a 341 px row: 113 px shares.
+    expect(segmentLayout([40, 78, 38], 341, 4)).toBe('equal');
+    // The share is exactly the widest label, its slack and its room.
+    expect(segmentLayout([100 - SEGMENT_SLACK - 8, 50], 200, 4)).toBe('equal');
+    expect(segmentLayout([100 - SEGMENT_SLACK - 7, 50], 200, 4)).toBe('row');
+  });
+  it('keeps one row of label-wide segments while the labels fit side by side (Progress at 130% on 381 dp)', () => {
+    expect(segmentLayout([84, 82, 46, 56], 341, 4)).toBe('row');
+  });
+  it('keeps 8 px between two labels where a segment has less side room (Progress at 320 px: 1 px each side)', () => {
+    // At 115% on 320: "Overview" 65 px in a 70 px share would leave under 8 px to "Nutrition".
+    expect(segmentLayout([65, 60, 35, 44], 280, 1)).toBe('row');
+    expect(segmentLayout([70 - SEGMENT_SLACK - SEGMENT_GAP, 60, 35, 44], 280, 1)).toBe('equal');
+  });
+  it('goes to a second row only where the labels do not fit one row', () => {
+    expect(segmentLayout([120, 118, 70, 84], 341, 4)).toBe('wrap');
+    // One pixel of slack per label: labels that would fit only by a fraction of a pixel wrap.
+    const four = [80, 80, 80, 80];
+    expect(segmentLayout(four, 4 * (80 + SEGMENT_SLACK + 8), 4)).toBe('equal');
+    expect(segmentLayout([80, 80, 80, 90], 4 * (80 + SEGMENT_SLACK + 8) + 10 - 1, 4)).toBe('wrap');
+    expect(segmentLayout([80, 80, 80, 90], 4 * (80 + SEGMENT_SLACK + 8) + 10, 4)).toBe('row');
   });
 });
 

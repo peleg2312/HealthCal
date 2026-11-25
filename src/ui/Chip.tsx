@@ -1,10 +1,11 @@
+import { useIsFocused } from 'expo-router';
 import { ChevronDown } from 'lucide-react-native';
-import React from 'react';
-import { Platform, ScrollView, View, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useState } from 'react';
+import { Platform, ScrollView, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 
-import { fonts, useTheme } from '@/theme';
+import { fonts, useTheme, useVeryLargeText } from '@/theme';
 
-import { rovingIndex } from './controlRules';
+import { rovingIndex, segmentLayout } from './controlRules';
 import { DECORATIVE } from './decorative';
 import { PressableScale } from './Pressable';
 import { Text, useGrownText } from './Text';
@@ -107,9 +108,13 @@ export function ChipWrap({ children, style }: { children: React.ReactNode; style
  * choice and focus along the row (Home and End to its ends), and Space or Enter
  * picks the focused one.
  *
- * At large text (`useGrownText`) no label is cut: each segment is as wide as its label, the extra room is
- * shared, and segments that do not fit go on to a second row (a label wider than the whole row wraps at its
- * spaces). At the designed size the segments share the row equally on one line, as always.
+ * With text grown (`useGrownText`: the app's size, the phone's, or a reader's own text spacing) no label is cut,
+ * and the row keeps one line while its labels fit it: through the phone's common text steps (under
+ * `VERY_LARGE_TEXT`) each label is measured as drawn, in its bold (selected) weight, and the row keeps equal shares
+ * while the widest fits its share, else segments as wide as their labels with the room left shared, and only where
+ * they do not fit one row do they go on to a second (`segmentLayout` in ./controlRules). With very large text the
+ * segments wrap as soon as text has grown, each as wide as its label (a label wider than the whole row wraps at
+ * its spaces). At the designed size the segments share the row equally on one line, as always.
  */
 export function Segmented<T extends string>({
   options,
@@ -136,12 +141,19 @@ export function Segmented<T extends string>({
   const current = options.findIndex((o) => o.value === value);
   const web = Platform.OS === 'web';
   const large = useGrownText();
+  // Through the common text steps the labels and the row are measured as drawn (`useSegmentFit`), and the row
+  // wraps only where they do not fit one line; with very large text it wraps as soon as text has grown.
+  const veryLarge = useVeryLargeText();
+  const measured = large && !veryLarge;
+  const fit = useSegmentFit(options.map((o) => o.label), measured);
+  const layout = !large ? 'equal' : measured ? fit.layout : 'wrap';
+  const wrap = layout === 'wrap';
   return (
     <View
       accessibilityRole={radio ? 'radiogroup' : 'tablist'}
       {...(web ? { role } : null)}
       accessibilityLabel={accessibilityLabel}
-      style={[{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border }, large ? { flexWrap: 'wrap' } : null, style]}>
+      style={[{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border }, wrap ? { flexWrap: 'wrap' } : null, style]}>
       {options.map((o, i) => {
         const active = o.value === value;
         return (
@@ -171,7 +183,11 @@ export function Segmented<T extends string>({
               : null)}
             style={[
               { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-              large ? { flexGrow: 1, flexShrink: 0, flexBasis: 'auto', maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 4 } : { flex: 1, paddingHorizontal: 4 },
+              wrap
+                ? { flexGrow: 1, flexShrink: 0, flexBasis: 'auto', maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 4 }
+                : layout === 'row'
+                  ? { flexGrow: 1, flexShrink: 0, flexBasis: 'auto', paddingHorizontal: SEGMENT_PAD }
+                  : { flex: 1, paddingHorizontal: SEGMENT_PAD },
             ]}>
             <Text
               variant="label"
@@ -184,8 +200,53 @@ export function Segmented<T extends string>({
           </PressableScale>
         );
       })}
+      {/* After the segments, so the arrow keys' `children[next]` still finds them. */}
+      {measured ? fit.probes(SEGMENT_LABEL_MEASURE) : null}
     </View>
   );
+}
+
+/** A segment's side room on each side, at the designed size and while its row keeps one line. */
+const SEGMENT_PAD = 4;
+/** A label as drawn in its wider weight, the selected one's bold. */
+const SEGMENT_LABEL_MEASURE = { fontSize: 14.5, lineHeight: 20, fontFamily: fonts.bold };
+
+/**
+ * A row of segments measured as drawn, for `segmentLayout` (./controlRules): each label drawn unseen on one line in
+ * `labelStyle` at its natural width, and the row's own width read by a probe that fills it. Nothing here is seen,
+ * read out or touched, and nothing widens the page. On the web a view laid out while its screen was hidden is no
+ * longer reported (the text size changed on Profile, over a tab), so the probes mount again, and measure again,
+ * each time their screen comes into focus. Used by the kit's `Segmented` and Progress's section tabs.
+ */
+export function useSegmentFit(labels: string[], measuring: boolean, pad = SEGMENT_PAD) {
+  const focusKey = useIsFocused() ? 'shown' : 'away';
+  const [rowW, setRowW] = useState(0);
+  const [widths, setWidths] = useState<Record<string, number>>({});
+  const layout = measuring ? segmentLayout(labels.map((l) => widths[l] ?? 0), rowW, pad) : 'equal';
+  // A hidden screen may report nothing or 0: only a real size is kept.
+  const onRow = (e: LayoutChangeEvent) => {
+    const w = Math.floor(e.nativeEvent.layout.width);
+    if (w > 0) setRowW(w);
+  };
+  const onLabel = (label: string) => (e: LayoutChangeEvent) => {
+    const w = Math.ceil(e.nativeEvent.layout.width);
+    if (w > 0) setWidths((was) => (was[label] === w ? was : { ...was, [label]: w }));
+  };
+  const probes = (labelStyle: object) => [
+    <View key={`segment-row-${focusKey}`} pointerEvents="none" {...DECORATIVE} onLayout={onRow} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} />,
+    <View key={`segment-words-${focusKey}`} pointerEvents="none" {...DECORATIVE} style={{ position: 'absolute', left: 0, top: 0, width: 0, height: 0, overflow: 'hidden', opacity: 0 }}>
+      <View style={{ width: 4000, flexDirection: 'row', alignItems: 'flex-start' }}>
+        {labels.map((l) => (
+          <View key={l} onLayout={onLabel(l)} style={{ flexDirection: 'row' }}>
+            <Text variant="label" numberOfLines={1} style={labelStyle}>
+              {l}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>,
+  ];
+  return { layout, probes };
 }
 
 /** The selected segment's level line, inset 18% each side of the label's cell. */

@@ -2692,6 +2692,11 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   // question closed by its scrim leaves no entry behind (the next Back leaves the screen). With no backend each screen's
   // own refresh empties the friends store, so the store is set again after each move (window.__healthcalFriends, a
   // test-hook build only), and nothing is sent.
+  // First, the sheet pair: one tap closes sheet A and opens sheet B (the case src/ui/sheetHistory.ts guards, which
+  // Friends' two pairs tested until their questions moved onto screens). On a past day the + sheet's "Weigh in" closes
+  // the + sheet and opens Weight with its weigh-in sheet for that day (`/weight?date=`): A's own step back must not
+  // close B, the person's Back then closes B on the same address, and a B closed by its scrim leaves no entry behind
+  // (one Back leaves Weight for the diary).
   {
     const { buildSeed } = await import(require('url').pathToFileURL(require.resolve('./seed.mjs')).href);
     const seed = buildSeed({ onboarded: true, theme: 'dark' });
@@ -2733,6 +2738,44 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
         week,
       );
     };
+    {
+      const yd = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1);
+      const yesterday = `${yd.getFullYear()}-${String(yd.getMonth() + 1).padStart(2, '0')}-${String(yd.getDate()).padStart(2, '0')}`;
+      const diaryAt = `/diary?date=${yesterday}`;
+      const weightAt = `/weight?date=${yesterday}`;
+      const dialogs = () => sp.evaluate(() => document.querySelectorAll('[role="dialog"]').length);
+      // The + sheet over yesterday's diary, then its "Weigh in", past each sheet's own wait before it adds its entry.
+      const pair = async () => {
+        await sp.goto(`${BASE}${diaryAt}`, { waitUntil: 'networkidle' });
+        await sp.getByTestId('meal-card-breakfast').first().waitFor({ timeout: 20000 });
+        await stap('tab-add');
+        const plus = await sp.getByTestId('quick-weight').first().waitFor({ timeout: 10000 }).then(() => true, () => false);
+        await sp.waitForTimeout(400);
+        await stap('quick-weight');
+        await sp.getByTestId('weight-save').first().waitFor({ timeout: 10000 }).catch(() => {});
+        await sp.waitForTimeout(700);
+        return plus;
+      };
+      const plus = await pair();
+      const at = await where();
+      const day = (await sp.getByTestId('weight-date-label').first().textContent().catch(() => '')) || '';
+      const weighIn = (await shown('weight-save')) && !(await shown('quick-weight')) && (await dialogs()) === 1;
+      check('sheet pair: on a past day one tap on the + sheet\'s "Weigh in" closes it and opens the weigh-in sheet for that day, which stays open', plus && weighIn && at === weightAt && /yesterday/i.test(day), `${at}, + sheet ${plus}, weigh-in ${weighIn}, day "${day}"`);
+      await sp.goBack();
+      await sp.waitForTimeout(500);
+      check("sheet pair: the browser's Back closes the weigh-in sheet, the address unchanged and Weight as it was", !(await shown('weight-save')) && (await where()) === weightAt && (await shown('weight-screen')) && (await dialogs()) === 0, `${await where()}, sheet ${await shown('weight-save')}`);
+      await sp.goBack();
+      await sp.waitForTimeout(600);
+      check('sheet pair: neither sheet left an entry behind: the next Back leaves Weight for the diary', (await where()) === diaryAt && !(await shown('quick-weight')), await where());
+      await pair();
+      // The scrim, above the weigh-in sheet.
+      await sp.touchscreen.tap(180, 40);
+      await sp.waitForTimeout(500);
+      check('sheet pair: the scrim closes the weigh-in sheet, the address unchanged', !(await shown('weight-save')) && (await where()) === weightAt, await where());
+      await sp.goBack();
+      await sp.waitForTimeout(600);
+      check('sheet pair: a sheet closed by its scrim leaves no entry behind: one Back leaves Weight for the diary', (await where()) === diaryAt && (await dialogs()) === 0, await where());
+    }
     await sp.goto(`${BASE}/`, { waitUntil: 'networkidle' });
     await sp.getByTestId('today-friends').first().waitFor({ timeout: 20000 });
     await stap('today-friends');

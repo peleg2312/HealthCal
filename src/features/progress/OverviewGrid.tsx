@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
+import { SizeProbe, useMeasureKey } from '@/features/today/MeasureWidth';
 import { hoursFigure } from '@/features/trackers/helpers';
 import { formatNumber, formatVolume, weightUnit, weightValue } from '@/lib/units';
-import { useTheme } from '@/theme';
+import { useTheme, useVeryLargeText } from '@/theme';
 import type { TrendPoint } from '@/lib/trend';
-import { Card } from '@/ui';
+import { Card, useGrownText } from '@/ui';
 
 import { changeDirection, changeWords } from './change';
+import { keepsShape, tileRoom } from './grownFit';
 import { TrendLegend } from './parts';
 
 import { weeklyRateText } from './goalDate';
@@ -31,6 +33,10 @@ function avgTrend(trend: TrendPoint[], start: string, end: string): number | nul
  * words is read out with the tile, and every detail is one tap away (Nutrition, Body, Habits).
  * The mark is a triangle only for a change worth calling, by each measure's own rule (`change.ts`:
  * 100 kcal and 5% for calories, ...), else a dash; the spoken words always say the size.
+ *
+ * Two tiles a row, as designed, through the phone's common text steps while every tile's words, measured as drawn two
+ * a row (its title and its number on one line each, its caption in at most three lines with no word wider than the
+ * tile), fit (`./grownFit`); one a row where one does not, and always with very large text.
  */
 export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: number; onOpen: (s: ProgressSegment) => void }) {
   const { colors, spacing } = useTheme();
@@ -64,11 +70,27 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
   const adaptive = d.model.usingAdaptive;
   const waterShare = (x: PeriodSummary['water']) => (x && x.daysTracked > 0 ? x.daysAtGoal / x.daysTracked : null);
 
+  // Through the common text steps (text grown, under very large text) each tile measures its words as drawn two a
+  // row and says whether they fit; one tile that does not puts every tile one a row. With very large text, one a row.
+  const grown = useGrownText();
+  const veryLarge = useVeryLargeText();
+  const measuring = grown && !veryLarge;
+  const measureKey = useMeasureKey();
+  const [cardInner, setCardInner] = useState(0);
+  const [fits, setFits] = useState<Record<string, boolean | null>>({});
+  const room = tileRoom(cardInner, spacing.lg);
+  const oneColumn = veryLarge || (measuring && !keepsShape(Object.values(fits)));
+  const fitFor = (id: string) => ({
+    oneColumn,
+    probe: measuring ? { room, key: measureKey, onFit: (f: boolean | null) => setFits((was) => (was[id] === f ? was : { ...was, [id]: f })) } : undefined,
+  });
+
   return (
     // One card divided by hairlines, two columns (the designer's 2 x 4 grid).
     <Card padding={0} testID="progress-overview-grid" style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
       <ProgressTile
         testID="progress-tile-calories"
+        {...fitFor('progress-tile-calories')}
         index={0}
         borderRight
         title="Calories"
@@ -86,6 +108,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
       />
       <ProgressTile
         testID="progress-tile-weight"
+        {...fitFor('progress-tile-weight')}
         index={1}
         title="Weight trend"
         color={colors.weight}
@@ -99,6 +122,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
       />
       <ProgressTile
         testID="progress-tile-protein"
+        {...fitFor('progress-tile-protein')}
         index={2}
         borderRight
         borderTop
@@ -116,6 +140,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
       />
       <ProgressTile
         testID="progress-tile-expenditure"
+        {...fitFor('progress-tile-expenditure')}
         index={3}
         borderTop
         title="You burn"
@@ -140,6 +165,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
       />
       <ProgressTile
         testID="progress-tile-water"
+        {...fitFor('progress-tile-water')}
         index={4}
         borderRight
         borderTop
@@ -157,6 +183,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
       />
       <ProgressTile
         testID="progress-tile-activity"
+        {...fitFor('progress-tile-activity')}
         index={5}
         borderTop
         title="Activity"
@@ -178,6 +205,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
       />
       <ProgressTile
         testID="progress-tile-sleep"
+        {...fitFor('progress-tile-sleep')}
         index={6}
         borderRight
         borderTop
@@ -195,6 +223,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
       />
       <ProgressTile
         testID="progress-tile-consistency"
+        {...fitFor('progress-tile-consistency')}
         index={7}
         borderTop
         title="Consistency"
@@ -213,6 +242,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
           <TrendLegend period={period} />
         </View>
       ) : null}
+      {measuring ? <SizeProbe key={`overview-${measureKey}`} onSize={(w) => (w > 0 ? setCardInner(w) : undefined)} /> : null}
     </Card>
   );
 }

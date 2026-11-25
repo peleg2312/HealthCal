@@ -8,7 +8,10 @@
  * clock orders the pull cursor, and every row belongs to exactly one user.
  * The SQL itself is tested separately by scripts/dev/test-sql.sh.
  *
- *   node scripts/dev/mock-backend.cjs [--port=54321] [--static=<dir> --static-port=8090] [--plans=on]
+ *   node scripts/dev/mock-backend.cjs [--port=54321] [--static=<dir> --static-port=8090] [--plans=on] [--no-meals]
+ *
+ * --no-meals answers as the live server did before supabase/migrations/20261201000000_friends_meals.sql
+ * was applied (see "a server without meals" below); a test can also switch with POST /__meals { on }.
  *
  * Plans are off unless --plans=on or a test turns them on (POST /__billing { plansOn: true }); see
  * "plans and payments (stand-in)" below for the billing function, its pages and test hooks.
@@ -310,8 +313,50 @@ function forgetSocial(uid) {
   state.declines = state.declines.filter((d) => d.decliner !== uid && d.asker !== uid);
   state.socialLimits.delete(uid);
 }
+// ------------------------------------------------------------- a server without meals
+// --no-meals, or POST /__meals { on: false }: the server as it was before 20261201000000_friends_meals.sql, so a
+// test can run the new app against it (the app update can reach phones before the migration is applied). The
+// meal functions do not exist, so PostgREST answers 404 with PGRST202, in its own words; friends_overview has
+// no feed, my_meals, meal_settings, meals_allowed, audience, share_meals or see_meals (as in
+// 20261116000000_friends_hardening.sql); send_cheer knows only workouts and days, so 'meal:<ref>' is 'invalid'
+// (its first check, before the cheers table's own check could refuse it); friend_remove and social_leave touch
+// no meal. Meals already held stay in memory, untouched, as the tables would wait for the migration.
+state.mealsOn = !('no-meals' in flags);
+const MEAL_FUNCTIONS = ['meal_show', 'meal_show_auto', 'meal_update', 'meal_stop', 'meal_stop_all', 'meal_settings_set', 'meal_audience_set', 'friend_prefs_set'];
+/** PostgREST 12's answer to a call of a function its schema cache does not hold (the argument names sorted). */
+function missingFunction(fn, body) {
+  const args = Object.keys(body && typeof body === 'object' && !Array.isArray(body) ? body : {}).sort();
+  const named = `public.${fn}`;
+  const sig = args.length ? `${named}(${args.join(', ')})` : `${named} without parameters`;
+  const searched = args.length ? `${named} with parameters ${args.join(', ')}` : `${named} without parameters`;
+  return {
+    __error: {
+      status: 404,
+      body: { code: 'PGRST202', details: `Searched for the function ${searched} or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.`, hint: null, message: `Could not find the function ${sig} in the schema cache` },
+    },
+  };
+}
+/** The cheers a person received from friends, newest first, as friends_overview lists them. */
+function received(me) {
+  const card = (id) => state.social.get(id);
+  return state.cheers
+    .filter((c) => c.to_user === me && areFriends(me, c.from_user) && card(c.from_user))
+    .map((c) => ({ from_user: c.from_user, display_name: card(c.from_user).display_name, avatar: card(c.from_user).avatar, ref: c.ref, created_at: c.created_at }))
+    .reverse();
+}
+/** friends_overview as 20261116000000_friends_hardening.sql answers it: the new answer without its meal parts. */
+function overviewWithoutMeals(o) {
+  const me = o.me ? { code: o.me.code, display_name: o.me.display_name, avatar: o.me.avatar, sharing: o.me.sharing, share_key: o.me.share_key } : null;
+  const friends = o.friends.map(({ share_meals, see_meals, ...f }) => f);
+  return { me, friends, incoming: o.incoming, outgoing: o.outgoing, cheers: o.cheers };
+}
+
 /** Returns the function's JSON answer, or undefined when the route is not a friends function. */
 function friendsRpc(route, me, body) {
+  if (!state.mealsOn) {
+    const fn = route.startsWith('POST /rest/v1/rpc/') ? route.slice('POST /rest/v1/rpc/'.length) : '';
+    if (MEAL_FUNCTIONS.includes(fn)) return missingFunction(fn, body);
+  }
   const now = () => new Date().toISOString();
   const card = (p) => ({ user_id: p.user_id, display_name: p.display_name, avatar: p.avatar });
   switch (route) {
@@ -407,12 +452,12 @@ function friendsRpc(route, me, body) {
       );
       state.cheers = state.cheers.filter((c) => !((c.from_user === me && c.to_user === other) || (c.from_user === other && c.to_user === me)));
       // From this moment neither sees the other's meals.
-      if (other && other !== me) forgetMealsBetween(me, other);
+      if (other && other !== me && state.mealsOn) forgetMealsBetween(me, other);
       return null;
     }
     case 'POST /rest/v1/rpc/send_cheer': {
       const ref = String(body.p_ref || '').trim();
-      if (!isCheerRef(ref) && !/^meal:[0-9a-f]{32}$/.test(ref)) return 'invalid';
+      if (!isCheerRef(ref) && !(state.mealsOn && /^meal:[0-9a-f]{32}$/.test(ref))) return 'invalid';
       if (!areFriends(me, body.p_to)) return 'not_friends';
       // A real day of the last two weeks, a workout the friend publishes and shares now, or a meal they show the caller now.
       if (ref.startsWith('day:')) {
@@ -428,8 +473,10 @@ function friendsRpc(route, me, body) {
       return 'ok';
     }
     case 'POST /rest/v1/rpc/friends_overview': {
-      purgeMeals();
-      dropUnseenMeals([me]);
+      if (state.mealsOn) {
+        purgeMeals();
+        dropUnseenMeals([me]);
+      }
       const mine = state.social.get(me);
       const person = (id) => state.social.get(id);
       const cheeredByMe = (owner, ref) => state.cheers.some((c) => c.from_user === me && c.to_user === owner && c.ref === ref);
@@ -471,7 +518,7 @@ function friendsRpc(route, me, body) {
             .sort((a, b) => a.display_name.toLowerCase().localeCompare(b.display_name.toLowerCase())),
           cheers: state.cheers.filter((c) => c.to_user === me && c.ref === `meal:${m.ref}` && areFriends(me, c.from_user)).length,
         }));
-      return {
+      const answer = {
         // share_key only in the caller's own card.
         me: mine
           ? {
@@ -506,14 +553,21 @@ function friendsRpc(route, me, body) {
           .map((f) => ({ ...card(person(f.requester)), created_at: f.created_at })),
         // Pending, whether or not it was declined: the sender cannot tell.
         outgoing: state.friendships.filter((f) => f.requester === me && f.status === 'pending' && person(f.addressee)).map((f) => ({ ...card(person(f.addressee)), created_at: f.created_at })),
-        cheers: state.cheers
-          .filter((c) => c.to_user === me && areFriends(me, c.from_user) && person(c.from_user))
-          .map((c) => ({ from_user: c.from_user, display_name: person(c.from_user).display_name, avatar: person(c.from_user).avatar, ref: c.ref, created_at: c.created_at }))
-          .reverse(),
+        // Workout and day cheers only: all an app from before meals reads (it names any other ref "a workout of yours").
+        cheers: received(me).filter((c) => !c.ref.startsWith('meal:')),
+        // A shown meal's cheers, in the same shape, under a key such an app leaves alone.
+        meal_cheers: received(me).filter((c) => c.ref.startsWith('meal:')),
       };
+      return state.mealsOn ? answer : overviewWithoutMeals(answer);
     }
     case 'POST /rest/v1/rpc/social_leave':
-      leaveSocial(me);
+      if (state.mealsOn) leaveSocial(me);
+      else {
+        // As before meals: the card, every friendship and every cheer; nothing else.
+        state.cheers = state.cheers.filter((c) => c.from_user !== me && c.to_user !== me);
+        state.friendships = state.friendships.filter((f) => f.requester !== me && f.addressee !== me);
+        state.social.delete(me);
+      }
       return null;
     case 'POST /rest/v1/rpc/meal_show': {
       const mine = state.social.get(me);
@@ -972,6 +1026,8 @@ const api = http.createServer(async (req, res) => {
       mealAudience: Object.fromEntries([...state.mealAudience].map(([k, v]) => [k, [...v]])),
       friendPrefs: Object.fromEntries(state.friendPrefs),
       clockOffsetMs: state.clockOffsetMs,
+      // False while the stand-in answers as the server before meals (--no-meals, POST /__meals).
+      mealsOn: state.mealsOn,
       // Plans: the switches, each account's entitlement row (by email), the webhooks received, and the AI reports.
       billing: {
         plansOn: state.billing.plansOn,
@@ -1063,6 +1119,11 @@ const api = http.createServer(async (req, res) => {
     if (body.reset) state.clockOffsetMs = 0;
     if (typeof body.advanceMs === 'number' && Number.isFinite(body.advanceMs)) state.clockOffsetMs += body.advanceMs;
     return send(res, 200, { offsetMs: state.clockOffsetMs, now: new Date(nowMs()).toISOString() });
+  }
+  // Test hook: the server with or without meals ({ on }), as --no-meals starts it (see "a server without meals").
+  if (route === 'POST /__meals') {
+    if (typeof body.on === 'boolean') state.mealsOn = body.on;
+    return send(res, 200, { on: state.mealsOn });
   }
   // Test hook: Google on or off, and new accounts paused.
   if (route === 'POST /__google') {

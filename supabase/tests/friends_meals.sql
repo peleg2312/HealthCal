@@ -279,6 +279,8 @@ declare bad text;
 begin
   if public.send_cheer(pg_temp.kept('ana')::uuid, 'meal:' || pg_temp.kept('lunch')) <> 'ok' then raise exception 'cheering a meal'; end if;
   if public.send_cheer(pg_temp.kept('ana')::uuid, '  meal:' || pg_temp.kept('lunch') || ' ') <> 'ok' then raise exception 'cheering twice is harmless'; end if;
+  -- A day cheer beside it, so the overview below holds both kinds.
+  if public.send_cheer(pg_temp.kept('ana')::uuid, 'day:' || to_char(current_date, 'YYYY-MM-DD')) <> 'ok' then raise exception 'cheering a day'; end if;
   foreach bad in array array['meal:' || repeat('b', 32), 'meal:ABC', 'meal:' || upper(pg_temp.kept('lunch')), 'meal:'' or 1=1 --', 'meal:' || pg_temp.kept('lunch') || 'x'] loop
     if public.send_cheer(pg_temp.kept('ana')::uuid, bad) <> 'invalid' then raise exception 'cheer for % accepted', bad; end if;
   end loop;
@@ -290,7 +292,43 @@ declare o jsonb;
 begin
   o := public.friends_overview();
   if (o -> 'my_meals' -> 0 ->> 'cheers')::int <> 1 then raise exception 'cheer count: %', o -> 'my_meals'; end if;
-  if not (o -> 'cheers') @> jsonb_build_array(jsonb_build_object('display_name', 'Ben', 'ref', 'meal:' || pg_temp.kept('lunch'))) then raise exception 'cheers received: %', o -> 'cheers'; end if;
+  -- A meal's cheer comes under meal_cheers, never under cheers; a day's (or a workout's) under cheers only.
+  if ((o -> 'meal_cheers') @> jsonb_build_array(jsonb_build_object('display_name', 'Ben', 'ref', 'meal:' || pg_temp.kept('lunch')))) is not true then raise exception 'meal cheers received: %', o -> 'meal_cheers'; end if;
+  if ((o -> 'cheers') @> jsonb_build_array(jsonb_build_object('display_name', 'Ben', 'ref', 'day:' || to_char(current_date, 'YYYY-MM-DD')))) is not true then raise exception 'cheers received: %', o -> 'cheers'; end if;
+  if exists (select 1 from jsonb_array_elements(o -> 'cheers') x where x ->> 'ref' like 'meal:%') then raise exception 'a meal cheer under cheers: %', o -> 'cheers'; end if;
+  if exists (select 1 from jsonb_array_elements(o -> 'meal_cheers') x where x ->> 'ref' not like 'meal:%') then raise exception 'another cheer under meal_cheers: %', o -> 'meal_cheers'; end if;
+  if pg_temp.keys_of(o -> 'meal_cheers' -> 0) is distinct from pg_temp.keys_of(o -> 'cheers' -> 0) then raise exception 'meal cheers in another shape: %', o -> 'meal_cheers'; end if;
+end $$;
+
+-- An app from before meals reads the same overview (phones keep an older app for a while): every key its
+-- toOverview reads is there with the type it reads, and the meal parts are keys it leaves alone. A meal's
+-- cheer is under meal_cheers, a key it leaves alone, so it never names one "a workout of yours" (its name for
+-- a ref it does not know): every ref under cheers is a workout's or a day's.
+do $$
+declare o jsonb; x jsonb;
+begin
+  o := public.friends_overview();
+  if not pg_temp.keys_of(o) @> array['cheers', 'friends', 'incoming', 'me', 'outgoing'] then raise exception 'older app: overview keys %', pg_temp.keys_of(o); end if;
+  if not pg_temp.keys_of(o -> 'me') @> array['avatar', 'code', 'display_name', 'share_key', 'sharing']
+     or jsonb_typeof(o -> 'me' -> 'code') <> 'string' or jsonb_typeof(o -> 'me' -> 'share_key') <> 'string' or jsonb_typeof(o -> 'me' -> 'sharing') <> 'object' then
+    raise exception 'older app: own card %', pg_temp.keys_of(o -> 'me');
+  end if;
+  if jsonb_typeof(o -> 'incoming') <> 'array' or jsonb_typeof(o -> 'outgoing') <> 'array' or jsonb_array_length(o -> 'friends') = 0 or jsonb_array_length(o -> 'cheers') = 0 then
+    raise exception 'older app: lists %', o;
+  end if;
+  for x in select value from jsonb_array_elements(o -> 'friends') loop
+    if not pg_temp.keys_of(x) @> array['avatar', 'cheered', 'display_name', 'since', 'summary', 'summary_updated_at', 'user_id']
+       or jsonb_typeof(x -> 'user_id') <> 'string' or jsonb_typeof(x -> 'summary') <> 'object' or jsonb_typeof(x -> 'cheered') <> 'array' then
+      raise exception 'older app: friend %', pg_temp.keys_of(x);
+    end if;
+  end loop;
+  for x in select value from jsonb_array_elements(o -> 'cheers') loop
+    if not pg_temp.keys_of(x) @> array['avatar', 'created_at', 'display_name', 'from_user', 'ref'] or jsonb_typeof(x -> 'ref') <> 'string' then
+      raise exception 'older app: cheer %', pg_temp.keys_of(x);
+    end if;
+    if not (x ->> 'ref' ~ '^([0-9a-f]{32}|day:[0-9]{4}-[0-9]{2}-[0-9]{2})$') then raise exception 'older app: a cheer it cannot name: %', x ->> 'ref'; end if;
+  end loop;
+  if coalesce(jsonb_array_length(o -> 'meal_cheers'), 0) = 0 then raise exception 'older app: the meal cheer should wait under meal_cheers'; end if;
 end $$;
 
 -- ------------------------------------------- showing again, calories, more friends
@@ -427,7 +465,7 @@ begin
   if public.meal_update(pg_temp.kept('dinner'), '[{"name": ""}]') <> 'stopped' then raise exception 'an emptied meal should stop'; end if;
   o := public.friends_overview();
   if exists (select 1 from jsonb_array_elements(o -> 'my_meals') x where x ->> 'meal' = 'dinner') then raise exception 'emptied dinner still shown'; end if;
-  if exists (select 1 from jsonb_array_elements(o -> 'cheers') x where x ->> 'ref' = 'meal:' || pg_temp.kept('dinner')) then raise exception 'cheers of a stopped meal remain'; end if;
+  if exists (select 1 from jsonb_array_elements((o -> 'cheers') || (o -> 'meal_cheers')) x where x ->> 'ref' = 'meal:' || pg_temp.kept('dinner')) then raise exception 'cheers of a stopped meal remain'; end if;
   if public.meal_update(pg_temp.kept('dinner'), '[{"name": "Pasta", "portion": "1 plate", "source": "ai"}]') <> 'gone' then raise exception 'an edit brought a stopped meal back'; end if;
 end $$;
 

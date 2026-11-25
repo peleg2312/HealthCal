@@ -7,7 +7,7 @@ import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
 import { ALSO_IN_WATER, waterFor } from '@/features/drinks/rules';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
 import { MealMenuJournalRow } from '@/features/journal/JournalRows';
-import { ShowToFriendsRow, useShowMealStep } from '@/features/friends/ShowMeal';
+import { MealShownCaption, ShowToFriendsRow, useShowMealStep, useShownMeal } from '@/features/friends/ShowMeal';
 import { figureWords, otherFigure, setCalorieFigure, useCalorieFigure } from '@/features/today/calorieFigure';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { addDays, formatDayLabel } from '@/lib/dates';
@@ -374,6 +374,8 @@ export function MealCard({
   const total = sum.kcal;
   // Its protein, carbs and fat under its name ("P 31 g · C 52 g · F 18 g"), none for calories typed in alone.
   const macros = mealMacroLine(sum);
+  // While the meal is shown to friends, who sees it takes the macros line's place.
+  const shownToFriends = useShownMeal(meal, date) !== null;
   const add = () => router.push(href('/food/search', { meal, date }) as never);
   // A removed row fades where it is, then folds away while the rows below close the space.
   const rows = useLeavingRows(entries);
@@ -437,11 +439,18 @@ export function MealCard({
               </AnimatedNumber>
             ) : null}
           </View>
-          {entries.length > 0 && macros ? (
-            // Plain words, never in the macros' colours (data colours are fills and keys only); heard in full.
-            <Text variant="caption" color="textSecondary" testID={`meal-macros-${meal}`} {...figure(mealMacroSpoken(sum))}>
-              {macros}
-            </Text>
+          {entries.length > 0 ? (
+            // Under the name one caption line: who sees the meal while it is shown to friends ("Shown to Maya and Sam",
+            // `MealShownCaption`, the approved mock's line, read after the total as part of the card), else its macros.
+            // One line either way, so a shown meal keeps the header's height and Breakfast and Lunch stay whole at 360 x 740.
+            shownToFriends ? (
+              <MealShownCaption meal={meal} date={date} />
+            ) : macros ? (
+              // Plain words, never in the macros' colours (data colours are fills and keys only); heard in full.
+              <Text variant="caption" color="textSecondary" testID={`meal-macros-${meal}`} {...figure(mealMacroSpoken(sum))}>
+                {macros}
+              </Text>
+            ) : null
           ) : null}
         </View>
         {filled ? (

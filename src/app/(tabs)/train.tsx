@@ -9,22 +9,25 @@ import { BringIn } from '@/features/activity/BringIn';
 import { QuickStartTiles, SessionRow } from '@/features/activity/components';
 import { summariseWeek } from '@/features/activity/build';
 import { deleteActivity, openSession } from '@/features/activity/session';
+import { MeasureEach } from '@/features/activity/MeasureEach';
 import { RoutineCards, useRoutineTemplates } from '@/features/activity/RoutineCards';
 import { WeekCard } from '@/features/activity/WeekCard';
 import { historyDaySpoken, historyDayWord, historyWeekLabel, historyWeeks, WEEKS_PER_PAGE } from '@/features/activity/history';
 import { startRoutineDraft, type RoutineTemplate } from '@/features/activity/routines';
+import { ACTION_PAD_TIGHT, actionsLayout, weekRangeShort } from '@/features/activity/trainFit';
 import { draftHasContent, useStrengthDrafts } from '@/features/activity/strengthDraft';
 import { StepsLine } from '@/features/health-sync/ui/StepsLine';
 import { SyncedFromLine } from '@/features/health-sync/ui/SyncedFromLine';
+import { SizeProbe, useMeasureKey } from '@/features/today/MeasureWidth';
 import { isolateRtl } from '@/lib/bidi';
 import { addDays, formatDuration, formatShortDate, startOfWeek, weekdayShort } from '@/lib/dates';
 import { trainingOverview } from '@/lib/trainingLoad';
 import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
-import { useTextGrowth, useTheme } from '@/theme';
+import { useTextGrowth, useTheme, useVeryLargeText } from '@/theme';
 import type { ActivityEntry } from '@/types';
-import { Button, Card, Chip, ConfirmSheet, EmptyState, RestoreRow, Screen, SectionTitle, Text } from '@/ui';
+import { Button, BUTTON_ICON, Card, Chip, ConfirmSheet, EmptyState, RestoreRow, Screen, SectionTitle, Text, useGrownText } from '@/ui';
 
 const web = Platform.OS === 'web';
 
@@ -32,11 +35,31 @@ export default function TrainScreen() {
   const { colors, spacing } = useTheme();
   const grow = useTextGrowth();
   const narrow = useWindowDimensions().width < 360;
-  const actionStyle = narrow ? { flexGrow: 1, flexBasis: 'auto' as const, paddingHorizontal: 14 } : { flexGrow: 1, flexBasis: 150 * grow };
+  // Log activity and Workout: two equal halves as designed. With very large text each is at least 150 px per 100% of
+  // text, so they stack. Through the common steps (`fit`: the app's 115% and 130%, Android's 1.15 and 1.3) they keep
+  // the halves while each label, measured as drawn, fits its half; else each is as wide as its own words, then with
+  // the tighter side room it has under 360 px (`actionsLayout`), and the row wraps them only where the two, as drawn,
+  // still do not fit side by side.
+  const veryLarge = useVeryLargeText();
+  const fit = useGrownText() && !veryLarge;
+  const measureKey = useMeasureKey();
+  const [labelW, setLabelW] = useState<Record<string, number>>({});
+  const [actionsW, setActionsW] = useState(0);
+  const draft = useStrengthDrafts((s) => s.drafts.new);
+  const draftActive = draftHasContent(draft);
+  const workoutTitle = draftActive ? 'Resume' : 'Workout';
+  const shared = fit ? actionsLayout([labelW.log ?? 0, labelW[workoutTitle] ?? 0], BUTTON_ICON.lg, actionsW, spacing.md) : 'halves';
+  const actionStyle =
+    narrow || shared === 'tight'
+      ? { flexGrow: 1, flexBasis: 'auto' as const, paddingHorizontal: ACTION_PAD_TIGHT }
+      : veryLarge
+        ? { flexGrow: 1, flexBasis: 150 * grow }
+        : shared === 'own'
+          ? { flexGrow: 1, flexBasis: 'auto' as const }
+          : { flexGrow: 1, flexBasis: 150 };
   const profile = useProfile();
   const activities = useLive('activities');
   const recentIds = useStore((s) => s.recentActivityIds);
-  const draft = useStrengthDrafts((s) => s.drafts.new);
   const [pages, setPages] = useState(1);
   // Workouts removed while Train is in front: each keeps a Restore row above History (the second way back after
   // the toast's Undo) until it is restored or the person leaves the tab (Train stays mounted, so focus decides).
@@ -68,7 +91,6 @@ export default function TrainScreen() {
   }, [recentIds]);
 
   const visibleWeeks = history.slice(0, pages * WEEKS_PER_PAGE);
-  const draftActive = draftHasContent(draft);
   const routines = useRoutineTemplates();
   const [replace, setReplace] = useState<RoutineTemplate | null>(null);
 
@@ -80,8 +102,10 @@ export default function TrainScreen() {
   // Starting a routine never silently throws away a workout in progress.
   const startRoutine = (tpl: RoutineTemplate) => (draftActive ? setReplace(tpl) : begin(tpl));
 
+  // The header's overline says the week's dates in short ("Nov 23–29") where, with text grown through the common steps,
+  // "Week of Nov 23" measured as drawn does not fit its line beside the cups; very large text keeps its own wrap.
   return (
-    <Screen tabs testID="train-screen" header={<TabHeader tab="train" overline={`Week of ${formatShortDate(weekStart)}`} title="Train" />}>
+    <Screen tabs testID="train-screen" header={<TabHeader tab="train" overline={`Week of ${formatShortDate(weekStart)}`} overlineTight={fit ? weekRangeShort(weekStart) : undefined} title="Train" />}>
       {weekStart !== startOfWeek(t) ? (
         <View style={{ flexDirection: 'row' }}>
           <Chip testID="train-this-week" label="Back to this week" onPress={() => router.setParams({ week: undefined })} />
@@ -97,12 +121,26 @@ export default function TrainScreen() {
         current={weekStart === startOfWeek(t)}
       />
 
-      {/* Side by side when both labels fit (150 px each, more as text grows); stacked at large text rather than cut.
-          Under 360 px each is as wide as its own label with tighter side room, so the two still sit side by side
-          at 320 and both are in the first view at 320 x 640 (a label that does not fit wraps the pair, never cut).
-          Both are secondary, Log activity with the exercise colour on its edge: the tab bar's + is the screen's
-          one filled primary button. */}
+      {/* Side by side when both labels fit (150 px each as designed, measured with text grown); stacked with very
+          large text rather than cut. Under 360 px each is as wide as its own label with tighter side room, so the
+          two still sit side by side at 320 and both are in the first view at 320 x 640 (a label that does not fit
+          wraps the pair, never cut). Both are secondary, Log activity with the exercise colour on its edge: the tab
+          bar's + is the screen's one filled primary button. */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
+        {fit && !narrow ? (
+          <>
+            <SizeProbe key={`actions-${measureKey}`} onSize={(w) => setActionsW(Math.floor(w))} />
+            {/* The two labels as the large kit Button draws them (variant title). */}
+            <MeasureEach
+              key={`labels-${measureKey}-${workoutTitle}`}
+              onWidths={setLabelW}
+              items={[
+                { key: 'log', node: <Text variant="title">Log activity</Text> },
+                { key: workoutTitle, node: <Text variant="title">{workoutTitle}</Text> },
+              ]}
+            />
+          </>
+        ) : null}
         <Button
           testID="train-log-activity"
           title="Log activity"
@@ -114,7 +152,7 @@ export default function TrainScreen() {
         />
         <Button
           testID="train-start-workout"
-          title={draftActive ? 'Resume' : 'Workout'}
+          title={workoutTitle}
           variant="secondary"
           icon={draftActive ? <Timer size={18} color={colors.exercise} /> : <Dumbbell size={18} color={colors.text} />}
           onPress={() => router.push('/activity/strength')}

@@ -41,6 +41,9 @@ function strings(): string[] {
   out.push(W.friendsSince('Nov 2'), W.friendsSince(null), W.mealsTheyShow('Maya'), W.seesMyMealsTitle('Maya'), W.seesMyMealsLine('Maya'), W.theirMealsTitle('Maya'), W.removeNote('Maya'), W.addNote('Maya'));
   out.push(W.itemCaption({ portion: '1 bowl', kcal: 310, source: 'builtin' }, true), W.itemCaption({ portion: '1 bowl', kcal: 310, kcalLow: 250, source: 'ai' }, true), W.itemCaption({ portion: '1 bowl', source: 'builtin' }, false));
   out.push(W.friendSourceLabel('custom', 'Maya', 'Your food'), W.friendSourceLabel('builtin', 'Maya', 'Reference data'));
+  for (const meals of [true, false]) {
+    out.push(W.leaveNote(meals), W.leaveConfirm(meals), W.leftToast(meals), W.removeNote('Maya', meals), W.removeConfirm(meals), W.removedToast('Maya', meals), W.neverSharedLine(meals));
+  }
   return out;
 }
 
@@ -65,6 +68,17 @@ describe('the Friends words', () => {
     expect(W.showButton(['Maya', 'Sam'])).toContain('Maya');
     expect(W.showButton(['a', 'b', 'c'])).toBe('Show to 3 friends');
     expect(W.namesLine(['A', 'B', 'C', 'D', 'E'])).toMatch(/and 3 more$/);
+  });
+
+  it('leave meals out of every line where meals do not work for this person, and keep them where they do', () => {
+    const withMeals = [W.SCREEN_SUBTITLE, W.leaveNote(true), W.leaveConfirm(true), W.leftToast(true), W.removeNote('Maya', true), W.removeConfirm(true), W.removedToast('Maya', true), W.neverSharedLine(true)];
+    const without = [W.SCREEN_SUBTITLE_WORKOUTS, W.leaveNote(false), W.leaveConfirm(false), W.leftToast(false), W.removeNote('Maya', false), W.removeConfirm(false), W.removedToast('Maya', false), W.neverSharedLine(false)];
+    expect(withMeals.filter((s) => !/\bmeals?\b/i.test(s))).toEqual([]);
+    expect(without.filter((s) => /\bmeals?\b/i.test(s))).toEqual([]);
+    expect(W.SCREEN_SUBTITLE_WORKOUTS).toBe('Workouts and cheers');
+    expect(W.removeNote('Maya')).toBe(W.removeNote('Maya', true));
+    expect(W.leftToast(false)).toBe('Friends turned off. Your card, friendships and cheers were removed.');
+    expect(W.removedToast('Maya', false)).toBe('Maya is no longer a friend. Cheers between you were removed too.');
   });
 
   it('count days left from the clock, never below zero', () => {

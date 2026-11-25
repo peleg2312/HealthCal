@@ -18,6 +18,8 @@ import {
   myMealTitle,
   RECENT_WORKOUTS,
   REMOVE_FRIEND,
+  removeConfirm,
+  removedToast,
   removeNote,
   seesMyMealsLine,
   seesMyMealsTitle,
@@ -68,7 +70,8 @@ export default function FriendScreen() {
     }, []),
   );
 
-  const { me, friends, feed } = mealsOverview(overview);
+  // mealWords: meals are named only where they work for this person (never on a server without them, nor under 18).
+  const { me, friends, feed, mealWords } = mealsOverview(overview);
   const friend = friends.find((f) => f.userId === id) ?? null;
 
   if (!friend) {
@@ -92,7 +95,7 @@ export default function FriendScreen() {
   const current = isCurrentWeek(s, today);
   const since = friend.since ? formatShortDate(toISODate(new Date(friend.since))) : null;
   const mealsOn = !!me?.mealsAllowed;
-  const meals = mealsOn ? mealsOf(localFeed({ feed, today, seeMeals: !!me?.mealSettings.see, friends }), friend.userId) : [];
+  const theirMeals = mealsOn ? mealsOf(localFeed({ feed, today, seeMeals: !!me?.mealSettings.see, friends }), friend.userId) : [];
   const workouts = s.workouts ?? [];
   const dayCheer = dayRef(today);
 
@@ -107,7 +110,7 @@ export default function FriendScreen() {
   const remove = async () => {
     setConfirmRemove(false);
     const res = await removeFriend(friend.userId);
-    toast(res.ok ? `${name} is no longer a friend. Cheers and meals between you were removed too.` : res.message);
+    toast(res.ok ? removedToast(name, mealWords) : res.message);
     if (res.ok) goBack('/friends');
   };
 
@@ -137,12 +140,12 @@ export default function FriendScreen() {
         </Card>
       )}
 
-      {meals.length ? (
+      {theirMeals.length ? (
         <View style={{ gap: spacing.md }}>
-          <SectionTitle title={mealsTheyShow(name)} action={String(meals.length)} />
+          <SectionTitle title={mealsTheyShow(name)} action={String(theirMeals.length)} />
           <Card padding={0} testID="friend-meals">
             <View {...listRole}>
-              {meals.map((m, i) => (
+              {theirMeals.map((m, i) => (
                 <View key={feedKey(m)} {...itemRole}>
                   {i > 0 ? <Divider inset={spacing.lg} /> : null}
                   <ListRow
@@ -209,7 +212,7 @@ export default function FriendScreen() {
       <View style={{ gap: spacing.sm }}>
         <Button testID="friends-remove" title={REMOVE_FRIEND} variant="danger" onPress={() => setConfirmRemove(true)} />
         <Text variant="caption" color="textSecondary" style={{ textAlign: 'center' }}>
-          {removeNote(name)}
+          {removeNote(name, mealWords)}
         </Text>
       </View>
 
@@ -225,7 +228,7 @@ export default function FriendScreen() {
       <ConfirmSheet
         visible={confirmRemove}
         title={`Remove ${name}?`}
-        message="You stop seeing each other's week and meals, and the cheers between you are removed. They are not told, and you can add each other again with a code."
+        message={removeConfirm(mealWords)}
         confirmLabel={REMOVE_FRIEND}
         destructive
         onConfirm={() => void remove()}

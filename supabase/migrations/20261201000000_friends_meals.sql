@@ -870,7 +870,10 @@ $$;
 --   feed: what friends chose to show the caller, newest first, at most 100: the meals they
 --     may see now (social_visible_meals) and friends' shared workouts dated in the last
 --     7 days. Never who else sees a meal, who else cheered it, or when it was shown;
---   my_meals: the caller's meals showing now, with viewers and a cheer count.
+--   my_meals: the caller's meals showing now, with viewers and a cheer count;
+--   meal_cheers: the cheers received for the caller's shown meals ('meal:<ref>'), in the same
+--     shape as cheers. `cheers` keeps the workout and day cheers only, the refs an app from
+--     before meals knows (it would name any other "a workout of yours"); this app reads both.
 -- Volatile, because a read also lets expired meals leave the server.
 create or replace function public.friends_overview()
 returns jsonb
@@ -939,6 +942,14 @@ begin
       from public.cheers c
       join public.social_profiles p on p.user_id = c.from_user
       where c.to_user = me and c.created_at > now() - interval '14 days' and public.social_are_friends(me, c.from_user)
+        and c.ref not like 'meal:%'
+    ), '[]'::jsonb),
+    'meal_cheers', coalesce((
+      select jsonb_agg(jsonb_build_object('from_user', c.from_user, 'display_name', p.display_name, 'avatar', p.avatar, 'ref', c.ref, 'created_at', c.created_at) order by c.created_at desc)
+      from public.cheers c
+      join public.social_profiles p on p.user_id = c.from_user
+      where c.to_user = me and c.created_at > now() - interval '14 days' and public.social_are_friends(me, c.from_user)
+        and c.ref like 'meal:%'
     ), '[]'::jsonb),
     'feed', coalesce((
       select jsonb_agg(f.item order by f.day desc, f.kind_rank, f.shown_at desc nulls last, f.seq, f.name_key, f.ref)

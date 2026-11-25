@@ -13,6 +13,7 @@ import { Avatar, Button, Card, Divider, figure, IconButton, MiniCup, Text, TextF
 
 import { formatCode, normalizeCode } from './summary';
 import { dayLabel, personMark, sharingSentence, type FriendDay } from './week';
+import { neverSharedLine } from './words';
 
 /** Below this width (iPhone SE) the friend screens tighten up, as Today does. */
 export function useNarrow(): boolean {
@@ -287,8 +288,8 @@ export function SharingRow({ title, subtitle, value, onChange, testID }: { title
   );
 }
 
-/** The three sharing switches, each saying exactly what it shows, and the sentence about what is never shared. */
-export function SharingSwitches({ sharing, onChange }: { sharing: SocialSharing; onChange: (key: keyof SocialSharing, on: boolean) => void }) {
+/** The three sharing switches, each saying exactly what it shows, and the sentence about what is never shared (`meals`: name meals, where they work). */
+export function SharingSwitches({ sharing, onChange, meals = true }: { sharing: SocialSharing; onChange: (key: keyof SocialSharing, on: boolean) => void; meals?: boolean }) {
   const { spacing } = useTheme();
   return (
     <View>
@@ -300,18 +301,18 @@ export function SharingSwitches({ sharing, onChange }: { sharing: SocialSharing;
       <SharingRow testID="friends-share-streak" title="Logging streak" subtitle="How many days in a row you have logged" value={sharing.streak} onChange={(v) => onChange('streak', v)} />
       <Divider />
       <SharingRow testID="friends-share-workouts" title="Recent workouts" subtitle="Name, length and distance from the last two weeks" value={sharing.workouts} onChange={(v) => onChange('workouts', v)} />
-      <NeverShared />
+      <NeverShared meals={meals} />
     </View>
   );
 }
 
-export function NeverShared() {
+export function NeverShared({ meals = true }: { meals?: boolean }) {
   const { colors, spacing } = useTheme();
   return (
     <View style={{ flexDirection: 'row', gap: 8, marginTop: spacing.sm }}>
       <Lock size={14} color={colors.textSecondary} strokeWidth={2} style={{ marginTop: 2 }} />
       <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
-        Your weight and your day’s total are never shared, whatever you choose here. A meal leaves the phone when you show it.
+        {neverSharedLine(meals)}
       </Text>
     </View>
   );

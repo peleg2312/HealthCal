@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { cleanMealSettings, cleanSharedMealItems, cleanWireText, mealCheerRef, mealItemsSignature, mealOfCheer, sharedMealRef, toFeed, toMyMeals } from './friendsWire';
+import { cleanMealSettings, cleanSharedMealItems, cleanWireText, mealCheerRef, mealItemsSignature, mealOfCheer, mergeCheers, sharedMealRef, toFeed, toMyMeals, workoutFeedOf } from './friendsWire';
 
 const ALLOWED = ['name', 'emoji', 'portion', 'source', 'foodId', 'barcode', 'serving', 'quantity', 'grams', 'kcal', 'kcalLow', 'kcalHigh'];
 
@@ -193,5 +193,51 @@ describe('reading the server', () => {
     expect(cleanMealSettings(undefined)).toEqual({ auto: [], kcal: false, see: true });
     expect(cleanMealSettings({ auto: ['snack', 'brunch', 'lunch'], kcal: true, see: false })).toEqual({ auto: ['lunch', 'snack'], kcal: true, see: false });
     expect(cleanMealSettings({ kcal: 'yes', see: 0 })).toEqual({ auto: [], kcal: false, see: true });
+  });
+});
+
+describe('mergeCheers (workout and day cheers under cheers, a meal’s under meal_cheers)', () => {
+  const c = (ref: string, createdAt: string) => ({ ref, createdAt });
+  it('makes one list, newest first, whatever the two lists hold', () => {
+    const cheers = [c('day:2026-11-25', '2026-11-25T09:00:00.123456+00:00'), c('a'.repeat(32), '2026-11-24T18:00:00+00:00')];
+    const meals = [c(`meal:${'b'.repeat(32)}`, '2026-11-25T10:30:00.5+00:00'), c(`meal:${'c'.repeat(32)}`, '2026-11-24T20:00:00.999999+02:00')];
+    expect(mergeCheers(cheers, meals).map((x) => x.ref)).toEqual([`meal:${'b'.repeat(32)}`, 'day:2026-11-25', `meal:${'c'.repeat(32)}`, 'a'.repeat(32)]);
+  });
+  it('reads a server time with microseconds, keeps equal times in order (workouts and days first) and puts an unreadable time last', () => {
+    const at = '2026-11-25T09:00:00.123456+00:00';
+    expect(mergeCheers([c('w1', at), c('w2', 'not a time')], [c('m1', at), c('m0', '2026-11-25T09:00:00.124+00:00')]).map((x) => x.ref)).toEqual(['m0', 'w1', 'm1', 'w2']);
+  });
+  it('a server without meals sends one list: kept as it came', () => {
+    const cheers = [c('x', '2026-11-25T09:00:00Z'), c('y', '2026-11-24T09:00:00Z')];
+    expect(mergeCheers(cheers, [])).toEqual(cheers);
+    expect(mergeCheers([], [])).toEqual([]);
+  });
+});
+
+describe('workoutFeedOf (a server that sends no feed)', () => {
+  const ref = (c: string) => c.repeat(32);
+  const w = (id: string, date: string, extra: Record<string, unknown> = {}) => ({ id, name: 'Running', emoji: '🏃', minutes: 30, date, ...extra });
+  const friend = (userId: string, displayName: string, workouts: ReturnType<typeof w>[], cheered: string[] = []) => ({ userId, displayName, avatar: '', cheered, summary: { workouts } });
+
+  it('lists every friend’s shared workouts as the server’s feed does: newest day first, then their own order, then by name', () => {
+    const feed = workoutFeedOf([
+      friend('sam', 'sam', [w(ref('a'), '2026-11-24'), w(ref('b'), '2026-11-25')], [ref('b')]),
+      friend('maya', 'Maya', [w(ref('c'), '2026-11-25', { name: '  ', distanceKm: 4.2 }), w(ref('d'), '2026-11-25', { distanceKm: 0 })]),
+    ]);
+    expect(feed.map((i) => [i.displayName, i.ref[0], i.day, i.cheered])).toEqual([
+      ['Maya', 'c', '2026-11-25', false],
+      ['Maya', 'd', '2026-11-25', false],
+      ['sam', 'b', '2026-11-25', true],
+      ['sam', 'a', '2026-11-24', false],
+    ]);
+    expect(feed[0]).toEqual({ kind: 'workout', userId: 'maya', displayName: 'Maya', avatar: '', ref: ref('c'), day: '2026-11-25', name: 'Workout', emoji: '🏃', minutes: 30, distanceKm: 4.2, cheered: false });
+    expect('distanceKm' in feed[1]).toBe(false);
+  });
+
+  it('leaves out what the server’s feed leaves out, and keeps at most 100', () => {
+    expect(workoutFeedOf([friend('sam', 'Sam', [w('record-id', '2026-11-25'), w(ref('a'), '2026-02-30'), w(ref('b'), '2026-11-25', { minutes: -1 })])])).toEqual([]);
+    expect(workoutFeedOf([friend('', 'Nobody', [w(ref('a'), '2026-11-25')])])).toEqual([]);
+    const many = Array.from({ length: 120 }, (_, i) => w(i.toString(16).padStart(32, '0'), '2026-11-25'));
+    expect(workoutFeedOf([friend('sam', 'Sam', many)])).toHaveLength(100);
   });
 });

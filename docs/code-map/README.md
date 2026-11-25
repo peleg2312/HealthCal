@@ -100,8 +100,8 @@ with how many steps away it is). This one is worked out from the sources, in abo
 
 ## Counts
 
-875 files (280 of them tests), 4317 exported names (class 17, component 290, const 1112, default 49, function 2079, interface 508, type 262),
-248 re-export lines, 3488 names imported somewhere, 5124 file-to-file dependencies.
+881 files (282 of them tests), 4362 exported names (class 17, component 292, const 1129, default 49, function 2102, interface 511, type 262),
+248 re-export lines, 3528 names imported somewhere, 5157 file-to-file dependencies.
 
 ## Refreshing it
 

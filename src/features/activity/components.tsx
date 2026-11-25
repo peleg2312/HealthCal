@@ -1,19 +1,31 @@
 import { Trash2 } from 'lucide-react-native';
-import React from 'react';
+import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { DayStepper } from '@/features/food/components';
+import { SizeProbe, useMeasureKey } from '@/features/today/MeasureWidth';
 import { useToday } from '@/store/clock';
 import { useLive, useProfile } from '@/store/selectors';
 import { INTENSITY_LABELS, kcalRange } from '@/lib/exercise';
 import { dayRuleFor, type ExerciseRule } from '@/lib/exerciseBudget';
 import { formatDistance, formatNumber } from '@/lib/units';
-import { cup, fonts, LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
+import { cup, fonts, LARGE_TEXT, useTextGrowth, useTheme, useVeryLargeText } from '@/theme';
 import type { ActivityEntry, ISODate, UnitSystem } from '@/types';
-import { CupKey, IconButton, PressableScale, Text } from '@/ui';
+import { CupKey, IconButton, PressableScale, Text, useGrownText } from '@/ui';
 
-import { deleteSessionLabel, historyFigureBeside, historyFigureWords, historyMetaLines } from './history';
+import {
+  deleteSessionLabel,
+  figureWordsHold,
+  historyFigureBeside,
+  historyFigureBesideMeasured,
+  historyFigureWords,
+  historyMetaLine,
+  historyMetaLines,
+  historyNamePieces,
+  MIN_NAME_WORD,
+} from './history';
 import { budgetAdds, budgetAddsShort, NEXT_DAY_HINT } from './logWords';
+import { MeasureEach } from './MeasureEach';
 
 /**
  * The day of a workout: the app's one date control (`DayStepper`, `@/features/food/components`), the same look
@@ -56,7 +68,9 @@ function useDayRule(date: ISODate): ExerciseRule {
  * its day's rule (`budgetAddsShort`: "~290 kcal added", "~290 kcal added over 7 days", "~290 kcal not added"),
  * so it never reads as the run log's larger burn. Where the name and the figure do not fit side by side
  * (`historyFigureBeside`), the figure takes a line of its own under the name. An estimate's range is in the
- * label and on the session's own screen ("likely 390–585 kcal").
+ * label and on the session's own screen ("likely 390–585 kcal"). Through the phone's common text steps (text grown,
+ * under `VERY_LARGE_TEXT`) the row decides both from its words as drawn on the device (`MeasureEach`, its room from
+ * `SizeProbe`): the figure stays beside the name wherever the two fit, and the line is one line wherever it fits.
  */
 export function SessionRow({
   entry,
@@ -78,33 +92,80 @@ export function SessionRow({
   const measured = !!entry.measured;
   const range = measured ? null : kcalRange(entry.kcalNet);
   const parts = sessionParts(entry, units);
+  const lineParts = day ? [day.word, ...parts] : parts;
   // The app's text size and the phone's setting together, so at 200% the figure goes under the name.
   const scale = useTextGrowth();
-  const room = Math.min(width, 560) - 40 - ROW_CHROME;
-  const meta = historyMetaLines(day ? [day.word, ...parts] : parts, room, scale);
+  // Text grown but not very large (`fit`): the row's words are measured as drawn and its room read from its own column.
+  const grown = useGrownText();
+  const veryLarge = useVeryLargeText();
+  const fit = grown && !veryLarge;
+  const measureKey = useMeasureKey();
+  const [drawnW, setDrawnW] = useState<Record<string, number> | null>(null);
+  const [colW, setColW] = useState(0);
+  const estimatedRoom = Math.min(width, 560) - 40 - ROW_CHROME;
+  const room = fit && colW > 0 ? colW : estimatedRoom;
   const rule = useDayRule(entry.date);
   const adds = budgetAdds(rule, entry.kcalNet);
   const short = budgetAddsShort(rule);
-  const beside = historyFigureBeside(entry.name, adds.figure, short, room, scale);
+  const pieces = historyNamePieces(entry.name);
+  const over = short.indexOf(' over ');
+  const w = fit ? drawnW : null;
+  const meta = historyMetaLines(lineParts, room, scale, w && { parts: lineParts.map((_, i) => w[`part-${i}`] ?? 0), line: w.line ?? 0 });
+  const beside =
+    (w && historyFigureBesideMeasured(entry.name, room, { figure: w.figure ?? 0, name: w.name ?? 0, pieces: pieces.map((_, i) => w[`piece-${i}`] ?? 0), minName: w.minName ?? 0 })) ??
+    historyFigureBeside(entry.name, adds.figure, short, estimatedRoom, scale);
+  // The figure's words are held together (breaking only before "over 7 days") at the designed size and, with text
+  // grown, while each held run as drawn fits the row; else (and with very large text) they wrap at their spaces.
+  const holdWords = fit ? figureWordsHold(w ? (over < 0 ? [w.figure ?? 0] : [w.head ?? 0, w.tail ?? 0]) : [], room) : scale <= LARGE_TEXT;
   // Named by what it shows, as drawn and in its order (WCAG 2.5.3, label in name: "Volleyball, ~290 kcal added,
   // Sun · 75 min · Moderate"), then what it leaves out: the date in full where the row shows a short day (so two
   // rows never share a name), how the figure was found and what a tap does.
   const spoken = [
-    `${entry.name}, ${adds.figure} kcal ${short}, ${(day ? [day.word, ...parts] : parts).join(' · ')}${garmin ? `, ${measured ? 'Garmin · measured' : 'Garmin'}` : ''}`,
+    `${entry.name}, ${adds.figure} kcal ${short}, ${lineParts.join(' · ')}${garmin ? `, ${measured ? 'Garmin · measured' : 'Garmin'}` : ''}`,
     ...(day && day.spoken.toLowerCase() !== day.word.toLowerCase() ? [day.spoken] : []),
     `${adds.words[0].toUpperCase()}${adds.words.slice(1)}, ${measured ? 'from a measured burn' : `an estimate, likely ${formatNumber(range![0])} to ${formatNumber(range![1])} kcal`}`,
     'Edit',
   ].join('. ');
-  const figure = (
-    <Text variant="numM" testID={`session-kcal-${entry.id}`} style={{ fontSize: 17, lineHeight: 22, flexShrink: beside ? 0 : 1 }}>
+  const figureText = (words: string, testID?: string) => (
+    <Text variant="numM" testID={testID} style={{ fontSize: 17, lineHeight: 22, flexShrink: beside ? 0 : 1 }}>
       {adds.figure}
       <Text variant="unit">{' kcal'}</Text>
       <Text variant="label" color="textSecondary">
-        {/* At large text the words may take their own line under the figure, never splitting a word. */}
-        {scale > LARGE_TEXT ? ` ${short}` : historyFigureWords(short)}
+        {words}
       </Text>
     </Text>
   );
+  const figure = figureText(holdWords ? historyFigureWords(short) : ` ${short}`, `session-kcal-${entry.id}`);
+  // What a row with grown text measures, each on one line as drawn: the figure (whole, and its two held runs on the
+  // week rule), the name, its pieces and the reference word, and the line under it, whole and by part.
+  const nameStyle = { fontFamily: fonts.semibold } as const;
+  const measuring = fit ? (
+    <MeasureEach
+      key={`each-${measureKey}`}
+      onWidths={setDrawnW}
+      items={[
+        { key: 'figure', node: figureText(historyFigureWords(short)) },
+        ...(over < 0
+          ? []
+          : [
+              { key: 'head', node: figureText(historyFigureWords(short.slice(0, over))) },
+              {
+                key: 'tail',
+                node: (
+                  <Text variant="label" color="textSecondary">
+                    {historyFigureWords(short.slice(over + 1)).slice(1)}
+                  </Text>
+                ),
+              },
+            ]),
+        { key: 'name', node: <Text variant="bodyStrong" style={nameStyle}>{entry.name}</Text> },
+        ...pieces.map((p, i) => ({ key: `piece-${i}`, node: <Text variant="bodyStrong" style={nameStyle}>{p.text}</Text> })),
+        { key: 'minName', node: <Text variant="bodyStrong" style={nameStyle}>{MIN_NAME_WORD}</Text> },
+        { key: 'line', node: <Text variant="caption">{historyMetaLine(lineParts)}</Text> },
+        ...lineParts.map((p, i) => ({ key: `part-${i}`, node: <Text variant="caption">{historyMetaLine([p])}</Text> })),
+      ]}
+    />
+  ) : null;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 18, paddingRight: 4 }}>
       <PressableScale
@@ -117,6 +178,8 @@ export function SessionRow({
           <Text style={{ fontSize: 17, lineHeight: 24 }}>{entry.emoji}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          {fit ? <SizeProbe key={`col-${measureKey}`} onSize={(cw) => setColW(Math.floor(cw))} /> : null}
+          {measuring}
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.md }}>
             {/* Two lines for a long name: nothing here is cut. */}
             <Text variant="bodyStrong" numberOfLines={2} style={{ flex: 1, minWidth: 0, fontFamily: fonts.semibold }}>

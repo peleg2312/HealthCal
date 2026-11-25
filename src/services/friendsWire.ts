@@ -110,6 +110,25 @@ export function mealOfCheer(cheerRef: string): string | null {
   return cheerRef.startsWith('meal:') && isRef(cheerRef.slice(5)) ? cheerRef.slice(5) : null;
 }
 
+/** A server time in milliseconds (its fraction cut to 3 digits, as every JavaScript engine reads it); unreadable is -Infinity. */
+function serverTime(v: string): number {
+  const t = Date.parse(v.replace(/(\.\d{3})\d+/, '$1'));
+  return Number.isFinite(t) ? t : -Infinity;
+}
+
+/**
+ * The cheers received as one list, newest first. The overview sends them in two (20261201000000_friends_meals.sql):
+ * `cheers` for workouts and days, the only list an app from before meals reads (it would name any other ref "a
+ * workout of yours"), and `meal_cheers` for shown meals, absent on a server without meals. Each list comes newest
+ * first; equal times keep their order, workouts and days before meals.
+ */
+export function mergeCheers<C extends { createdAt: string }>(cheers: readonly C[], mealCheers: readonly C[]): C[] {
+  return [...cheers, ...mealCheers]
+    .map((c, i) => ({ c, i, t: serverTime(c.createdAt) }))
+    .sort((a, b) => (a.t === b.t ? a.i - b.i : b.t - a.t))
+    .map((x) => x.c);
+}
+
 /** Meal settings as the server sent them, made whole. */
 export function cleanMealSettings(raw: unknown): MealSettings {
   const o = isObject(raw) ? raw : {};

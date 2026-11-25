@@ -17,11 +17,13 @@ import {
   autoLine,
   daysLeft,
   KCAL_WITH_MEALS,
-  LEAVE_CONFIRM,
-  LEAVE_NOTE,
+  leaveConfirm,
+  leaveNote,
   LEAVE_TITLE,
+  leftToast,
   mealChip,
   MEALS_INTRO,
+  MEALS_NOT_YET,
   myMealLine,
   myMealTitle,
   NEVER_SHARED,
@@ -60,7 +62,8 @@ export default function FriendsSettingsScreen() {
   const overview = useFriends((s) => s.overview);
   const today = useToday();
   const now = useNow();
-  const { me, friends, myMeals } = mealsOverview(overview);
+  // mealWords: meals are named only where they work for this person (never on a server without them, nor under 18).
+  const { me, friends, myMeals, mealsAvailable, mealWords } = mealsOverview(overview);
   const [name, setName] = useState(me?.displayName ?? '');
   const [nameFor, setNameFor] = useState(me?.displayName ?? '');
   const [savingName, setSavingName] = useState(false);
@@ -135,7 +138,7 @@ export default function FriendsSettingsScreen() {
   const leave = async () => {
     setConfirmLeave(false);
     const res = await leaveSocial();
-    toast(res.ok ? 'Friends turned off. Your card, friendships, cheers and meals were removed.' : res.message);
+    toast(res.ok ? leftToast(mealWords) : res.message);
     // Back to Friends, which shows its set-up again (never a second Friends screen on top of the first).
     if (res.ok) goBack('/friends');
   };
@@ -276,9 +279,10 @@ export default function FriendsSettingsScreen() {
           </View>
         </>
       ) : (
-        <Card tone="alt" testID="friends-settings-under-18">
+        // A server without meals yet (an app update can reach the phone first) says so; otherwise it is the age.
+        <Card tone="alt" testID={mealsAvailable ? 'friends-settings-under-18' : 'friends-settings-meals-not-yet'}>
           <Text variant="body" color="text">
-            {UNDER_18}
+            {mealsAvailable ? UNDER_18 : MEALS_NOT_YET}
           </Text>
         </Card>
       )}
@@ -297,7 +301,7 @@ export default function FriendsSettingsScreen() {
         <Card testID="friends-settings-leave">
           <View style={{ gap: spacing.md }}>
             <Text variant="body" color="textSecondary">
-              {LEAVE_NOTE}
+              {leaveNote(mealWords)}
             </Text>
             <Button testID="friends-leave" title={LEAVE_TITLE} variant="danger" size="md" onPress={() => setConfirmLeave(true)} />
           </View>
@@ -354,7 +358,7 @@ export default function FriendsSettingsScreen() {
         onConfirm={() => void stopAll()}
         onCancel={() => setConfirmStopAll(false)}
       />
-      <ConfirmSheet visible={confirmLeave} title="Turn friends off?" message={LEAVE_CONFIRM} confirmLabel={LEAVE_TITLE} destructive onConfirm={() => void leave()} onCancel={() => setConfirmLeave(false)} />
+      <ConfirmSheet visible={confirmLeave} title="Turn friends off?" message={leaveConfirm(mealWords)} confirmLabel={LEAVE_TITLE} destructive onConfirm={() => void leave()} onCancel={() => setConfirmLeave(false)} />
     </Screen>
   );
 }
