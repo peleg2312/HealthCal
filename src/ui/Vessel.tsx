@@ -7,6 +7,7 @@ import { spokenUnits } from '@/lib/spokenUnits';
 import { motion, useTheme, vesselBase } from '@/theme';
 
 import { DECORATIVE, figure } from './decorative';
+import { isLaidOut } from './controlRules';
 import { useFadeAfter, usePour, useReachFlash } from './motion';
 import { brimOverhang, fillRatio, goalState, levelY, placeLabels, type GoalKind } from './vesselLayout';
 
@@ -433,7 +434,7 @@ export function Trough({
     <View
       testID={testID}
       style={[{ height }, style]}
-      onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))}
+      onLayout={(e) => isLaidOut(e.nativeEvent.layout.width) && setW(Math.round(e.nativeEvent.layout.width))}
       {...DECORATIVE}>
       <View
         style={{

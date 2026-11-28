@@ -8,7 +8,7 @@ import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, fonts, motion, useReducedMotion, useTheme } from '@/theme';
 
 import { sayOnWeb } from './announce';
-import { scrubKey } from './controlRules';
+import { isLaidOut, scrubKey } from './controlRules';
 import { haptic } from './haptics';
 import { DrawReveal, ease } from './motion';
 import { useFocusRing } from './Pressable';
@@ -16,7 +16,7 @@ import { Text } from './Text';
 
 function useWidth(): [number, (e: LayoutChangeEvent) => void] {
   const [w, setW] = useState(0);
-  return [w, (e) => setW(Math.round(e.nativeEvent.layout.width))];
+  return [w, (e) => isLaidOut(e.nativeEvent.layout.width) && setW(Math.round(e.nativeEvent.layout.width))];
 }
 
 let seq = 0;

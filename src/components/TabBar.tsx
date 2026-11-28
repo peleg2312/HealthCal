@@ -6,7 +6,7 @@ import { Animated, Easing, Platform, useWindowDimensions, View } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { cup, fonts, LARGE_TEXT, MAX_CONTENT_WIDTH, motion, useReducedMotion, useTextGrowth, useTheme } from '@/theme';
-import { PressableScale, setTabBarExtra, TAB_BAR_HEIGHT, Text, useToastDock } from '@/ui';
+import { isLaidOut, PressableScale, setTabBarExtra, TAB_BAR_HEIGHT, Text, useToastDock } from '@/ui';
 
 import { QuickLogSheet } from './QuickLogSheet';
 
@@ -115,6 +115,7 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
         onPress={() => navigateToTab(route.key)}
         onLayout={(e) => {
           const { x, width } = e.nativeEvent.layout;
+          if (!isLaidOut(width)) return;
           const c = x + width / 2;
           setCentres((cur) => (cur[index] === c ? cur : { ...cur, [index]: c }));
         }}
@@ -190,6 +191,7 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
           testID="tab-list"
           onLayout={(e) => {
             const w = e.nativeEvent.layout.width;
+            if (!isLaidOut(w)) return;
             setRowW((cur) => (cur === w ? cur : w));
           }}
           style={{ flexDirection: 'row', paddingHorizontal: pad, height: TAB_BAR_HEIGHT }}>
@@ -219,6 +221,7 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
               {...(Platform.OS === 'web' ? ({ 'aria-hidden': true } as object) : null)}
               onLayout={(e) => {
                 const { x, width } = e.nativeEvent.layout;
+                if (!isLaidOut(width)) return;
                 setSlot((cur) => (cur && cur.x === x && cur.width === width ? cur : { x, width }));
               }}
               style={large ? { width: PLUS_W_LARGE, flexShrink: 0 } : { flex: 1.1 }}

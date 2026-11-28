@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ANDROID_TARGET, ariaFromState, fixedSize, NO_MINUS, numberTextProblem, numberTextValue, pressesOnSpace, rovingIndex, rowStacks, scrubKey, SEGMENT_GAP, SEGMENT_SLACK, segmentLayout, slopToReach, spokenFieldName, stepperKey, wantsAndroidTarget, webAutoComplete } from './controlRules';
+import { ANDROID_TARGET, ariaFromState, fixedSize, NO_MINUS, numberTextProblem, numberTextValue, pressesOnSpace, rovingIndex, isLaidOut, rowStacks, scrubKey, SEGMENT_GAP, SEGMENT_SLACK, segmentLayout, slopToReach, spokenFieldName, stepperKey, wantsAndroidTarget, webAutoComplete } from './controlRules';
 
 describe('slopToReach (48 dp on Android)', () => {
   it('grows a 44 px cup to 48 on both axes', () => {
@@ -145,6 +145,43 @@ describe('rowStacks (a list row at large text)', () => {
   });
   it('waits for the row to be measured', () => {
     expect(rowStacks({ rowWidth: 0, sideWidth: 0, growth: 2 })).toBe(false);
+  });
+});
+
+describe('isLaidOut (a hidden screen reports 0, which is no measurement)', () => {
+  it('takes a box drawn on screen', () => {
+    expect(isLaidOut(381)).toBe(true);
+    expect(isLaidOut(0.5)).toBe(true);
+    expect(isLaidOut(343, 50)).toBe(true);
+  });
+  it("ignores a hidden screen's 0 × 0", () => {
+    expect(isLaidOut(0)).toBe(false);
+    expect(isLaidOut(0, 0)).toBe(false);
+  });
+  it('ignores a 0 width or, when asked, a 0 height', () => {
+    expect(isLaidOut(0, 50)).toBe(false);
+    expect(isLaidOut(343, 0)).toBe(false);
+  });
+  it('judges by the width alone when no height is given (a cup’s empty children are 0 tall but as wide as their column)', () => {
+    expect(isLaidOut(120)).toBe(true);
+  });
+  it('ignores what is not a size', () => {
+    expect(isLaidOut(Number.NaN)).toBe(false);
+    expect(isLaidOut(-1)).toBe(false);
+    expect(isLaidOut(100, Number.NaN)).toBe(false);
+  });
+});
+
+describe('a layout callback keeps the last good value through a hidden screen', () => {
+  // What every kit callback does with a report: store it only when it is a measurement.
+  const follow = (reports: number[], start = 0) => reports.reduce((kept, w) => (isLaidOut(w) ? w : kept), start);
+  it('keeps the tab row’s width while Profile covers Today, and takes a real change on return', () => {
+    expect(follow([381, 0, 381])).toBe(381);
+    expect(follow([381, 0])).toBe(381);
+    expect(follow([381, 0, 412])).toBe(412);
+  });
+  it('stays unmeasured until a first real report', () => {
+    expect(follow([0, 0])).toBe(0);
   });
 });
 

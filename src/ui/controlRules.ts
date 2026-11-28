@@ -249,6 +249,19 @@ export function rowStacks(v: { rowWidth: number; sideWidth: number; growth: numb
   return v.growth > 1 && v.rowWidth > 0 && v.rowWidth - v.sideWidth < ROW_WORD_ROOM * v.growth;
 }
 
+/**
+ * Whether a layout report is a measurement, for every layout callback of the kit and the tab bar. On the web a view
+ * whose screen is hidden (another screen pushed over it, the tab bar under it too) reports a width and a height of 0,
+ * which is never the size of a box drawn on screen: such a report is ignored and the last good value kept, so a screen
+ * comes back drawn as it left (the tab bar's + over its slot, a bar's fill, a chart's bars, a field's padding, a row's
+ * stacking), never for a frame as if its boxes were 0 wide. Pass the height only where a box drawn on screen is never
+ * 0 tall; a box that can be (a cup's `children`, empty) is judged by its width alone. The same rule as `isMeasured`
+ * (`@/features/today/measured`), which the kit does not import.
+ */
+export function isLaidOut(width: number, height?: number): boolean {
+  return width > 0 && (height === undefined || height > 0);
+}
+
 /** The kit's words under a number field that takes no negative when a minus is typed into it. */
 export const NO_MINUS = 'Enter 0 or more, without a minus.';
 

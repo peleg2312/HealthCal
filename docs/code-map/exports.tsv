@@ -4207,6 +4207,7 @@ src/ui/controlRules.ts	SlopInsets	type
 src/ui/controlRules.ts	StateIn	interface
 src/ui/controlRules.ts	ariaFromState	function
 src/ui/controlRules.ts	fixedSize	function
+src/ui/controlRules.ts	isLaidOut	function
 src/ui/controlRules.ts	isSpaceKey	function
 src/ui/controlRules.ts	numberTextProblem	function
 src/ui/controlRules.ts	numberTextValue	function
@@ -4268,6 +4269,7 @@ src/ui/index.ts	figure	re-export	src/ui/decorative.ts:figure
 src/ui/index.ts	fillRatio	re-export	src/ui/vesselLayout.ts:fillRatio
 src/ui/index.ts	goalState	re-export	src/ui/vesselLayout.ts:goalState
 src/ui/index.ts	haptic	re-export	src/ui/haptics.ts:haptic
+src/ui/index.ts	isLaidOut	re-export	src/ui/controlRules.ts:isLaidOut
 src/ui/index.ts	isReducedMotion	re-export	src/theme/motion.ts:isReducedMotion
 src/ui/index.ts	levelY	re-export	src/ui/vesselLayout.ts:levelY
 src/ui/index.ts	motion	re-export	src/theme/motion.ts:motion

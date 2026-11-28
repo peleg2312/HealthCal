@@ -50,7 +50,7 @@ src/app/welcome.tsx	src/features/auth/GoogleButton.tsx	src/features/auth/demo.ts
 src/codeMap.test.ts
 src/components/PourWait.tsx	src/features/ai/mark/fill.ts	src/features/ai/mark/index.ts	src/features/auth/lines.ts	src/theme/index.tsx	src/theme/motion.ts	src/theme/tokens.ts	src/ui/Text.tsx	src/ui/index.ts
 src/components/QuickLogSheet.tsx	src/features/ai/mark/AiGlyph.tsx	src/features/ai/mark/SourceMark.tsx	src/features/ai/mark/index.ts	src/features/drinks/via.ts	src/features/food/actions.ts	src/features/food/addedTo.ts	src/features/food/build.ts	src/features/food/displayName.ts	src/features/food/favoriteWords.ts	src/features/food/favorites.ts	src/features/food/helpers.ts	src/features/food/log.ts	src/features/food/oneTap.ts	src/features/food/quickSheet.ts	src/features/food/searchTab.ts	src/features/food/usuals.ts	src/features/today/MeasureWidth.tsx	src/features/today/StatusRail.tsx	src/features/today/fit.ts	src/features/today/viewedDay.ts	src/lib/bidi.ts	src/lib/dates.ts	src/lib/nutrition.ts	src/lib/units.ts	src/store/clock.ts	src/store/index.ts	src/store/selectors.ts	src/theme/index.tsx	src/theme/textSize.ts	src/theme/tokens.ts	src/types/index.ts	src/ui/Button.tsx	src/ui/Chip.tsx	src/ui/Pressable.tsx	src/ui/Sheet.tsx	src/ui/Text.tsx	src/ui/Toast.tsx	src/ui/index.ts
-src/components/TabBar.tsx	src/components/QuickLogSheet.tsx	src/theme/index.tsx	src/theme/motion.ts	src/theme/textSize.ts	src/theme/tokens.ts	src/ui/Pressable.tsx	src/ui/Screen.tsx	src/ui/Text.tsx	src/ui/Toast.tsx	src/ui/index.ts
+src/components/TabBar.tsx	src/components/QuickLogSheet.tsx	src/theme/index.tsx	src/theme/motion.ts	src/theme/textSize.ts	src/theme/tokens.ts	src/ui/Pressable.tsx	src/ui/Screen.tsx	src/ui/Text.tsx	src/ui/Toast.tsx	src/ui/controlRules.ts	src/ui/index.ts
 src/components/TabHeader.tsx	src/app/(tabs)/diary.tsx	src/app/(tabs)/index.tsx	src/app/(tabs)/progress.tsx	src/app/(tabs)/train.tsx	src/app/coach.tsx	src/features/coach/CoachEntry.tsx	src/features/coach/movedToast.ts	src/features/friends/FriendsEntry.tsx	src/features/today/MeasureWidth.tsx	src/features/today/fit.ts	src/features/today/greetingTitle.ts	src/lib/dates.ts	src/store/selectors.ts	src/theme/index.tsx	src/theme/textSize.ts	src/theme/tokens.ts	src/ui/Pressable.tsx	src/ui/Text.tsx	src/ui/index.ts
 src/data/activities.test.ts	src/data/activities.ts	src/data/activityNamesHe.ts
 src/data/activities.ts	src/data/activityNamesHe.ts	src/lib/hebrew.ts	src/types/index.ts
@@ -834,13 +834,13 @@ src/ui/Chip.tsx	src/theme/index.tsx	src/theme/textSize.ts	src/theme/tokens.ts	sr
 src/ui/Field.tsx	src/lib/spokenUnits.ts	src/theme/index.tsx	src/theme/textSize.ts	src/theme/tokens.ts	src/ui/Button.tsx	src/ui/Pressable.tsx	src/ui/Text.tsx	src/ui/controlRules.ts	src/ui/decorative.ts	src/ui/toastControls.ts
 src/ui/List.tsx	src/theme/index.tsx	src/theme/motion.ts	src/theme/textSize.ts	src/theme/tokens.ts	src/ui/Button.tsx	src/ui/Chip.tsx	src/ui/Pressable.tsx	src/ui/Text.tsx	src/ui/controlRules.ts	src/ui/decorative.ts
 src/ui/Pressable.tsx	src/theme/index.tsx	src/theme/motion.ts	src/ui/controlRules.ts	src/ui/haptics.ts	src/ui/hitTrim.ts	src/ui/toastControls.ts
-src/ui/ProgressBar.tsx	src/theme/index.tsx	src/theme/motion.ts	src/ui/motion.tsx	src/ui/vesselLayout.ts
+src/ui/ProgressBar.tsx	src/theme/index.tsx	src/theme/motion.ts	src/ui/controlRules.ts	src/ui/motion.tsx	src/ui/vesselLayout.ts
 src/ui/RestoreRow.tsx	src/lib/bidi.ts	src/theme/index.tsx	src/ui/Button.tsx	src/ui/Text.tsx
 src/ui/Screen.tsx	src/theme/index.tsx	src/theme/tokens.ts	src/ui/Button.tsx	src/ui/Pressable.tsx	src/ui/Sheet.tsx	src/ui/Text.tsx	src/ui/Toast.tsx	src/ui/keyboardInset.ts	src/ui/motion.tsx	src/ui/shortWindow.ts	src/ui/toastControls.ts
 src/ui/Sheet.tsx	src/lib/spokenUnits.ts	src/theme/index.tsx	src/theme/motion.ts	src/theme/tokens.ts	src/ui/Button.tsx	src/ui/Text.tsx	src/ui/Toast.tsx	src/ui/keyboardInset.ts	src/ui/motion.tsx	src/ui/sheetHistory.ts	src/ui/shortWindow.ts	src/ui/toastControls.ts
 src/ui/Text.tsx	src/lib/bidi.ts	src/lib/text.ts	src/theme/index.tsx	src/theme/legibility.ts	src/theme/textSize.ts	src/theme/tokens.ts	src/ui/textLang.ts	src/ui/textSpacing.ts
 src/ui/Toast.tsx	src/lib/bidi.ts	src/lib/spokenUnits.ts	src/theme/index.tsx	src/theme/motion.ts	src/theme/textSize.ts	src/theme/tokens.ts	src/ui/Pressable.tsx	src/ui/Text.tsx	src/ui/decorative.ts	src/ui/keyboardInset.ts	src/ui/toastControls.ts
-src/ui/Vessel.tsx	src/lib/spokenUnits.ts	src/theme/index.tsx	src/theme/motion.ts	src/theme/tokens.ts	src/ui/decorative.ts	src/ui/motion.tsx	src/ui/vesselLayout.ts
+src/ui/Vessel.tsx	src/lib/spokenUnits.ts	src/theme/index.tsx	src/theme/motion.ts	src/theme/tokens.ts	src/ui/controlRules.ts	src/ui/decorative.ts	src/ui/motion.tsx	src/ui/vesselLayout.ts
 src/ui/announce.ts
 src/ui/controlRules.test.ts	src/ui/controlRules.ts
 src/ui/controlRules.ts

@@ -3332,6 +3332,7 @@ src/ui/controlRules.ts	SEGMENT_SLACK	1	src/ui/controlRules.test.ts
 src/ui/controlRules.ts	SHORT_WINDOW	1	src/ui/shortWindow.ts
 src/ui/controlRules.ts	ariaFromState	2	src/ui/Pressable.tsx	src/ui/controlRules.test.ts
 src/ui/controlRules.ts	fixedSize	2	src/ui/Pressable.tsx	src/ui/controlRules.test.ts
+src/ui/controlRules.ts	isLaidOut	5	src/components/TabBar.tsx	src/ui/Charts.tsx	src/ui/ProgressBar.tsx	src/ui/Vessel.tsx	src/ui/controlRules.test.ts
 src/ui/controlRules.ts	isSpaceKey	1	src/ui/Pressable.tsx
 src/ui/controlRules.ts	numberTextProblem	11	src/app/activity/log.tsx	src/app/body.tsx	src/app/food/custom.tsx	src/app/food/detail.tsx	src/app/food/quick.tsx	src/app/settings/goals.tsx	src/app/weight.tsx	src/features/ai/ItemRow.tsx	src/features/onboarding/components.tsx	src/ui/Field.tsx	src/ui/controlRules.test.ts
 src/ui/controlRules.ts	numberTextValue	3	src/features/onboarding/components.tsx	src/ui/Field.tsx	src/ui/controlRules.test.ts

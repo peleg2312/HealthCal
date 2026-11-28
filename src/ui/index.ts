@@ -2,7 +2,7 @@ export * from './Button';
 export * from './Card';
 export * from './Charts';
 export * from './Chip';
-export { ANDROID_TARGET, NO_MINUS, numberTextProblem, numberTextValue, SHORT_WINDOW, webAutoComplete } from './controlRules';
+export { ANDROID_TARGET, isLaidOut, NO_MINUS, numberTextProblem, numberTextValue, SHORT_WINDOW, webAutoComplete } from './controlRules';
 export { decorative, DECORATIVE, figure, type FigureProps } from './decorative';
 export * from './Field';
 export * from './List';

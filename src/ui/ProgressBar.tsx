@@ -4,6 +4,7 @@ import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reani
 
 import { motion, useTheme } from '@/theme';
 
+import { isLaidOut } from './controlRules';
 import { useFadeAfter, usePour, useReachFlash } from './motion';
 import type { GoalKind } from './vesselLayout';
 
@@ -70,7 +71,7 @@ export function ProgressBar({
   const brimOpacity = useFadeAfter(reached, pour.endsIn, pour.instant);
   const flash = useReachFlash(reached, { delay: pour.endsIn, instant: pour.instant, memoryKey, onReached });
   return (
-    <View style={[{ height, justifyContent: 'center' }, style]} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+    <View style={[{ height, justifyContent: 'center' }, style]} onLayout={(e) => isLaidOut(e.nativeEvent.layout.width) && setW(e.nativeEvent.layout.width)}>
       <View style={{ height, borderRadius: radius.track, backgroundColor: trackColor ?? colors.track, overflow: 'hidden' }}>
         {/* Keyed by the width: the animated styles are first worked out with the real width, so the bar never shows a frame full with the tick at 0. */}
         {w > 0 ? <BarFill key={w} w={w} height={height} level={level} color={color} within={within} overColor={overColor ?? colors.warning} /> : null}
