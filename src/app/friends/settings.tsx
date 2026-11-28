@@ -32,7 +32,11 @@ import {
   myMealLine,
   myMealTitle,
   NEVER_SHARED,
+  NOTES_FROM_FRIENDS,
+  NOTES_FROM_FRIENDS_ON,
+  notesAllToast,
   NOTHING_SHOWN,
+  savedStoppedToast,
   SEE_MEALS,
   SEE_MEALS_ON,
   SETTINGS_SUBTITLE,
@@ -47,11 +51,13 @@ import {
   UNDER_18,
   WHO_SEES_MEALS,
 } from '@/features/friends/words';
-import { withoutMarks } from '@/lib/bidi';
-import { leaveSocial, refreshFriends, setMealAudience, setMealSettings, setupSocial, showMeal, stopAllMeals, stopMeal, useFriends, type SocialSharing } from '@/services/friends';
+import { isolateRtl, withoutMarks } from '@/lib/bidi';
+import { leaveSocial, refreshFriends, setMealAudience, setMealSettings, setNotesOn, setupSocial, showMeal, showSavedMeal, stopAllMeals, stopMeal, useFriends, type SocialSharing } from '@/services/friends';
+import { sharedSavedRef } from '@/services/friendsWire';
+import { useLive } from '@/store/selectors';
 import { useNow, useToday } from '@/store/clock';
 import { cup, fonts, useLargeText, useTheme } from '@/theme';
-import type { MealType } from '@/types';
+import type { MealType, MySharedSavedMeal } from '@/types';
 import { Button, Card, Chip, ChipWrap, ConfirmSheet, CupKey, decorative, Divider, EmptyState, goBack, haptic, Header, ListRow, PressableScale, Screen, SectionTitle, Sheet, Text, toast } from '@/ui';
 
 /**
@@ -104,6 +110,7 @@ export default function FriendsSettingsScreen() {
   const overview = useFriends((s) => s.overview);
   const today = useToday();
   const now = useNow();
+  const savedMeals = useLive('savedMeals');
   // mealWords: meals are named only where they work for this person (never on a server without them, nor under 18).
   const { me, friends, myMeals, mealsAvailable, mealWords } = mealsOverview(overview);
   const [name, setName] = useState(me?.displayName ?? '');
@@ -157,7 +164,36 @@ export default function FriendsSettingsScreen() {
     toast(res.ok ? said : res.message);
   };
   const audienceNames = friends.filter((f) => me.audience.includes(f.userId)).map((f) => f.displayName);
-  const namesOf = (m: MySharedMeal) => m.viewers.map((v) => v.displayName);
+  const namesOf = (m: { viewers: { displayName: string }[] }) => m.viewers.map((v) => v.displayName);
+  // Doing things together: notes and saved meals shown, only while the server has them.
+  const together = overview?.togetherAvailable !== false;
+  const savedNow = together ? (overview?.mySavedMeals ?? []) : [];
+  const shownCount = myMeals.length + savedNow.length;
+  const stopSaved = async (m: MySharedSavedMeal) => {
+    const res = await stopMeal(m.ref);
+    if (!res.ok) {
+      toast(res.message);
+      return;
+    }
+    haptic.tap();
+    // Undo shows the same saved meal to the same people again, found by its reference among this phone's saved meals.
+    const source = savedMeals.find((x) => sharedSavedRef(me.shareKey, x.id) === m.ref);
+    toast(
+      savedStoppedToast(m.name),
+      source
+        ? {
+            label: 'Undo',
+            onPress: () =>
+              void showSavedMeal({ savedMealId: source.id, name: m.name, items: m.items, servings: m.servings ?? null, showKcal: m.showKcal, viewers: m.viewers.map((v) => v.userId) }).then((r) => !r.ok && toast(r.message)),
+          }
+        : undefined,
+    );
+  };
+  const setAllNotes = async (on: boolean) => {
+    const res = await setNotesOn(on);
+    if (res.ok) haptic.select();
+    toast(res.ok ? notesAllToast(on) : res.message);
+  };
 
   const stopOne = async (m: MySharedMeal) => {
     const res = await stopMeal(m.ref);
@@ -304,10 +340,10 @@ export default function FriendsSettingsScreen() {
           </View>
 
           <View style={{ gap: spacing.md }}>
-            <SectionTitle title={SHOWING_NOW} action={myMeals.length ? `${myMeals.length} ${myMeals.length === 1 ? 'meal' : 'meals'}` : undefined} />
+            <SectionTitle title={SHOWING_NOW} action={shownCount ? `${shownCount} ${shownCount === 1 ? 'meal' : 'meals'}` : undefined} />
             <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }} testID="friends-settings-showing">
-              {myMeals.length ? (
-                myMeals.map((m, i) => (
+              {shownCount ? (
+                [...myMeals.map((m, i) => (
                   <React.Fragment key={m.ref}>
                     {i > 0 ? <Divider /> : null}
                     <View testID={`friends-showing-${m.ref.slice(0, 8)}`} style={{ flexDirection: large ? 'column' : 'row', alignItems: large ? 'stretch' : 'center', gap: spacing.md, minHeight: 64, paddingVertical: spacing.sm }}>
@@ -322,7 +358,23 @@ export default function FriendsSettingsScreen() {
                       </View>
                     </View>
                   </React.Fragment>
-                ))
+                )),
+                ...savedNow.map((m, i) => (
+                  <React.Fragment key={m.ref}>
+                    {i + myMeals.length > 0 ? <Divider /> : null}
+                    <View testID={`friends-showing-saved-${i}`} style={{ flexDirection: large ? 'column' : 'row', alignItems: large ? 'stretch' : 'center', gap: spacing.md, minHeight: 64, paddingVertical: spacing.sm }}>
+                      <View style={{ flex: large ? undefined : 1, minWidth: 0 }}>
+                        <Text variant="bodyStrong">{isolateRtl(m.name)}</Text>
+                        <Text variant="caption" color="textSecondary">
+                          {myMealLine(namesOf(m), m.cheers, daysLeft(m.expiresAt, now.getTime()))}
+                        </Text>
+                      </View>
+                      <View style={{ alignSelf: large ? 'flex-end' : 'center' }}>
+                        <Button testID={`friends-showing-saved-stop-${i}`} title={STOP} variant="secondary" size="sm" full={false} accessibilityLabel={`Stop showing ${withoutMarks(m.name)}`} onPress={() => void stopSaved(m)} />
+                      </View>
+                    </View>
+                  </React.Fragment>
+                ))]
               ) : (
                 <Text variant="body" color="textSecondary" style={{ paddingVertical: spacing.md }} testID="friends-showing-none">
                   {NOTHING_SHOWN}
@@ -342,6 +394,12 @@ export default function FriendsSettingsScreen() {
           </Text>
         </Card>
       )}
+
+      {together ? (
+        <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }} testID="friends-settings-notes">
+          <SharingRow testID="friends-settings-notes-on" title={NOTES_FROM_FRIENDS} subtitle={NOTES_FROM_FRIENDS_ON} value={overview?.notesOn !== false} onChange={(v) => void setAllNotes(v)} />
+        </Card>
+      ) : null}
 
       {/* Last and quiet: a row in the danger colour, confirmed before anything is removed. */}
       <Card padding={0} testID="friends-settings-leave">

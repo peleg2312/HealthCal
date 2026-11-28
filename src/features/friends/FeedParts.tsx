@@ -5,8 +5,7 @@
  * initials cup in their own tint; a short level line inside a cup means something new since the last look.
  * Nothing here shows a figure beside another person's, so nothing reads as a league table.
  *
- * Room left for what comes next: a shared "Together this week" card goes between the people row and "Recent"
- * (the screen's own order), and a meal row can take one more cup ("Save to my meals") beside "+".
+ * "Together this week" (`TogetherParts`) sits between the people row and "Recent", in the screen's own order.
  */
 import { HandHeart, UserPlus } from 'lucide-react-native';
 import React from 'react';
@@ -23,7 +22,7 @@ import type { FeedItem } from './contract';
 import { feedKey, type FeedDay } from './feed';
 import { mealFoodsLine } from './MealCard';
 import { dayLabel } from './week';
-import { cheersChipLabel, cheersTitle, INVITE, INVITE_OPEN, itemWhat, RECENT } from './words';
+import { cheersChipLabel, cheersNotesLabel, cheersNotesTitle, INVITE, INVITE_OPEN, itemWhat, RECENT } from './words';
 
 const CUP = 56;
 const CELL = 72;
@@ -86,23 +85,23 @@ export function PeopleRow({ people, newIds, onOpen, onAdd }: { people: { userId:
   );
 }
 
-/** "Recent", a level-2 heading, with the cheers received as one chip at its end ("3 cheers for you") that opens the list. */
-export function RecentTitle({ cheers, onCheers }: { cheers: number; onCheers: () => void }) {
+/** "Recent", a level-2 heading, with the cheers and notes received as one chip at its end ("3 cheers for you", "2 cheers · 1 note") that opens the list. */
+export function RecentTitle({ cheers, notes = 0, onCheers }: { cheers: number; notes?: number; onCheers: () => void }) {
   const { colors, spacing } = useTheme();
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.md, rowGap: spacing.sm, marginTop: 4 }}>
       <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
         {RECENT}
       </Text>
-      {cheers > 0 ? (
+      {cheers + notes > 0 ? (
         <View testID="friends-cheers" style={{ marginLeft: 'auto' }}>
           <Button
             testID="friends-cheers-open"
-            title={cheersTitle(cheers)}
+            title={cheersNotesTitle(cheers, notes)}
             variant="secondary"
             size="sm"
             full={false}
-            accessibilityLabel={cheersChipLabel(cheers)}
+            accessibilityLabel={notes ? cheersNotesLabel(cheers, notes) : cheersChipLabel(cheers)}
             icon={<HandHeart color={colors.text} />}
             onPress={onCheers}
           />

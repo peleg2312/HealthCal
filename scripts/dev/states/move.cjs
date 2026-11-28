@@ -423,6 +423,36 @@ const friendsMeals = [
   { id: 'friends-show-sheet-200', route: '/auth?mode=signin', flags: { __healthcalTextSize: true }, taps: [...signIn(DANA), 'tab-diary', { wait: 1200 }, 'meal-menu-lunch', 'meal-menu-show'], sheet: true, note: 'show lunch at 200% text' },
 ];
 
+// ------------------------------------------------------------------ friends doing things together (a build with a backend)
+// Only with --backend, after friends-meals.mjs and then `API=<the stand-in> node scripts/dev/states/friends-together.mjs`
+// (Dana in a minutes circle with Maya and Sam, logging together with Maya, asked by Jo, two notes, Maya's saved meal
+// shown; Rui's days-logged circle asking Ari). Jo is the first in Dana's people row, Dana the first in Maya's and Sam's.
+const toMeals = ['tab-add', 'quick-search', 'search-tab-meals', 'search-edit-meals', { wait: 800 }];
+const friendsTogether = [
+  { id: 'friends-together-card', route: '/auth?mode=signin', taps: friends(DANA), waitFor: 'together-card', note: 'Friends with the circle: one cup, names, days to go, Cheer everyone; a saved meal from Maya; cheers and notes in the chip' },
+  { id: 'friends-together-sheet', route: '/auth?mode=signin', taps: [...friends(DANA), 'together-open'], sheet: true, note: 'the circle: people by name only, the goal to change, Leave quiet and last' },
+  { id: 'friends-together-leave', route: '/auth?mode=signin', taps: [...friends(DANA), 'together-open', 'together-leave'], sheet: true, note: 'leave the circle? nobody is told' },
+  { id: 'friends-together-notes-sheet', route: '/auth?mode=signin', taps: [...friends(DANA), 'friends-cheers-open'], sheet: true, note: 'cheers and notes for you: the two notes as sentences above the cheers' },
+  { id: 'friends-together-saved-sheet', route: '/auth?mode=signin', taps: [...friends(DANA), 'friends-saved-0-open'], sheet: true, note: 'a friend’s saved meal: foods, Cheer, Add to my diary, Save to my meals' },
+  { id: 'friends-together-saved-done', route: '/auth?mode=signin', taps: [...friends(DANA), 'friends-saved-0-save', { wait: 600 }], waitFor: 'toast-action', note: 'Save to my meals from the row: one toast with Undo, the own food left out' },
+  { id: 'friends-together-invite', route: '/auth?mode=signin', taps: friends('meals.none@example.com'), waitFor: 'together-invite-join', note: 'an invitation to a days-logged circle: Join or a quiet decline' },
+  { id: 'friends-together-join', route: '/auth?mode=signin', taps: [...friends('meals.none@example.com'), 'together-invite-join'], sheet: true, note: 'the join step: what counts, what the others see (a circle of two), leave any time' },
+  { id: 'friends-together-start', route: '/auth?mode=signin', taps: [...friends('meals.jo@example.com'), 'together-start-open'], sheet: true, note: 'start a circle: minutes or days logged, who to ask, the goal, what counts' },
+  { id: 'friends-together-start-picked', route: '/auth?mode=signin', taps: [...friends('meals.jo@example.com'), 'together-start-open', '^together-who-', 'together-kind-days'], sheet: true, note: 'start a days-logged circle with Dana picked: the button names her' },
+  { id: 'friends-together-start-teen', route: '/auth?mode=signin', taps: [...friends('meals.teen@example.com'), 'together-start-open'], sheet: true, note: 'under 18: active minutes only, no days logged' },
+  { id: 'friends-buddy-invite', route: '/auth?mode=signin', taps: [...friends(DANA), '^friends-person-'], waitFor: 'buddy-invite', note: 'Jo’s page: Jo asks to log together; send a note' },
+  { id: 'friends-buddy-accept', route: '/auth?mode=signin', taps: [...friends(DANA), '^friends-person-', 'buddy-accept'], sheet: true, note: 'accept logging together: what each day shows and never shows' },
+  { id: 'friends-buddy-card', route: '/auth?mode=signin', taps: [...friends('meals.maya@example.com'), '^friends-person-'], waitFor: 'buddy-card', note: 'Maya on Dana’s page: the pair’s week in cups, days together, the run, notes' },
+  { id: 'friends-buddy-offer', route: '/auth?mode=signin', taps: [...friends('meals.sam@example.com'), '^friends-person-'], waitFor: 'buddy-offer', note: 'Sam on Dana’s page: "Log together with Dana" offered, today’s note already sent' },
+  { id: 'friends-buddy-ask-sheet', route: '/auth?mode=signin', taps: [...friends('meals.sam@example.com'), '^friends-person-', 'buddy-ask'], sheet: true, note: 'ask to log together: what it shows, Ask Dana' },
+  { id: 'friends-buddy-manage', route: '/auth?mode=signin', taps: [...friends('meals.maya@example.com'), '^friends-person-', 'friend-manage'], sheet: true, note: 'Manage: meals, notes from Dana, stop logging together, remove' },
+  { id: 'friends-together-settings', route: '/auth?mode=signin', taps: [...friends('meals.maya@example.com'), 'friends-settings-open'], waitFor: 'friends-settings-notes', note: 'settings: the saved meal showing now, notes from friends' },
+  { id: 'friends-meals-show-cup', route: '/auth?mode=signin', taps: [...signIn(DANA), ...toMeals], waitFor: 'saved-meal-show-0', note: 'Saved meals with "Show to friends" beside edit and delete' },
+  { id: 'friends-meals-show-sheet', route: '/auth?mode=signin', taps: [...signIn(DANA), ...toMeals, 'saved-meal-show-0'], sheet: true, note: 'show a saved meal: the foods friends see, who, calories off, never shown' },
+  { id: 'friends-together-200', route: '/auth?mode=signin', flags: { __healthcalTextSize: true }, taps: friends(DANA), waitFor: 'together-card', note: 'the circle at 200% text' },
+  { id: 'friends-buddy-200', route: '/auth?mode=signin', flags: { __healthcalTextSize: true }, taps: [...friends('meals.maya@example.com'), '^friends-person-'], waitFor: 'buddy-card', note: 'logging together and notes at 200% text' },
+];
+
 // ------------------------------------------------------------------ online drinks (a build with a backend)
 // The drink sheet's "Online products" with answers: only with --backend, against a build exported with
 // EXPO_PUBLIC_SUPABASE_URL pointing at scripts/dev/mock-backend.cjs (README, "Testing accounts and sync
@@ -441,5 +471,5 @@ const drinksOnline = [
 module.exports = [
   ...train, ...pick, ...log, ...imports, ...strength, ...water, ...weight, ...body, ...sleep, ...fasting, ...friendsLocal,
   // Only with --backend: every run passes --url now, and builds from with-build.cjs have no accounts.
-  ...(process.argv.includes('--backend') ? [...drinksOnline, ...friendsSignedIn, ...friendsMeals] : []),
+  ...(process.argv.includes('--backend') ? [...drinksOnline, ...friendsSignedIn, ...friendsMeals, ...friendsTogether] : []),
 ];

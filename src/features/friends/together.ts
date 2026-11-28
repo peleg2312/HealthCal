@@ -59,3 +59,14 @@ export function buddyCup(count: BuddyDay['count']): 'full' | 'half' | 'empty' | 
 export function buddyDaysTogether(week: readonly BuddyDay[]): number {
   return week.filter((d) => d.count === 2).length;
 }
+
+/**
+ * Whether "Show to friends" is offered on a saved meal: friends on, 18 or over (meals allowed), a server with meals
+ * and saved meals shown, and at least one friend who can be picked. Otherwise the control is simply not there.
+ */
+export function canShowSaved(
+  overview: { me: { mealsAllowed?: boolean } | null; friends: readonly { shareMeals: boolean }[]; mealsAvailable?: boolean; togetherAvailable?: boolean } | null,
+): boolean {
+  if (!overview?.me || overview.mealsAvailable === false || overview.togetherAvailable === false) return false;
+  return overview.me.mealsAllowed === true && overview.friends.some((f) => f.shareMeals);
+}

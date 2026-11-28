@@ -38,7 +38,7 @@ function strings(): string[] {
   out.push(W.showLine(TODAY, TODAY, 3), W.cheersTitle(1), W.cheersTitle(4), `Maya: ${W.mealCheerTarget(undefined, TODAY)}`);
   out.push(W.cheersSummary([{ displayName: 'Maya', ref: 'a' }, { displayName: 'Sam', ref: 'a' }, { displayName: 'Jo', ref: 'b' }], (c) => (c.ref === 'a' ? 'your lunch' : 'your run')));
   for (const auto of [[], ['lunch'], ['breakfast', 'dinner'], MEALS] as MealType[][]) out.push(W.autoLine(auto));
-  out.push(W.friendsSince('Nov 2'), W.friendsSince(null), W.mealsTheyShow('Maya'), W.seesMyMealsTitle('Maya'), W.seesMyMealsOn('Maya'), W.theirMealsOn('Maya'), W.weekOf('Maya'), W.theyShowYou('Maya'), W.manageTitle('Maya'), W.manageLine(true), W.manageLine(false), W.nothingShownYet('Maya'), W.theirMealsTitle('Maya'), W.removeNote('Maya'), W.addNote('Maya'));
+  out.push(W.friendsSince('Nov 2'), W.friendsSince(null), W.mealsTheyShow('Maya'), W.seesMyMealsTitle('Maya'), W.seesMyMealsOn('Maya'), W.theirMealsOn('Maya'), W.weekOf('Maya'), W.theyShowYou('Maya'), W.manageTitle('Maya'), W.manageLine(true), W.manageLine(false), W.manageLine(true, true), W.manageLine(false, true), W.nothingShownYet('Maya'), W.theirMealsTitle('Maya'), W.removeNote('Maya'), W.addNote('Maya'));
   out.push(W.itemCaption({ portion: '1 bowl', kcal: 310, source: 'builtin' }, true), W.itemCaption({ portion: '1 bowl', kcal: 310, kcalLow: 250, source: 'ai' }, true), W.itemCaption({ portion: '1 bowl', source: 'builtin' }, false));
   out.push(W.friendSourceLabel('custom', 'Maya', 'Your food'), W.friendSourceLabel('builtin', 'Maya', 'Reference data'));
   for (const [f, n] of [[0, 0], [1, 0], [3, 2], [12, 1]]) out.push(W.feedNewsLine(f, n));
@@ -50,6 +50,24 @@ function strings(): string[] {
   for (const meals of [true, false]) {
     out.push(W.leaveNote(meals), W.leaveConfirm(meals), W.leftToast(meals), W.removeNote('Maya', meals), W.removeConfirm(meals), W.removedToast('Maya', meals), W.neverSharedLine(meals));
   }
+  // Together, buddies, notes and saved meals.
+  for (const kind of ['minutes', 'days'] as const) {
+    out.push(W.togetherKindWord(kind), W.goalChoice(kind, 480), W.lastWeekLine(kind, 328, 600), W.goalSavedToast(kind, 480), W.countsLine(kind), W.togetherSpoken(kind, 412, 600, false), W.togetherSpoken(kind, 600, 600, true));
+    for (const n of NAMES) out.push(W.circleInviteLine(kind, 600, n));
+  }
+  for (const n of NAMES) {
+    out.push(W.circleNames(n), W.circleLine(n, 3, false), W.circleLine(n, 1, true), W.askButton(n), W.savedShownToast('Chicken bowl', n));
+    if (n.length) out.push(W.askedLine(n), W.startedToast(n));
+  }
+  for (const d of [7, 2, 1, 0]) out.push(W.daysToGo(d));
+  for (const n of [0, 1, 3]) out.push(W.cheeredEveryoneToast(n), W.buddyRunLine(n), W.buddyWeekLine(n, false), W.buddyWeekLine(n, true), W.borrowedToast('Maya’s lunch', n));
+  for (const c of [null, 0, 1, 2] as const) out.push(W.buddyDaySpoken('Mon', c));
+  for (const k of ['thinking_of_you', 'walk_later', 'nice_week'] as const) out.push(W.NOTE_WORDS[k], W.noteSentLine(k), W.noteButtonLabel(k, 'Maya', false), W.noteButtonLabel(k, 'Maya', true), `Maya ${W.noteReceived(k)}`);
+  for (const [c, n] of [[3, 0], [0, 1], [2, 1], [1, 3]]) out.push(W.cheersNotesTitle(c, n), W.cheersNotesLabel(c, n));
+  for (const on of [true, false]) out.push(W.notesFromToast('Maya', on), W.notesAllToast(on));
+  out.push(W.circleInviteTitle('Maya'), W.declineCircleLabel('Maya'), W.circleDeclinedToast('Maya'), W.buddyAsk('Maya'), W.buddyAskButton('Maya'), W.buddyAskedToast('Maya'), W.buddyAskedTitle('Maya'), W.buddyInviteTitle('Maya'));
+  out.push(W.buddyAcceptedToast('Maya'), W.buddyDeclinedToast('Maya'), W.buddyWith('Maya'), W.buddyStopNote('Maya'), W.buddyStoppedToast('Maya'), W.noteTo('Maya'), W.notesLine('Maya'), W.noteSentToast('Maya'));
+  out.push(`Maya: ${W.savedCheerTarget('Chicken bowl')}`, W.savedTheyShow('Maya'), W.notesFrom('Maya'), W.notesFromOn('Maya'), W.borrowedName('Maya', 'lunch'), W.saveCupLabel('Maya’s lunch'), W.savedMealLine(3), W.savedMealLine(3, 4), W.showSavedTitle('Chicken bowl'), W.savedStoppedToast('Chicken bowl'));
   return out;
 }
 
@@ -67,6 +85,21 @@ describe('the Friends words', () => {
 
   it('never name a figure that could be compared: no total, no budget left or over', () => {
     expect(strings().filter((s) => /\b(left|over|under|remaining)\b/i.test(s) && !/left out|18 and over/.test(s))).toEqual([]);
+  });
+
+  it('name a circle by its people, you last, and never set one figure beside a name', () => {
+    expect(W.circleNames([])).toBe('You');
+    expect(W.circleNames(['Maya'])).toBe('Maya and you');
+    expect(W.circleNames(['Jo', 'Maya'])).toBe('Jo, Maya and you');
+    expect(W.circleNames(['a', 'b', 'c', 'd'])).toBe('4 friends and you');
+    expect(W.circleLine(['Jo', 'Maya'], 3, false)).toBe('Jo, Maya and you · 3 days to go');
+    // The join step says plainly what a circle of two gives away.
+    expect(W.SEEN_NOTE).toMatch(/circle of two/);
+    expect(W.SEEN_NOTE).toMatch(/names/);
+  });
+
+  it('keep notes to three fixed presets', () => {
+    expect(Object.keys(W.NOTE_WORDS).sort()).toEqual(['nice_week', 'thinking_of_you', 'walk_later']);
   });
 
   it('name people in words, with a short form past three', () => {

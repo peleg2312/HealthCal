@@ -15,6 +15,7 @@ import { LangButton, LangIconButton } from '@/features/food/langName';
 import { ItemCaption, LogSavedMealSheet } from '@/features/food/SavedMealParts';
 import { SaveCurrentMealRow, useVisitOrder } from '@/features/food/SavedMealRow';
 import { currentValues } from '@/features/food/usuals';
+import { ShowSavedCup, ShowSavedMealSheet, useCanShowSaved } from '@/features/friends/ShowSavedMeal';
 import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, sumNutrients } from '@/lib/nutrition';
 import { useToday } from '@/store/clock';
@@ -53,6 +54,9 @@ export default function SavedMealsScreen() {
   // "Save lunch as a meal": the meal and day chosen above, while it holds two foods or more that are not a saved meal yet.
   const toSave = mealToSave(entries, meal, date, saved);
   const [logging, setLogging] = useState<SavedMeal | null>(null);
+  // "Show to friends": only for someone friends can see meals from, on a server that has it.
+  const canShow = useCanShowSaved();
+  const [showing, setShowing] = useState<SavedMeal | null>(null);
   const build = (id?: string) => router.push(href('/food/meal-edit', { id, meal, date }) as never);
 
   return (
@@ -134,6 +138,7 @@ export default function SavedMealsScreen() {
                   style={{ flex: 1 }}
                   onPress={() => setLogging(m)}
                 />
+                {canShow ? <ShowSavedCup meal={m} testID={`saved-meal-show-${i}`} onPress={() => setShowing(m)} /> : null}
                 <LangIconButton testID={`saved-meal-edit-${i}`} accessibilityLabel={`Edit ${m.name}`} tone="clear" onPress={() => build(m.id)}>
                   <PenLine size={18} color={colors.textSecondary} />
                 </LangIconButton>
@@ -148,6 +153,7 @@ export default function SavedMealsScreen() {
       )}
 
       <LogSavedMealSheet key={logging?.id ?? 'none'} meal={logging} mealType={meal} date={date} onClose={() => setLogging(null)} />
+      {canShow ? <ShowSavedMealSheet meal={showing} onClose={() => setShowing(null)} /> : null}
     </Screen>
   );
 }

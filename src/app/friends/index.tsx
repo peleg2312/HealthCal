@@ -3,7 +3,9 @@ import { RefreshCw, Settings, Users } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, RefreshControl, View } from 'react-native';
 
-import { CheersList, IncomingRequests, InviteCard, Loading, OutgoingRequests } from '@/features/friends/components';
+import { CheersList, IncomingRequests, InviteCard, Loading, NotesList, OutgoingRequests } from '@/features/friends/components';
+import { FriendSavedMeals } from '@/features/friends/FriendSavedMeals';
+import { TogetherSection } from '@/features/friends/TogetherParts';
 import { markFriendsSeen } from '@/features/friends/attention';
 import type { FeedItem } from '@/features/friends/contract';
 import { feedByDay, feedKey, friendsWithNew, localFeed, newTodayCount } from '@/features/friends/feed';
@@ -20,13 +22,16 @@ import { showShortcutMeal } from '@/features/friends/showNow';
 import { formatCode, ownWorkoutsByRef, WORKOUT_WINDOW_DAYS } from '@/features/friends/summary';
 import { cheerCaption } from '@/features/friends/week';
 import {
+  CHEERS_NOTES_TITLE,
   CHEERS_TITLE,
   cheerWhat,
   FEED_EMPTY,
   FEED_EMPTY_TITLE,
   FEED_EMPTY_WORKOUTS,
   feedNewsLine,
+  FRIENDS_SAVED_TITLE,
   MENU_SHOW_LINE,
+  savedCheerTarget,
   SCREEN_SUBTITLE,
   SCREEN_SUBTITLE_WORKOUTS,
   SCREEN_TITLE,
@@ -38,10 +43,11 @@ import { timeAgo } from '@/features/settings/format';
 import { addDays } from '@/lib/dates';
 import { mealForTime } from '@/lib/nutrition';
 import { cheerFriend, cheerMeal, refreshFriends, removeFriend, respondToRequest, undoDecline, useFriends, type FriendRequest } from '@/services/friends';
+import { mealOfCheer } from '@/services/friendsWire';
 import { useNow, useToday } from '@/store/clock';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import type { FoodEntry, ISODate, MealType } from '@/types';
+import type { FeedSavedMeal, FoodEntry, ISODate, MealType } from '@/types';
 import { Button, Card, EmptyState, goBack, Header, IconButton, ListRow, Screen, SectionTitle, Sheet, Text, toast } from '@/ui';
 
 /** The diary menu's own show step, in a sheet of its own, for the shortcut's meal. */
@@ -121,7 +127,12 @@ export default function FriendsScreen() {
   const ownWorkouts = ownWorkoutsByRef(activities.filter((a) => a.date >= since), shareKey);
   const ownMeals = ownMealsByRef(shareKey, today);
   for (const m of myMeals) ownMeals.set(m.ref, { day: m.day, meal: m.meal });
-  const describe = (ref: string) => cheerWhat(ref, { workouts: ownWorkouts, meals: ownMeals }, today);
+  // A cheer for a saved meal shown is named by that meal ("your Chicken bowl").
+  const savedNames = new Map((overview?.mySavedMeals ?? []).map((m) => [m.ref, m.name]));
+  const describe = (ref: string) => {
+    const saved = savedNames.get(mealOfCheer(ref) ?? '');
+    return saved ? savedCheerTarget(saved) : cheerWhat(ref, { workouts: ownWorkouts, meals: ownMeals }, today);
+  };
 
   const pull = async () => {
     setRefreshing(true);
@@ -228,6 +239,12 @@ export default function FriendsScreen() {
 
   // ------------------------------------------------ the full screen
   const { incoming, outgoing, cheers } = overview;
+  // Doing things together: everything of it hides calmly while the server has none of it (no error, no toast).
+  const together = overview.togetherAvailable !== false;
+  const notes = together ? (overview.notes ?? []) : [];
+  const savedShown = together && me.mealsAllowed ? (overview.sharedSavedMeals ?? []) : [];
+  const openSaved = (m: FeedSavedMeal) =>
+    setOpenMeal({ meal: { owner: m, meal: { ref: m.ref, day: today, meal: hourMeal, items: m.items, showKcal: m.showKcal }, cheered: m.cheered, saved: { name: m.name, servings: m.servings } }, adding: false });
   const copyCode = () => void copyText(formatCode(me.code), 'Code copied');
   const units = profile.units;
   const openAdd = () => router.push('/friends/add' as never);
@@ -255,7 +272,10 @@ export default function FriendsScreen() {
         <InviteCard code={me.code} sharing={me.sharing} onShare={() => void shareInvite(me.code)} onCopy={copyCode} onEnter={openAdd} />
       )}
 
-      {/* A shared "Together this week" card belongs here, under the people and above the feed. */}
+      {/* Together this week: invitations, the circle's one cup, or a quiet row that starts one. */}
+      {together && friends.length ? (
+        <TogetherSection circles={overview.together ?? []} invites={overview.togetherInvites ?? []} friends={friends} adult={me.mealsAllowed} today={today} />
+      ) : null}
 
       {friends.length && shortcut ? (
         <Card padding={0} testID="friends-show-now-card">
@@ -270,9 +290,11 @@ export default function FriendsScreen() {
         </Card>
       ) : null}
 
+      {friends.length ? <FriendSavedMeals title={FRIENDS_SAVED_TITLE} meals={savedShown} withPerson onOpen={openSaved} testID="friends-saved" /> : null}
+
       {friends.length ? (
         <View style={{ gap: spacing.md }}>
-          <RecentTitle cheers={cheers.length} onCheers={() => setCheersOpen(true)} />
+          <RecentTitle cheers={cheers.length} notes={notes.length} onCheers={() => setCheersOpen(true)} />
           {days.length ? (
             <View testID="friends-feed" style={{ gap: spacing.lg }}>
               {days.map((d) => (
@@ -323,8 +345,11 @@ export default function FriendsScreen() {
         </View>
       ) : null}
 
-      <Sheet visible={cheersOpen} onClose={() => setCheersOpen(false)} title={CHEERS_TITLE}>
-        <CheersList cheers={cheers} describe={(c) => describe(c.ref)} when={(c) => cheerCaption(c.ref, timeAgo(c.createdAt, now))} />
+      <Sheet visible={cheersOpen} onClose={() => setCheersOpen(false)} title={notes.length ? CHEERS_NOTES_TITLE : CHEERS_TITLE}>
+        <View style={{ gap: spacing.md }}>
+          {notes.length ? <NotesList notes={notes} when={(n) => timeAgo(n.createdAt, now) ?? ''} /> : null}
+          {cheers.length ? <CheersList cheers={cheers} describe={(c) => describe(c.ref)} when={(c) => cheerCaption(c.ref, timeAgo(c.createdAt, now))} /> : null}
+        </View>
       </Sheet>
       <ShowNowSheet meal={showFor} date={today} entries={todayEntries} onClose={() => setShowFor(null)} />
       <FriendMealSheet

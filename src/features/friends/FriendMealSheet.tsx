@@ -6,7 +6,7 @@
  * anything else, which opens search with its name. One toast with one Undo (`logItems`).
  */
 import { router } from 'expo-router';
-import { Search } from 'lucide-react-native';
+import { BookmarkPlus, Search } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Platform, View } from 'react-native';
 
@@ -22,17 +22,23 @@ import { fonts, useLargeText, useTheme } from '@/theme';
 import type { ISODate, MealType } from '@/types';
 import { Button, CupKey, Divider, haptic, PressableScale, Sheet, Text } from '@/ui';
 
+import { saveToMyMeals } from './borrow';
 import { CheerButton } from './components';
 import type { SharedMeal } from './contract';
 import { copiedToast, copyItems, copyKcal, copyRows, findHref, firstTicked, type CopyRow } from './copyMeal';
 import { sharedName, sharedSourceWords } from './MealCard';
-import { ADD_TITLE, ADD_TO_DIARY, addButton, addFrom, addNote, FIND, friendMealTitle, KCAL_HIDDEN, NOT_IN_LIST, showLine, YOU_CHEERED } from './words';
+import { ADD_TITLE, ADD_TO_DIARY, addButton, addFrom, addNote, borrowedName, FIND, friendMealTitle, KCAL_HIDDEN, NOT_IN_LIST, SAVE_TO_MY_MEALS, savedMealLine, showLine, YOU_CHEERED } from './words';
 
 export interface OpenMeal {
   /** The friend who shows it. */
   owner: { userId: string; displayName: string };
   meal: SharedMeal;
   cheered: boolean;
+  /**
+   * A saved meal or recipe the friend shows (no day): its name and servings. `meal.meal` is then only where the add
+   * step starts (the meal of the hour), and `meal.day` is not drawn.
+   */
+  saved?: { name: string; servings?: number };
 }
 
 /**
@@ -149,7 +155,7 @@ function AddRow({ row, owner, ticked, onToggle, onFind, testID }: { row: CopyRow
 
 /** The sheet: a friend's meal, then (in place) the step that adds it to the diary. */
 export function FriendMealSheet({ open, startAdding, onClose, onCheer }: { open: OpenMeal | null; startAdding: boolean; onClose: () => void; onCheer: (o: OpenMeal) => void }) {
-  const { spacing } = useTheme();
+  const { colors, spacing } = useTheme();
   const todayDate = useToday();
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [step, setStep] = useState<'view' | 'add'>('view');
@@ -173,6 +179,9 @@ export function FriendMealSheet({ open, startAdding, onClose, onCheer }: { open:
   if (!open) return <Sheet visible={false} onClose={onClose}>{null}</Sheet>;
   const owner = open.owner.displayName;
   const m = open.meal;
+  const saved = open.saved;
+  // "Maya’s lunch", or a saved meal by its own name: "Maya’s Chicken bowl".
+  const title = saved ? borrowedName(isolateRtl(owner), isolateRtl(saved.name)) : friendMealTitle(owner, m.meal);
 
   if (step === 'add') {
     const count = rows.filter((r) => r.kind === 'copy' && ticked.has(r.index)).length;
@@ -188,7 +197,7 @@ export function FriendMealSheet({ open, startAdding, onClose, onCheer }: { open:
         visible
         onClose={onClose}
         title={ADD_TITLE}
-        subtitle={addFrom(owner, m.meal)}
+        subtitle={saved ? `From ${title}` : addFrom(owner, m.meal)}
         footer={<Button testID="friend-meal-add-confirm" title={addButton(count, meal, copyKcal(rows, ticked))} disabled={count === 0} onPress={add} />}>
         <View style={{ gap: spacing.md }} testID="friend-meal-add">
           <MealPicker value={meal} onChange={setMeal} testIDPrefix="friend-meal-add-meal" />
@@ -232,12 +241,12 @@ export function FriendMealSheet({ open, startAdding, onClose, onCheer }: { open:
     <Sheet
       visible
       onClose={onClose}
-      title={friendMealTitle(owner, m.meal)}
-      subtitle={showLine(m.day, todayDate, m.items.length)}
+      title={title}
+      subtitle={saved ? savedMealLine(m.items.length, saved.servings) : showLine(m.day, todayDate, m.items.length)}
       footer={
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           <View style={{ flex: 2 }}>
-            <CheerButton testID="friend-meal-cheer" cheered={open.cheered} label={withoutMarks(friendMealTitle(owner, m.meal))} onPress={() => onCheer(open)} full />
+            <CheerButton testID="friend-meal-cheer" cheered={open.cheered} label={withoutMarks(title)} onPress={() => onCheer(open)} full />
           </View>
           <View style={{ flex: 3 }}>
             <Button testID="friend-meal-add-open" title={ADD_TO_DIARY} size="sm" onPress={() => setStep('add')} />
@@ -263,6 +272,19 @@ export function FriendMealSheet({ open, startAdding, onClose, onCheer }: { open:
             {YOU_CHEERED}
           </Text>
         ) : null}
+        {/* Keep it for another day: a saved meal of the person's own, no server (proposal 5a). */}
+        <Button
+          testID="friend-meal-save"
+          title={SAVE_TO_MY_MEALS}
+          variant="ghost"
+          size="sm"
+          full={false}
+          style={{ alignSelf: 'center' }}
+          icon={<BookmarkPlus color={colors.actionInk} />}
+          onPress={() => {
+            if (saveToMyMeals({ owner, what: saved ? { name: saved.name } : { meal: m.meal }, items: m.items, servings: saved?.servings })) onClose();
+          }}
+        />
       </View>
     </Sheet>
   );

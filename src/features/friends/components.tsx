@@ -1,21 +1,21 @@
-import { Copy, HandHeart, Lock, Plus, Share as ShareIcon, UserPlus, X } from 'lucide-react-native';
+import { Copy, HandHeart, Lock, Mail, Plus, Share as ShareIcon, UserPlus, X } from 'lucide-react-native';
 import React from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { PourWait } from '@/components/PourWait';
 
 import { weekdayShort } from '@/lib/dates';
 import { formatDistance } from '@/lib/units';
-import type { CheerReceived, FriendRequest, FriendWorkout, SocialSharing } from '@/services/friends';
+import { useFriends, type CheerReceived, type FriendRequest, type FriendWorkout, type SocialSharing } from '@/services/friends';
 import { cupFor, fonts, useTheme } from '@/theme';
-import type { ISODate, UnitSystem } from '@/types';
+import type { ISODate, NoteReceived, UnitSystem } from '@/types';
 import { Avatar, Button, Card, CupKey, decorative, Divider, figure, IconButton, MiniCup, Text, TextField, Toggle } from '@/ui';
 
-import { avatarTintKey } from './avatar';
+import { friendTints, tintFor } from './avatar';
 
 import { formatCode, normalizeCode } from './summary';
 import { personMark, sharingSentence, type FriendDay } from './week';
-import { addCupLabel, cheerCupLabel, ENTER_THEIR_CODE, INVITE_LINE, INVITE_TITLE, neverSharedLine } from './words';
+import { addCupLabel, cheerCupLabel, ENTER_THEIR_CODE, INVITE_LINE, INVITE_TITLE, neverSharedLine, noteReceived } from './words';
 
 /** Below this width (iPhone SE) the friend screens tighten up, as Today does. */
 export function useNarrow(): boolean {
@@ -29,12 +29,14 @@ export const idFor = (userId: string) => userId.replace(/[^A-Za-z0-9-]/g, '').to
 
 /**
  * A person: a cup tile with their initials, always (never an emoji). With their user id the tile wears their own
- * soft tint (`avatarTintKey`: one of the theme's six, the same on every screen), initials in `avatarInk`; without
- * one (the person's own preview) it is the plain cup.
+ * soft tint (one of the theme's six, the same on every screen: `friendTints` over the person's friends, so the first
+ * six friends differ, else `avatarTintKey`), initials in `avatarInk`; without one (the person's own preview) it is
+ * the plain cup.
  */
 export function PersonMark({ name, avatar, id, size = 44 }: { name: string; avatar: string; id?: string; size?: number }) {
   const { colors } = useTheme();
-  const tint = avatarTintKey(id);
+  const friends = useFriends((s) => s.overview?.friends);
+  const tint = tintFor(id, friendTints(friends ?? []));
   const initials = personMark(name, avatar).text;
   if (!tint) return <Avatar initials={initials} size={size} />;
   return (
@@ -278,6 +280,37 @@ export function CheersList({ cheers, describe, when }: { cheers: CheerReceived[]
           </View>
         </React.Fragment>
       ))}
+    </Card>
+  );
+}
+
+/** Notes the user received: "Maya sent “Walk later?”", newest first (in the cheers sheet, above the cheers). */
+export function NotesList({ notes, when }: { notes: NoteReceived[]; when: (n: NoteReceived) => string }) {
+  const { colors, spacing } = useTheme();
+  return (
+    <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }} testID="friends-notes-list">
+      <View {...(Platform.OS === 'web' ? ({ role: 'list' } as object) : null)}>
+        {notes.map((n, i) => (
+          <View key={n.id} {...(Platform.OS === 'web' ? ({ role: 'listitem' } as object) : null)}>
+            {i > 0 ? <Divider inset={48} /> : null}
+            <View testID={`friends-note-received-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: spacing.sm }}>
+              <PersonMark name={n.displayName} avatar={n.avatar} id={n.userId} size={36} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text variant="body">
+                  <Text variant="bodyStrong">{n.displayName}</Text>
+                  {` ${noteReceived(n.kind)}`}
+                </Text>
+                {when(n) ? (
+                  <Text variant="caption" color="textSecondary">
+                    {when(n)}
+                  </Text>
+                ) : null}
+              </View>
+              {decorative(<Mail size={18} color={colors.textSecondary} strokeWidth={1.9} />)}
+            </View>
+          </View>
+        ))}
+      </View>
     </Card>
   );
 }

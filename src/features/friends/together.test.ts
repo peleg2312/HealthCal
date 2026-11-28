@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buddyCup, buddyDaysTogether, daysLeftInWeek, NOTE_KINDS, TOGETHER_RULES, togetherGoalChoices, togetherProgress } from './together';
+import { buddyCup, buddyDaysTogether, canShowSaved, daysLeftInWeek, NOTE_KINDS, TOGETHER_RULES, togetherGoalChoices, togetherProgress } from './together';
 
 describe('the shared cup', () => {
   it('pours the circle’s share and is reached at the goal or past it, never above full', () => {
@@ -48,5 +48,22 @@ describe('buddies and notes', () => {
 
   it('offers three preset notes and nothing else', () => {
     expect(NOTE_KINDS).toEqual(['thinking_of_you', 'walk_later', 'nice_week']);
+  });
+});
+
+describe('Show to friends on a saved meal', () => {
+  const me = { mealsAllowed: true };
+  const friends = [{ shareMeals: true }];
+  it('is offered with friends on, 18 or over, a friend to pick and a server that has it', () => {
+    expect(canShowSaved({ me, friends })).toBe(true);
+    expect(canShowSaved({ me, friends, togetherAvailable: true, mealsAvailable: true })).toBe(true);
+  });
+  it('hides calmly otherwise', () => {
+    expect(canShowSaved(null)).toBe(false);
+    expect(canShowSaved({ me: null, friends })).toBe(false);
+    expect(canShowSaved({ me: { mealsAllowed: false }, friends })).toBe(false);
+    expect(canShowSaved({ me, friends: [{ shareMeals: false }] })).toBe(false);
+    expect(canShowSaved({ me, friends, togetherAvailable: false })).toBe(false);
+    expect(canShowSaved({ me, friends, mealsAvailable: false })).toBe(false);
   });
 });

@@ -3,7 +3,9 @@ import { SlidersHorizontal } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
+import { BuddyCard, NotesCard } from '@/features/friends/BuddyParts';
 import { CheerButton, Loading, WeekCups } from '@/features/friends/components';
+import { FriendSavedMeals } from '@/features/friends/FriendSavedMeals';
 import { feedKey, friendShows, localFeed, mealsOf } from '@/features/friends/feed';
 import { FeedRow, itemRole, listRole } from '@/features/friends/FeedParts';
 import { FriendMealSheet, type OpenMeal } from '@/features/friends/FriendMealSheet';
@@ -11,15 +13,22 @@ import { mealsOverview } from '@/features/friends/overview';
 import { dayRef } from '@/features/friends/summary';
 import { friendWeek, isCurrentWeek, sharesAnything } from '@/features/friends/week';
 import {
+  BUDDY_STOP,
+  buddyStopNote,
+  buddyStoppedToast,
   friendsSince,
   MANAGE,
   manageLine,
   manageTitle,
   nothingShownYet,
+  notesFrom,
+  notesFromOn,
+  notesFromToast,
   REMOVE_FRIEND,
   removeConfirm,
   removedToast,
   removeNote,
+  savedTheyShow,
   seesMyMealsOn,
   seesMyMealsTitle,
   theirMealsOn,
@@ -30,8 +39,9 @@ import {
 import { Figure } from '@/features/trackers/components';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { formatShortDate, toISODate } from '@/lib/dates';
-import { cheerFriend, cheerMeal, refreshFriends, removeFriend, setFriendMealPrefs, useFriends } from '@/services/friends';
-import { useToday } from '@/store/clock';
+import { cheerFriend, cheerMeal, refreshFriends, removeFriend, setFriendMealPrefs, setFriendNotes, stopBuddy, useFriends } from '@/services/friends';
+import { mealForTime } from '@/lib/nutrition';
+import { useNow, useToday } from '@/store/clock';
 import { useProfile } from '@/store/selectors';
 import { fonts, useLargeText, useTheme } from '@/theme';
 import { Card, ConfirmSheet, Divider, EmptyState, goBack, Header, ListRow, PressableScale, Screen, SectionTitle, Sheet, Text, toast, Toggle } from '@/ui';
@@ -57,8 +67,8 @@ function SwitchRow({ title, subtitle, value, onChange, testID }: { title: string
 /**
  * A friend's page: their week (figures, the week in cups and Cheer their day), what they show you (meals and
  * workouts together, newest first), and one "Manage" row whose sheet holds the rarer controls: the two meal
- * switches and, quiet and last, Remove. Room is left above the week for something the two do together and
- * under it for notes between them.
+ * switches, notes from them, ending logging together and, quiet and last, Remove. Logging together sits above
+ * their week and the notes under it (`BuddyParts`), both only while the server has them.
  */
 export default function FriendScreen() {
   const { colors, spacing } = useTheme();
@@ -68,8 +78,10 @@ export default function FriendScreen() {
   const overview = useFriends((s) => s.overview);
   const profile = useProfile();
   const today = useToday();
+  const now = useNow();
   const [manageOpen, setManageOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [confirmStop, setConfirmStop] = useState(false);
   const [openMeal, setOpenMeal] = useState<{ meal: OpenMeal; adding: boolean } | null>(null);
 
   useFocusEffect(
@@ -106,6 +118,13 @@ export default function FriendScreen() {
   const theirMeals = mealsOn ? mealsOf(localFeed({ feed, today, seeMeals: !!me?.mealSettings.see, friends }), friend.userId) : [];
   const shows = friendShows(theirMeals, friend, s.workouts ?? []);
   const dayCheer = dayRef(today);
+  // Doing things together: hidden calmly while the server has none of it.
+  const together = overview?.togetherAvailable !== false;
+  const buddies = together ? (overview?.buddies ?? []) : [];
+  const buddy = buddies.find((b) => b.userId === friend.userId) ?? null;
+  const buddyInvite = together ? ((overview?.buddyInvites ?? []).find((b) => b.userId === friend.userId) ?? null) : null;
+  const savedShown = together && mealsOn ? (overview?.sharedSavedMeals ?? []).filter((m) => m.userId === friend.userId) : [];
+  const notesOn = friend.notesOn !== false;
 
   const cheer = async (ref: string) => {
     const res = await cheerFriend(friend.userId, ref);
@@ -114,6 +133,15 @@ export default function FriendScreen() {
   const setPref = async (prefs: { shareMeals?: boolean; seeMeals?: boolean }, said: string) => {
     const res = await setFriendMealPrefs(friend.userId, prefs);
     toast(res.ok ? said : res.message);
+  };
+  const stopTogether = async () => {
+    setConfirmStop(false);
+    const res = await stopBuddy(friend.userId);
+    toast(res.ok ? buddyStoppedToast(name) : res.message);
+  };
+  const setNotes = async (on: boolean) => {
+    const res = await setFriendNotes(friend.userId, on);
+    toast(res.ok ? notesFromToast(name, on) : res.message);
   };
   const remove = async () => {
     setConfirmRemove(false);
@@ -134,7 +162,8 @@ export default function FriendScreen() {
 
   return (
     <Screen header={<Header title={name} subtitle={friendsSince(since)} />} testID="friend-screen">
-      {/* Something the two of you do together goes here, above their week. */}
+      {/* Logging together, above their week. */}
+      {together ? <BuddyCard friend={friend} buddy={buddy} invite={buddyInvite} pairs={buddies.length} /> : null}
       {sharesAnything(s) ? (
         <Card testID="friend-week">
           {weekHead}
@@ -161,7 +190,8 @@ export default function FriendScreen() {
         </Card>
       )}
 
-      {/* Notes between the two of you go here, under their week. */}
+      {/* A kind note, under their week. */}
+      {together ? <NotesCard friend={friend} sent={overview?.notesSent ?? []} /> : null}
 
       <View style={{ gap: spacing.md }}>
         <SectionTitle title={theyShowYou(name)} />
@@ -198,12 +228,22 @@ export default function FriendScreen() {
         </Card>
       </View>
 
+      <FriendSavedMeals
+        title={savedTheyShow(name)}
+        meals={savedShown}
+        withPerson={false}
+        testID="friend-saved"
+        onOpen={(m) =>
+          setOpenMeal({ meal: { owner: m, meal: { ref: m.ref, day: today, meal: mealForTime(now), items: m.items, showKcal: m.showKcal }, cheered: m.cheered, saved: { name: m.name, servings: m.servings } }, adding: false })
+        }
+      />
+
       <Card padding={0}>
         <ListRow
           testID="friend-manage"
           style={{ paddingHorizontal: spacing.lg }}
           title={MANAGE}
-          subtitle={manageLine(mealsOn)}
+          subtitle={manageLine(mealsOn, together)}
           left={<SlidersHorizontal size={20} color={colors.text} />}
           chevron
           onPress={() => setManageOpen(true)}
@@ -231,6 +271,31 @@ export default function FriendScreen() {
               />
               <Divider />
             </View>
+          ) : null}
+          {together ? (
+            <View testID="friend-notes-pref">
+              <SwitchRow testID="friend-notes-on" title={notesFrom(name)} subtitle={notesFromOn(name)} value={notesOn} onChange={(v) => void setNotes(v)} />
+              <Divider />
+            </View>
+          ) : null}
+          {buddy ? (
+            <>
+              <PressableScale
+                testID="buddy-stop"
+                focusRing="inside"
+                accessibilityLabel={`${BUDDY_STOP}. ${withoutMarks(buddyStopNote(name))}`}
+                onPress={() => {
+                  setManageOpen(false);
+                  setConfirmStop(true);
+                }}
+                style={{ minHeight: 56, paddingVertical: spacing.md, justifyContent: 'center' }}>
+                <Text variant="bodyStrong">{BUDDY_STOP}</Text>
+                <Text variant="caption" color="textSecondary">
+                  {buddyStopNote(name)}
+                </Text>
+              </PressableScale>
+              <Divider />
+            </>
           ) : null}
           {/* Quiet and last: words in the danger colour, no filled or outlined button. */}
           <PressableScale
@@ -260,6 +325,14 @@ export default function FriendScreen() {
           void cheerMeal(o.owner.userId, o.meal.ref).then((r) => !r.ok && toast(r.message));
           setOpenMeal((cur) => (cur ? { ...cur, meal: { ...cur.meal, cheered: true } } : cur));
         }}
+      />
+      <ConfirmSheet
+        visible={confirmStop}
+        title={`${BUDDY_STOP}?`}
+        message={buddyStopNote(name)}
+        confirmLabel={BUDDY_STOP}
+        onConfirm={() => void stopTogether()}
+        onCancel={() => setConfirmStop(false)}
       />
       <ConfirmSheet
         visible={confirmRemove}

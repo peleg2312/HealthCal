@@ -8,7 +8,7 @@
 import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
-import type { ISODate, MealType } from '@/types';
+import type { ISODate, MealType, NoteKind, TogetherKind } from '@/types';
 
 import { mealOfCheer } from '@/services/friendsWire';
 
@@ -340,7 +340,8 @@ export const weekOf = (name: string) => `${isolateRtl(name)}’s week`;
 export const theyShowYou = (name: string) => `${isolateRtl(name)} shows you`;
 export const MANAGE = 'Manage';
 /** The Manage row's line: what is behind it. */
-export const manageLine = (meals: boolean) => (meals ? 'Meals between you, or remove' : 'Remove friend');
+export const manageLine = (meals: boolean, notes = false) =>
+  notes ? (meals ? 'Meals and notes between you, or remove' : 'Notes from them, or remove') : meals ? 'Meals between you, or remove' : 'Remove friend';
 /** The Manage sheet's title: "You and Maya". */
 export const manageTitle = (name: string) => `You and ${isolateRtl(name)}`;
 /** The two switches, worded for what On does. */
@@ -355,3 +356,191 @@ export const GROUP_YOU = 'You';
 export const GROUP_MEALS = 'Meals';
 export const SEE_MEALS_ON = 'Meals friends show you appear with their workouts';
 export const ALWAYS_SHOW_HINT = 'Tap a meal to show it each day as you log it.';
+
+// ------------------------------------------------------------------ together this week (proposal 3)
+// A circle's one cup: the circle's total and its goal, members by name, never one person's figure and never an order.
+
+/** "Active minutes", "Days logged": what fills the cup. */
+export const togetherKindWord = (kind: TogetherKind) => (kind === 'minutes' ? 'Active minutes' : 'Days logged');
+/** The unit after the figure: "active min", "days logged". */
+export const togetherUnit = (kind: TogetherKind) => (kind === 'minutes' ? 'active min' : 'days logged');
+/** The same in full, for a screen reader. */
+export const togetherUnitSpoken = (kind: TogetherKind) => (kind === 'minutes' ? 'active minutes' : 'days logged');
+
+export const TOGETHER_TITLE = 'Together this week';
+export const TOGETHER_START = 'Fill a cup together';
+export const TOGETHER_START_LINE = 'One weekly goal with 1 to 5 friends';
+export const TOGETHER_OPEN = 'The circle';
+
+/** The others in the circle and you: "You", "Maya and you", "Jo, Maya and you", "4 friends and you". */
+export function circleNames(others: readonly string[]): string {
+  if (!others.length) return 'You';
+  if (others.length > 3) return `${others.length} friends and you`;
+  const n = others.map((x) => isolateRtl(x.trim() || 'A friend'));
+  return n.length === 1 ? `${n[0]} and you` : `${n.slice(0, -1).join(', ')}, ${n[n.length - 1]} and you`;
+}
+
+/** "3 days to go", "Last day of the week". */
+export const daysToGo = (n: number) => (n <= 1 ? 'Last day of the week' : `${n} days to go`);
+
+/** The card's line: who, and the week ("Jo, Maya and you · 3 days to go"), or the goal reached. */
+export function circleLine(others: readonly string[], days: number, reached: boolean): string {
+  return `${circleNames(others)} · ${reached ? 'goal reached' : daysToGo(days).toLowerCase()}`;
+}
+
+export const TOGETHER_REACHED = 'Goal reached together.';
+
+/** The cup's name for a screen reader: "412 of 600 active minutes together this week". */
+export function togetherSpoken(kind: TogetherKind, total: number, target: number, reached: boolean): string {
+  return `${formatNumber(total)} of ${formatNumber(target)} ${togetherUnitSpoken(kind)} together this week${reached ? ', goal reached' : ''}`;
+}
+
+/** Last week's cup, said once, plainly: "Last week: 328 of 600 active min together." */
+export const lastWeekLine = (kind: TogetherKind, total: number, target: number) => `Last week: ${formatNumber(total)} of ${formatNumber(target)} ${togetherUnit(kind)} together.`;
+
+export const IN_THE_CIRCLE = 'In the circle';
+export const NAMES_NOTE = 'Listed by name. The cup shows the circle’s total, never one person’s figure.';
+/** Who was asked and has not joined: "Asked Sam. They join when they accept." */
+export const askedLine = (names: readonly string[]) => (names.length ? `Asked ${namesLine(names)}. They join when they accept.` : '');
+export const CHANGE_GOAL = 'Change the goal';
+export const GOAL_FROM_THIS_WEEK = 'A new goal counts from this week. Anyone in the circle can change it.';
+export const SAVE_GOAL = 'Save goal';
+/** "Goal saved: 480 active min a week". */
+export const goalSavedToast = (kind: TogetherKind, target: number) => `Goal saved: ${formatNumber(target)} ${togetherUnit(kind)} a week`;
+export const ASK_MORE = 'Ask more friends';
+export const CHEER_EVERYONE = 'Cheer everyone';
+/** After "Cheer everyone": "Cheer sent to 2 friends". */
+export const cheeredEveryoneToast = (n: number) => (n > 0 ? `Cheer sent to ${n} ${n === 1 ? 'friend' : 'friends'}` : 'Everyone in the circle has your cheer for today');
+export const LEAVE_CIRCLE = 'Leave the circle';
+export const LEAVE_CIRCLE_NOTE = 'Nobody is told. The cup goes on with the others.';
+export const OUT_OF_CIRCLE = 'You are out of the circle. Nobody was told.';
+
+/** The start sheet. */
+export const WHAT_FILLS = 'What fills the cup';
+export const WHO_TO_ASK = 'Who to ask';
+export const WHO_TO_ASK_NOTE = 'Pick 1 to 5 friends. Each joins when they accept.';
+export const GOAL_FOR_WEEK = 'Goal for the week';
+export const GOAL_NOTE = 'Suggested for the number of people picked.';
+/** A goal choice: "480 active min", "20 days". */
+export const goalChoice = (kind: TogetherKind, n: number) => (kind === 'minutes' ? `${formatNumber(n)} active min` : `${n} days`);
+/** The start button names who: "Ask Maya and Sam", "Ask 4 friends", or "Pick who to ask". */
+export function askButton(names: readonly string[]): string {
+  if (!names.length) return 'Pick who to ask';
+  return names.length > 2 ? `Ask ${names.length} friends` : `Ask ${namesLine(names)}`;
+}
+/** Once started: "Asked Maya and Sam. The cup fills as they join." */
+export const startedToast = (names: readonly string[]) => `Asked ${names.length > 2 ? `${names.length} friends` : namesLine(names)}. The cup fills as they join.`;
+
+/** What joining means, said before anyone joins or starts: what counts, and what the others see. */
+export function countsLine(kind: TogetherKind): string {
+  return kind === 'minutes'
+    ? 'Your active minutes this week count toward the cup, also with Active minutes switched off for friends.'
+    : 'The days you log food this week count toward the cup, never what you ate or how much.';
+}
+export const SEEN_NOTE = 'Everyone in the circle sees each other’s names and the cup’s total, never one person’s figure. In a circle of two, the other person can work out your figure from the total.';
+export const LEAVE_ANY_TIME = 'You can leave any time, and nobody is told.';
+
+/** An invitation. */
+export const circleInviteTitle = (from: string) => `${isolateRtl(from)} asks you to fill a cup together`;
+/** "600 active min a week · with Maya and Sam". */
+export function circleInviteLine(kind: TogetherKind, target: number, members: readonly string[]): string {
+  return `${goalChoice(kind, target)} a week${members.length ? ` · with ${namesLine(members)}` : ''}`;
+}
+export const JOIN = 'Join';
+export const JOIN_TITLE = 'Join the circle';
+export const declineCircleLabel = (from: string) => `Decline ${from}’s invitation`;
+export const circleDeclinedToast = (from: string) => `Declined. ${from} is not told.`;
+export const JOINED_TOAST = 'You joined. Your figure now counts toward the cup.';
+
+// ------------------------------------------------------------------ logging together (proposal 4)
+
+export const BUDDY_TITLE = 'Logging together';
+/** The row that offers it: "Log together with Maya". */
+export const buddyAsk = (name: string) => `Log together with ${isolateRtl(name)}`;
+export const BUDDY_ASK_LINE = 'Which days you both logged, never what';
+export const BUDDY_EXPLAIN =
+  'Each day shows whether you both logged food, one of you did, or neither, never what or how much. One day a week that one of you misses is kept. Either of you can end it at any time, and nobody is told.';
+export const buddyAskButton = (name: string) => `Ask ${isolateRtl(name)}`;
+export const buddyAskedToast = (name: string) => `Asked ${name}. Nothing changes until they accept.`;
+export const buddyAskedTitle = (name: string) => `Asked ${isolateRtl(name)} to log together`;
+export const BUDDY_WAITING = 'Waiting for them to accept';
+export const TAKE_BACK = 'Take back';
+export const buddyInviteTitle = (name: string) => `${isolateRtl(name)} asks to log together`;
+export const ACCEPT = 'Accept';
+export const buddyAcceptedToast = (name: string) => `You and ${name} now log together`;
+export const buddyDeclinedToast = (name: string) => `Declined. ${name} is not told.`;
+/** "With Maya". */
+export const buddyWith = (name: string) => `With ${isolateRtl(name)}`;
+/** "4 days together this week", and "a day one of you missed is kept" when one was. */
+export function buddyWeekLine(both: number, kept: boolean): string {
+  return `${both} ${both === 1 ? 'day' : 'days'} together this week${kept ? ' · a day one of you missed is kept' : ''}`;
+}
+/** The run: "12 days in a row together", or a fresh start said plainly. */
+export const buddyRunLine = (run: number) => (run > 0 ? `${formatNumber(run)} ${run === 1 ? 'day' : 'days'} in a row together` : 'A new run starts with the next day you both log');
+/** One day's cup for a screen reader: "Mon, you both logged". */
+export function buddyDaySpoken(weekday: string, count: 0 | 1 | 2 | null): string {
+  const what = count === 2 ? 'you both logged' : count === 1 ? 'one of you logged' : count === 0 ? 'neither logged' : 'not counted';
+  return `${weekday}, ${what}`;
+}
+export const BUDDY_STOP = 'Stop logging together';
+export const buddyStopNote = (name: string) => `${isolateRtl(name)} is not told. It can start again when one of you asks and the other accepts.`;
+export const buddyStoppedToast = (name: string) => `Logging together with ${name} ended`;
+export const BUDDY_FULL = 'Logging together works with up to 3 friends at a time.';
+
+// ------------------------------------------------------------------ kind notes (proposal 6)
+
+/** The three notes, as drawn and as sent. No free text. */
+export const NOTE_WORDS: Record<NoteKind, string> = { thinking_of_you: 'Thinking of you', walk_later: 'Walk later?', nice_week: 'Nice week' };
+/** The notes card's heading: "Send Maya a note". */
+export const noteTo = (name: string) => `Send ${isolateRtl(name)} a note`;
+export const notesLine = (name: string) => `One note a day. ${isolateRtl(name)} can turn notes off, and you are not told.`;
+/** Once today's note to this friend is sent: "Sent today: “Walk later?”. Another can go tomorrow." */
+export const noteSentLine = (kind: NoteKind) => `Sent today: “${NOTE_WORDS[kind]}”. Another can go tomorrow.`;
+export const NOTES_DAY_FULL = 'Five notes sent today. More can go tomorrow.';
+export const noteSentToast = (name: string) => `Note sent to ${name}`;
+/** A note button's name: its words, then who it goes to ("Walk later?, send to Maya"), or that it went today. */
+export const noteButtonLabel = (kind: NoteKind, name: string, sent: boolean) => (sent ? `${NOTE_WORDS[kind]}, sent to ${name} today` : `${NOTE_WORDS[kind]}, send to ${name}`);
+/** A received note, after the sender's name: " sent “Walk later?”". */
+export const noteReceived = (kind: NoteKind) => `sent “${NOTE_WORDS[kind]}”`;
+/** The chip by "Recent": "3 cheers for you", "1 note for you", "2 cheers · 1 note". */
+export function cheersNotesTitle(cheers: number, notes: number): string {
+  if (!notes) return cheersTitle(cheers);
+  const n = `${notes} ${notes === 1 ? 'note' : 'notes'}`;
+  return cheers ? `${cheers} ${cheers === 1 ? 'cheer' : 'cheers'} · ${n}` : `${n} for you`;
+}
+/** Its name: its words, then where it leads. */
+export const cheersNotesLabel = (cheers: number, notes: number) => `${cheersNotesTitle(cheers, notes)}. See who sent them`;
+export const CHEERS_NOTES_TITLE = 'Cheers and notes for you';
+/** The Manage sheet's switch: "Notes from Maya". */
+export const notesFrom = (name: string) => `Notes from ${isolateRtl(name)}`;
+export const notesFromOn = (name: string) => `Notes ${isolateRtl(name)} sends appear in Friends. Not told when off`;
+export const notesFromToast = (name: string, on: boolean) => (on ? `Notes from ${name} are on` : `Notes from ${name} are off. ${name} is not told.`);
+export const NOTES_FROM_FRIENDS = 'Notes from friends';
+export const NOTES_FROM_FRIENDS_ON = 'Notes friends send you appear in Friends. Nobody is told when they are off';
+export const notesAllToast = (on: boolean) => (on ? 'Notes from friends are on' : 'Notes from friends are off. Nobody is told.');
+
+// ------------------------------------------------------------------ saved meals (proposal 5)
+
+export const SAVE_TO_MY_MEALS = 'Save to my meals';
+/** The saved meal's name: "Maya’s lunch", "Maya’s Chicken bowl". */
+export const borrowedName = (owner: string, what: string) => `${owner}’s ${what}`;
+/** The "save" cup's name in a row: "Save Maya’s Chicken bowl to my meals". */
+export const saveCupLabel = (what: string) => `Save ${what} to my meals`;
+/** Once saved: "Saved “Maya’s lunch” to your meals", and what was left out. */
+export function borrowedToast(name: string, leftOut: number): string {
+  const kept = `Saved “${name}” to your meals`;
+  return leftOut ? `${kept}. ${leftOut} ${leftOut === 1 ? 'food' : 'foods'} not in your food list left out` : kept;
+}
+export const SAVE_NONE = 'None of these foods is in your food list. Find adds them one by one.';
+export const FRIENDS_SAVED_TITLE = 'Saved meals friends show you';
+/** A friend's saved meal's line: "3 foods", "3 foods · makes 4 servings". */
+export const savedMealLine = (count: number, servings?: number) => `${foodsCount(count)}${servings && servings > 1 ? ` · makes ${formatNumber(servings)} servings` : ''}`;
+/** "Show Chicken bowl to friends". */
+export const showSavedTitle = (name: string) => `Show ${isolateRtl(name)} to friends`;
+export const SHOW_SAVED_NEVER = 'Never shown: macros, notes or when you eat it. It leaves their Friends after 7 days, or when you stop.';
+export const savedShownToast = (name: string, names: readonly string[]) => `${name} shown to ${names.length > 2 ? `${names.length} friends` : namesLine(names)}`;
+export const savedStoppedToast = (name: string) => `${name} is no longer shown`;
+/** On a friend's page: "Saved meals Maya shows you". */
+export const savedTheyShow = (name: string) => `Saved meals ${isolateRtl(name)} shows you`;
+/** A cheer for a saved meal the user shows, as the end of a sentence: "your Chicken bowl". */
+export const savedCheerTarget = (name: string) => `your ${isolateRtl(name)}`;
