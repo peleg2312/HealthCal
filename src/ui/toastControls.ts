@@ -1,10 +1,10 @@
 /**
- * Phones: the controls a screen toast keeps clear of. A browser finds them in the page (every button, link,
+ * Phones: the controls a screen toast is never over. A browser finds them in the page (every button, link,
  * field, switch); a phone has no such query, so the kit's own controls (every `PressableScale`, and so every
  * Button, IconButton, Chip, segment, row and switch, and every text field) put themselves on a list while
  * they are mounted inside a `Screen`, under that screen's id. When a toast shows, `ToastHost` measures the
- * focused screen's controls in the window (`measureInWindow`) and rests in the lowest band clear of all of
- * them, by the same pure rule as the web (`toastBottomAmong` in ./keyboardInset).
+ * focused screen's controls in the window (`measureInWindow`); when one lies under the place the toast always
+ * rests (`toastCoversAmong` in ./keyboardInset), the screen's scroll area ends 8 px above the toast.
  *
  * A sheet's content is under no screen (`Sheet` sets the scope to null): a sheet shows its own toast, and a
  * closing sheet's controls must not count for the screen under it. Controls outside every `Screen` (the

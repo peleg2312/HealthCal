@@ -107,6 +107,8 @@ export default function SavedMealsScreen() {
                       : `${approx}${kcal(n.kcal)} kcal · P ${Math.round(n.protein)} g · C ${Math.round(n.carbs)} g · F ${Math.round(n.fat)} g`}
                   </Text>
                 </View>
+                {/* "Show to friends" beside the star, where it takes no room from Log at 320 px. */}
+                {canShow ? <ShowSavedCup meal={m} testID={`saved-meal-show-${i}`} onPress={() => setShowing(m)} style={{ marginTop: -6 }} /> : null}
                 <FavoriteStar testID={`saved-meal-favorite-${i}`} on={on} name={m.name} onPress={() => toggleMealFavorite(m)} style={{ marginTop: -6, marginRight: -6 }} />
               </View>
               <MacroBar protein={n.protein * 4} carbs={n.carbs * 4} fat={n.fat * 9} height={6} />
@@ -138,7 +140,6 @@ export default function SavedMealsScreen() {
                   style={{ flex: 1 }}
                   onPress={() => setLogging(m)}
                 />
-                {canShow ? <ShowSavedCup meal={m} testID={`saved-meal-show-${i}`} onPress={() => setShowing(m)} /> : null}
                 <LangIconButton testID={`saved-meal-edit-${i}`} accessibilityLabel={`Edit ${m.name}`} tone="clear" onPress={() => build(m.id)}>
                   <PenLine size={18} color={colors.textSecondary} />
                 </LangIconButton>

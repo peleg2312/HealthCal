@@ -35,10 +35,9 @@ import {
   circleNames,
   countsLine,
   declineCircleLabel,
-  GOAL_FOR_WEEK,
   GOAL_FROM_THIS_WEEK,
   GOAL_NOTE,
-  goalChoice,
+  goalHeading,
   goalSavedToast,
   IN_THE_CIRCLE,
   JOIN,
@@ -283,11 +282,14 @@ function CircleSheet({ circle, friends, visible, onClose, onLeave }: { circle: T
 
         <View style={{ gap: spacing.sm }}>
           <Overline>{CHANGE_GOAL}</Overline>
+          <Text variant="label" color="textSecondary">
+            {goalHeading(circle.kind)}
+          </Text>
           <Segmented
             testID="together-goal"
             role="radiogroup"
-            accessibilityLabel={CHANGE_GOAL}
-            options={choices.map((c) => ({ value: String(c), label: goalChoice(circle.kind, c) }))}
+            accessibilityLabel={goalHeading(circle.kind)}
+            options={choices.map((c) => ({ value: String(c), label: formatNumber(c) }))}
             value={String(goal)}
             onChange={(v) => setGoal(Number(v))}
           />
@@ -394,12 +396,12 @@ function StartSheet({ visible, friends, adult, onClose }: { visible: boolean; fr
           </Text>
         </View>
         <View style={{ gap: spacing.sm }}>
-          <Overline>{GOAL_FOR_WEEK}</Overline>
+          <Overline>{goalHeading(kind)}</Overline>
           <Segmented
             testID="together-start-goal"
             role="radiogroup"
-            accessibilityLabel={GOAL_FOR_WEEK}
-            options={choices.map((c, i) => ({ value: String(i), label: goalChoice(kind, c) }))}
+            accessibilityLabel={goalHeading(kind)}
+            options={choices.map((c, i) => ({ value: String(i), label: formatNumber(c) }))}
             value={String(Math.min(choice, choices.length - 1))}
             onChange={(v) => setChoice(Number(v))}
           />
@@ -481,8 +483,8 @@ function JoinSheet({ invite, onClose }: { invite: TogetherInvite | null; onClose
 }
 
 /**
- * Everything of "Together this week" on Friends, under the people row: invitations first, then the circle, or a
- * quiet row that starts one. Drawn only while the server has circles and the person has a friend.
+ * Everything of "Together this week" on Friends, under the people row: invitations first, then the circle, or
+ * (with no invitation waiting) a quiet row that starts one. Drawn only while the server has circles and the person has a friend.
  */
 export function TogetherSection({
   circles,
@@ -537,7 +539,7 @@ export function TogetherSection({
       ))}
       {circle ? (
         <CircleCard circle={circle} today={today} friendIds={friendIds} onOpen={() => setSheet('circle')} />
-      ) : (
+      ) : invites.length ? null : (
         <Card padding={0} testID="together-start-card">
           <ListRow
             testID="together-start-open"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { KEYBOARD_MIN, keyboardCover, revealDelta, scrollGivesUp, TOAST_GAP, TOAST_HIGH_LOOKS, toastBand, toastBottom, toastBottomAmong, toastHighSettled, toastOutOfReach, toastPlaceAmong, toastReachTop, toastSpot } from './keyboardInset';
+import { KEYBOARD_MIN, keyboardCover, revealDelta, scrollGivesUp, sheetToastPlace, TOAST_GAP, toastBand, toastBottom, toastCovers, toastCoversAmong, toastGesture } from './keyboardInset';
 
 describe('keyboardCover', () => {
   it('is what the keyboard takes from the bottom of the page', () => {
@@ -82,112 +82,50 @@ describe('toastBottom', () => {
   });
 });
 
-describe('toastSpot', () => {
-  // Today at 360 x 740: the toast (309 x 44) would rest at top 612, over the three water-card cells.
-  const cells = [
-    { top: 610, bottom: 703, left: 37, right: 116 },
-    { top: 610, bottom: 703, left: 141, right: 204 },
-    { top: 610, bottom: 703, left: 229, right: 323 },
-  ];
-  const waterRow = [
-    { top: 519, bottom: 563, left: 37, right: 181 },
-    { top: 519, bottom: 555, left: 233, right: 323 },
-  ];
-  const ideas = [{ top: 368, bottom: 398, left: 139, right: 265 }];
-  const base = { lowest: 612, highest: toastReachTop(740, 44), height: 44, left: 25, right: 334 };
-  it('keeps the usual place when nothing is under it', () => {
-    expect(toastSpot({ ...base, controls: [{ top: 100, bottom: 140, left: 25, right: 334 }] })).toBe(612);
+describe('toastCovers (the toast rests in one place; a control under it makes the scroll area give way)', () => {
+  // Today at 360 x 740: the toast (309 x 44) rests at top 612, 12 px over the tab bar.
+  const base = { top: 612, height: 44, left: 25, right: 334 };
+  it('is false when nothing lies under or within 8 px of the toast', () => {
+    expect(toastCovers({ ...base, controls: [{ top: 100, bottom: 140, left: 25, right: 334 }] })).toBe(false);
+    expect(toastCovers({ ...base, controls: [{ top: 560, bottom: 603, left: 0, right: 360 }] })).toBe(false);
+    expect(toastCovers({ ...base, controls: [] })).toBe(false);
   });
-  it('rises to the lowest band clear of every control, never over one', () => {
-    const top = toastSpot({ ...base, controls: [...cells, ...waterRow, ...ideas] });
-    expect(top).toBe(519 - 8 - 44);
-    for (const c of [...cells, ...waterRow, ...ideas]) expect(top! + 44 <= c.top - 8 || top! >= c.bottom + 8).toBe(true);
+  it('is true for a control under it, or within 8 px above or below it', () => {
+    expect(toastCovers({ ...base, controls: [{ top: 620, bottom: 650, left: 30, right: 80 }] })).toBe(true);
+    expect(toastCovers({ ...base, controls: [{ top: 560, bottom: 606, left: 0, right: 360 }] })).toBe(true);
+    expect(toastCovers({ ...base, controls: [{ top: 662, bottom: 700, left: 0, right: 360 }] })).toBe(true);
   });
-  it('ignores controls it does not cross sideways', () => {
-    expect(toastSpot({ ...base, left: 130, right: 210, controls: [cells[0], cells[2]] })).toBe(612);
+  it('counts only controls it would cross sideways, and none that are not drawn', () => {
+    expect(toastCovers({ ...base, controls: [{ top: 620, bottom: 650, left: 0, right: 24 }] })).toBe(false);
+    expect(toastCovers({ ...base, controls: [{ top: 620, bottom: 621, left: 30, right: 300 }] })).toBe(false);
   });
-  it('keeps the action in thumb reach: no clear band in the lower 60% is null', () => {
-    const wall = [{ top: 250, bottom: 700, left: 0, right: 360 }];
-    expect(toastSpot({ ...base, controls: wall })).toBeNull();
-    expect(toastReachTop(740, 44)).toBe(274);
-  });
-  it('with no clear band in thumb reach, takes the lowest clear band higher up when it may (`above`), never a control', () => {
-    // Today at 360 x 740 with text at 200%: a 132 px toast, the water card's link, its "+ 250 ml" and the activity cell.
-    const big = [
-      { top: 322, bottom: 401, left: 37, right: 323 },
-      { top: 413, bottom: 459, left: 37, right: 172 },
-      { top: 506, bottom: 634, left: 37, right: 323 },
-    ];
-    const v = { lowest: 524, highest: toastReachTop(740, 132), height: 132, left: 25, right: 334, controls: big };
-    expect(toastSpot(v)).toBeNull();
-    const top = toastSpot({ ...v, above: 0 })!;
-    expect(top).toBe(322 - 8 - 132);
-    for (const c of big) expect(top + 132 <= c.top - 8 || top >= c.bottom + 8).toBe(true);
-    // Nothing clear even up there: null, it rests where it always rests.
-    expect(toastSpot({ ...v, above: 0, controls: [...big, { top: 40, bottom: 320, left: 0, right: 360 }] })).toBeNull();
-  });
-  it('never goes lower than its lowest place', () => {
-    expect(toastSpot({ ...base, controls: [{ top: 560, bottom: 600, left: 0, right: 360 }] })).toBe(612);
-  });
-  it('is null for a toast not measured yet', () => {
-    expect(toastSpot({ ...base, height: 0, controls: [] })).toBeNull();
+  it('is false for a toast not measured yet', () => {
+    expect(toastCovers({ ...base, height: 0, controls: [{ top: 620, bottom: 650, left: 30, right: 80 }] })).toBe(false);
   });
 });
 
-describe('toastBottomAmong (phones: the same rule from measured window boxes)', () => {
-  // Today at 360 x 740 on a phone: the toast (309 x 44, x 25) rests 84 px above the bottom (12 over the tab bar).
+describe('toastCoversAmong (phones: the same rule from measured window boxes)', () => {
   const toast = { x: 25, y: 0, width: 309, height: 44 };
   const box = (c: { top: number; bottom: number; left: number; right: number }) => ({ x: c.left, y: c.top, width: c.right - c.left, height: c.bottom - c.top });
-  const cells = [
-    { top: 610, bottom: 703, left: 37, right: 116 },
-    { top: 610, bottom: 703, left: 141, right: 204 },
-    { top: 610, bottom: 703, left: 229, right: 323 },
-  ].map(box);
-  const waterRow = [{ top: 519, bottom: 563, left: 37, right: 181 }].map(box);
-  it('rests where it always rests when nothing is under it (null)', () => {
-    expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast, controls: [box({ top: 100, bottom: 140, left: 25, right: 334 })] })).toBeNull();
+  it('measures from where the toast rests, 84 px up a 740 px window', () => {
+    expect(toastCoversAmong({ windowBottom: 740, resting: 84, toast, controls: [box({ top: 100, bottom: 140, left: 25, right: 334 })] })).toBe(false);
+    expect(toastCoversAmong({ windowBottom: 740, resting: 84, toast, controls: [box({ top: 610, bottom: 703, left: 20, right: 120 })] })).toBe(true);
   });
-  it('rises to the lowest band clear of every control, as a distance from the bottom', () => {
-    const bottom = toastBottomAmong({ windowBottom: 740, resting: 84, toast, controls: [...cells, ...waterRow] });
-    // Top 519 - 8 - 44 = 467: its bottom edge 740 - 511 = 229 px above the bottom of the window.
-    expect(bottom).toBe(740 - (519 - 8));
-    const top = 740 - bottom! - 44;
-    for (const c of [...cells, ...waterRow]) expect(top + 44 <= c.y - 8 || top >= c.y + c.height + 8).toBe(true);
-  });
-  it('keeps the action in thumb reach: with no clear band it stays where it rests', () => {
-    expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast, controls: [box({ top: 250, bottom: 700, left: 0, right: 360 })] })).toBeNull();
-  });
-  it('ignores what it does not cross sideways, and boxes a phone could not measure', () => {
-    expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast: { ...toast, x: 130, width: 80 }, controls: [cells[0], cells[2]] })).toBeNull();
-    expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast, controls: [{ x: Number.NaN, y: 610, width: 80, height: 93 }] })).toBeNull();
-  });
-  it('with `above`, rises past thumb reach rather than lie over a control', () => {
-    const tall = { x: 25, y: 0, width: 309, height: 168 };
-    // 320 x 640 at 200%: the water card's link, "+ 250 ml", the activity cell; the toast rests 84 px up.
-    const controls = [
-      { x: 37, y: 272, width: 246, height: 79 },
-      { x: 37, y: 363, width: 135, height: 46 },
-      { x: 33, y: 456, width: 254, height: 128 },
-    ];
-    expect(toastBottomAmong({ windowBottom: 640, resting: 84, toast: tall, controls })).toBeNull();
-    expect(toastBottomAmong({ windowBottom: 640, resting: 84, toast: tall, controls, above: 24 })).toBe(640 - (272 - 8));
-  });
-  it('is null before the toast or the window is measured', () => {
-    expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast: { ...toast, height: 0 }, controls: cells })).toBeNull();
-    expect(toastBottomAmong({ windowBottom: 0, resting: 84, toast, controls: cells })).toBeNull();
+  it('skips a box a phone could not measure, and is false before anything is measured', () => {
+    expect(toastCoversAmong({ windowBottom: 740, resting: 84, toast, controls: [{ x: Number.NaN, y: 610, width: 80, height: 93 }] })).toBe(false);
+    expect(toastCoversAmong({ windowBottom: 740, resting: 84, toast: { ...toast, height: 0 }, controls: [box({ top: 610, bottom: 703, left: 20, right: 120 })] })).toBe(false);
+    expect(toastCoversAmong({ windowBottom: 0, resting: 84, toast, controls: [box({ top: 610, bottom: 703, left: 20, right: 120 })] })).toBe(false);
   });
 });
 
-describe('when no band is clear, the screen makes one (toastPlaceAmong, toastBand, scrollGivesUp)', () => {
-  // The diary at 360 x 740 after a delete: every row is a control, the widest gap 33 px (measured with the 8 px each side).
+describe('the band a screen makes under the toast (toastBand, scrollGivesUp)', () => {
+  // The diary at 360 x 740 after a delete: every row is a control.
   const toast = { x: 35, y: 0, width: 290, height: 44 };
   const rows = [
     [0, 60], [68, 214], [236, 296], [329, 580], [612, 700],
   ].map(([top, bottom]) => ({ x: 20, y: top + 8, width: 320, height: bottom - top - 16 }));
-  it("says 'none' when no band at all is clear, and null when its own place is clear", () => {
-    expect(toastPlaceAmong({ windowBottom: 740, resting: 84, toast, controls: rows, above: 24 })).toBe('none');
-    expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast, controls: rows, above: 24 })).toBeNull();
-    expect(toastPlaceAmong({ windowBottom: 740, resting: 84, toast, controls: [] })).toBeNull();
+  it('the diary rows lie under the toast where it rests', () => {
+    expect(toastCoversAmong({ windowBottom: 740, resting: 84, toast, controls: rows })).toBe(true);
   });
   it('the band reaches from the bottom to 8 px above the toast where it rests', () => {
     // Rests 84 px up (12 over the tab bar), 44 tall, 8 clear: the scroll area ends 136 px above the bottom.
@@ -201,34 +139,46 @@ describe('when no band is clear, the screen makes one (toastPlaceAmong, toastBan
     expect(scrollGivesUp(toastBand(90 + 12, 44), 90)).toBe(64);
     expect(scrollGivesUp(0, 90)).toBe(0);
   });
-  it('once the scroll area has given it up, the toast rests where it always rests, clear of every control', () => {
-    const band = toastBand(84, 44);
-    const end = 740 - scrollGivesUp(band, 0);
+  it('once the scroll area has given it up, nothing that shows lies under the toast', () => {
+    const end = 740 - scrollGivesUp(toastBand(84, 44), 0);
     // What the scroll area shows of each row: nothing below its new end.
-    const seen = rows
-      .map((r) => ({ ...r, height: Math.min(r.y + r.height, end) - r.y }))
-      .filter((r) => r.height > 0);
-    expect(toastPlaceAmong({ windowBottom: 740, resting: 84, toast, controls: seen })).toBeNull();
+    const seen = rows.map((r) => ({ ...r, height: Math.min(r.y + r.height, end) - r.y })).filter((r) => r.height > 0);
+    expect(toastCoversAmong({ windowBottom: 740, resting: 84, toast, controls: seen })).toBe(false);
   });
 });
 
-describe('a high place is provisional before the toast is first drawn (toastOutOfReach, toastHighSettled)', () => {
-  it('tells a band under the header from one in thumb reach', () => {
-    // 360 x 740, a 60 px toast: thumb reach starts at a top of 266.
-    expect(toastOutOfReach(76, 740, 60)).toBe(true);
-    expect(toastOutOfReach(toastReachTop(740, 60), 740, 60)).toBe(false);
-    // Where it always rests on a tab (12 px above an 84 px tab bar): in reach.
-    expect(toastOutOfReach(740 - 84 - 12 - 60, 740, 60)).toBe(false);
+describe("sheetToastPlace (a sheet's toast: over its top edge, or at its bottom when that edge is high)", () => {
+  it('stands 12 px over a low sheet', () => {
+    // 360 x 740, a 300 px sheet: its toast's centre at 418, in the lower 60%.
+    expect(sheetToastPlace({ windowHeight: 740, sheetTop: 440, sheetHeight: 300, toastHeight: 44, lift: 90 })).toEqual({ sink: null, band: 0 });
   });
+  it('rests at the bottom of a tall sheet, over its footer, and the body gives way above it', () => {
+    // An 88% sheet (651 px): its top at 89. The toast rests 90 px above the sheet's bottom (its footer and padding).
+    const at = sheetToastPlace({ windowHeight: 740, sheetTop: 89, sheetHeight: 651, toastHeight: 44, lift: 90 });
+    expect(at.sink).toBe(651 - 90);
+    expect(at.band).toBe(90 + 44 + 8);
+  });
+  it('waits for the toast to be measured, above the sheet', () => {
+    expect(sheetToastPlace({ windowHeight: 740, sheetTop: 89, sheetHeight: 651, toastHeight: 0, lift: 90 }).sink).toBeNull();
+  });
+});
 
-  it('draws a high place only once two looks in a row agree on it, or the looks are used up', () => {
-    // The diary after a direct link: the first look finds the band under the header clear (the strip not drawn yet).
-    expect(toastHighSettled(604, null, 1)).toBe(false);
-    // The page still arriving: a second high place that differs is not drawn either.
-    expect(toastHighSettled(560, 604, 2)).toBe(false);
-    // A settled page: the same high place twice (a tall toast at large text with no band in reach clear).
-    expect(toastHighSettled(604, 604, 2)).toBe(true);
-    // Never hidden for good.
-    expect(toastHighSettled(520, 560, TOAST_HIGH_LOOKS)).toBe(true);
+describe('toastGesture (a finger on the toast: tap, flick away or settle back)', () => {
+  const w = 309;
+  it('a tap on its words dismisses it', () => {
+    expect(toastGesture({ dx: 2, dy: 3, vx: 0, vy: 0 }, w)).toBe('tap');
+  });
+  it('a drag down 24 px, a fast flick down or sideways, or a long sideways drag dismisses it', () => {
+    expect(toastGesture({ dx: 0, dy: 24, vx: 0, vy: 0.1 }, w)).toBe('dismiss');
+    expect(toastGesture({ dx: 0, dy: 12, vx: 0, vy: 0.8 }, w)).toBe('dismiss');
+    expect(toastGesture({ dx: -30, dy: 2, vx: -0.9, vy: 0 }, w)).toBe('dismiss');
+    expect(toastGesture({ dx: 80, dy: 4, vx: 0.1, vy: 0 }, w)).toBe('dismiss');
+    // A narrow toast: 30% of its width is enough.
+    expect(toastGesture({ dx: 40, dy: 0, vx: 0.1, vy: 0 }, 120)).toBe('dismiss');
+  });
+  it('too small or upward settles back', () => {
+    expect(toastGesture({ dx: 30, dy: 4, vx: 0.2, vy: 0 }, w)).toBe('back');
+    expect(toastGesture({ dx: 0, dy: 14, vx: 0, vy: 0.2 }, w)).toBe('back');
+    expect(toastGesture({ dx: 0, dy: -60, vx: 0, vy: -1.2 }, w)).toBe('back');
   });
 });

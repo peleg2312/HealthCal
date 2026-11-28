@@ -107,9 +107,9 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
   const cover = Platform.OS === 'web' ? webKeyboard : outerH > 0 && innerH > 0 ? Math.max(0, outerH - innerH) : 0;
   const dock = pinnedFooter ? footerH : insets.bottom + (tabs ? TAB_BAR_HEIGHT + 14 + barExtra : 0);
   useToastDock(dock, focused, { cover, rides: !!pinnedFooter }, domId);
-  // A toast that found no band clear of controls on this screen rests where it always rests, and the scroll area
-  // ends 8 px above it while it shows, so nothing a person can press is under it (`useToastBand`). Nothing on
-  // screen moves: the rows under the band leave the scroll area's view and are a scroll away.
+  // The toast always rests in one place; when a control of this screen lies under it, the scroll area ends 8 px above
+  // it while it shows, so nothing a person can press is under it (`useToastBand`). Nothing on screen moves: the rows
+  // under the band leave the scroll area's view and are a scroll away.
   const band = useToastBand(domId);
   // Under the scroll area lie the pinned footer and, while it is up, what the keyboard covers.
   const givesUp = focused ? scrollGivesUp(band, (pinnedFooter ? footerH : 0) + cover) : 0;

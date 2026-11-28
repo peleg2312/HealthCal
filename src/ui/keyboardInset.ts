@@ -89,8 +89,6 @@ export interface ControlBox {
   right: number;
 }
 
-/** A toast's action must have its centre in the lower 60% of the window: one hand reaches it (thumb reach). */
-export const TOAST_REACH_FROM = 0.4;
 /**
  * Room kept between a resting toast and any control above or below it: 8 px, so the toast stays off the control's
  * touch area too (a 36 px button reaches 44 with 4 px of slop each side, 48 dp on Android with 6; a 32 px chip 6 and 8).
@@ -98,63 +96,16 @@ export const TOAST_REACH_FROM = 0.4;
 export const TOAST_CLEAR = 8;
 
 /**
- * The lowest place a toast can rest without lying over a control: the top of the toast, in window
- * coordinates, or null when no place in the range is clear.
- *
- *   lowest     the lowest top allowed (a screen: 12 px above its chrome; a sheet: 12 px above the window's
- *              bottom inset). Tried first, so a toast that is clear where it always rested stays there.
- *   highest    the highest top allowed: the action's centre stays in the lower 60% of the window
- *              (`toastReachTop`), and a caller may pass a higher floor of its own.
- *   height     the toast's height; left and right its sides (only controls it would cross sideways count).
- *   controls   every control on the screen or in the sheet; each is kept `clear` px away.
- *   above      optional: the highest top allowed when no band in thumb reach is clear (the top of the screen
- *              or the window's top inset). Being over a control is worse than being out of thumb reach: a
- *              tall toast (large text) often finds no clear band in the lower 60%, and then takes the lowest
- *              clear band higher up rather than lie over the button just pressed.
- *
- * The answer is the lowest clear top, so the toast stays as close to the thumb and the chrome as it can.
+ * Whether a toast whose top is at `top` (window coordinates, y down) lies over a control or within `clear` px of one.
+ * The toast always rests in one place (`toastBottom`): this only decides whether the screen's scroll area gives way
+ * under it (`toastBand`). Only controls it would cross sideways count.
  */
-export function toastSpot(v: { lowest: number; highest: number; height: number; left: number; right: number; controls: ControlBox[]; clear?: number; above?: number }): number | null {
+export function toastCovers(v: { top: number; height: number; left: number; right: number; controls: ControlBox[]; clear?: number }): boolean {
   const clear = v.clear ?? TOAST_CLEAR;
-  if (!(v.height > 0) || !(v.lowest >= v.highest)) return null;
-  const blocks = v.controls.filter((c) => c.right - c.left >= 2 && c.bottom - c.top >= 2 && c.left < v.right && c.right > v.left).map((c) => ({ top: c.top - clear, bottom: c.bottom + clear }));
-  const free = (top: number) => blocks.every((b) => !(top < b.bottom && top + v.height > b.top));
-  const lowestClear = (hi: number, lo: number) => {
-    const tries = [lo, ...blocks.map((b) => b.top - v.height)].filter((t) => t <= lo && t >= hi).sort((a, b) => b - a);
-    for (const t of tries) if (free(t)) return Math.round(t);
-    return null;
-  };
-  const near = lowestClear(v.highest, v.lowest);
-  if (near !== null || typeof v.above !== 'number' || !(v.above < v.highest)) return near;
-  return lowestClear(v.above, v.highest);
-}
-
-/** The highest top a toast of this height may have in a window this tall, with its action in thumb reach. */
-export function toastReachTop(windowHeight: number, height: number): number {
-  return Math.ceil(windowHeight * TOAST_REACH_FROM - height / 2);
-}
-
-/**
- * Whether a toast placed with its top at `top` lies out of thumb reach: the band higher up that `toastSpot` takes
- * (`above`) only when no band in reach is clear. Such a place is provisional: a screen whose content is still
- * arriving (the diary mounted fresh after Add on an AI review opened by a direct link) shows that band clear before
- * its week strip is drawn, and the lowest band clear once it is. So the toast stays hidden and looks again until two
- * looks in a row agree on the high place or a look finds another (`toastHighSettled`), and it appears once, there.
- */
-export function toastOutOfReach(top: number, windowHeight: number, height: number): boolean {
-  return top < toastReachTop(windowHeight, height);
-}
-
-/** How many looks a toast takes at most before it shows in a high place no two looks agreed on. */
-export const TOAST_HIGH_LOOKS = 3;
-
-/**
- * Whether a high place (`toastOutOfReach`) found by look number `looks` (1 for the first) may be drawn: when the look
- * before it found the same place (`previous`, the bottom offset that look found when it was high too, else null), or
- * when the looks are used up. Otherwise the toast stays hidden and looks again.
- */
-export function toastHighSettled(at: number, previous: number | null, looks: number): boolean {
-  return previous === at || looks >= TOAST_HIGH_LOOKS;
+  if (!(v.height > 0)) return false;
+  return v.controls.some(
+    (c) => c.right - c.left >= 2 && c.bottom - c.top >= 2 && c.left < v.right && c.right > v.left && v.top < c.bottom + clear && v.top + v.height > c.top - clear,
+  );
 }
 
 /** A box as a phone measures it (`measureInWindow`): its left and top edge in the window, and its size. */
@@ -166,44 +117,79 @@ export interface WindowBox {
 }
 
 /**
- * Phones: where the screen toast rests, by the same rule as the web (`toastSpot`), from boxes a phone
- * measures in window coordinates. The toast host sits at the app's root, so the answer is a distance from
- * the bottom of the root (`windowBottom`, the root's bottom edge in the window), or null when the toast
- * should rest where it always rests (`resting`, its usual distance: 12 px above the screen's chrome),
- * because that place is clear or no clear band is in thumb reach or, with `above` (the window's top
- * inset), anywhere below that. `controls` are the screen's own kit
- * controls (every PressableScale and text field inside its `Screen`, measured as the toast shows).
+ * Phones: `toastCovers` from boxes measured in window coordinates. The toast host sits at the app's root, so
+ * where the toast rests is a distance from the bottom of the root (`resting`, 12 px above the screen's chrome)
+ * and `windowBottom` is the root's bottom edge in the window. `controls` are the screen's own kit controls
+ * (every PressableScale and text field inside its `Screen`, ./toastControls). False before anything is measured.
  */
-export function toastBottomAmong(v: { windowBottom: number; resting: number; toast: WindowBox; controls: WindowBox[]; above?: number }): number | null {
-  const at = toastPlaceAmong(v);
-  return at === 'none' ? null : at;
-}
-
-/**
- * `toastBottomAmong`, telling apart the two reasons it rests where it always rests: null when that place is clear
- * (or the toast cannot be measured), 'none' when no band at all is clear (the screen then makes one, `toastBand`).
- */
-export function toastPlaceAmong(v: { windowBottom: number; resting: number; toast: WindowBox; controls: WindowBox[]; above?: number }): number | null | 'none' {
+export function toastCoversAmong(v: { windowBottom: number; resting: number; toast: WindowBox; controls: WindowBox[] }): boolean {
   const h = Math.round(v.toast.height);
   const H = v.windowBottom;
-  if (!(h > 0) || !(H > 0) || !(v.toast.width > 0)) return null;
-  const lowest = H - v.resting - h;
+  if (!(h > 0) || !(H > 0) || !(v.toast.width > 0)) return false;
   const controls = v.controls
     .filter((c) => [c.x, c.y, c.width, c.height].every(Number.isFinite))
     .map((c) => ({ top: c.y, bottom: c.y + c.height, left: c.x, right: c.x + c.width }));
-  const top = toastSpot({ lowest, highest: toastReachTop(H, h), height: h, left: v.toast.x, right: v.toast.x + v.toast.width, controls, above: v.above });
-  if (top === null) return 'none';
-  if (top === Math.round(lowest)) return null;
-  return Math.round(H - top - h);
+  return toastCovers({ top: H - v.resting - h, height: h, left: v.toast.x, right: v.toast.x + v.toast.width, controls });
+}
+
+/** The highest a sheet's toast may stand above the sheet: its centre in the lower 60% of the window, in thumb reach. */
+export const TOAST_REACH_FROM = 0.4;
+
+/**
+ * Where a sheet's toast rests. Just above the sheet's top edge (12 px) while its centre stays in the lower 60% of the
+ * window; on a sheet whose top is higher than that, at the bottom of the sheet the way a screen's toast rests: `lift`
+ * px above the sheet's bottom edge (above its pinned footer, or above the home indicator), with the sheet's body
+ * ending 8 px above the toast (`band`, from the sheet's bottom edge: the sheet's own `toastBand`), so nothing in the
+ * body is under it.
+ *
+ *   windowHeight  the window (or what the keyboard leaves of it)
+ *   sheetTop      the sheet's top edge in the window
+ *   sheetHeight   the sheet's height
+ *   toastHeight   the toast's height (0 before it is laid out: it rests above the sheet until then)
+ *   lift          how far above the sheet's bottom edge the toast's bottom rests when it is in the sheet
+ *
+ * `sink` is how far below the sheet's top edge the toast's bottom rests (null: above the sheet, 12 px over its top
+ * edge), and `band` how far up from the sheet's bottom edge its body gives way (0: not at all).
+ */
+export function sheetToastPlace(v: { windowHeight: number; sheetTop: number; sheetHeight: number; toastHeight: number; lift: number }, gap = TOAST_GAP): { sink: number | null; band: number } {
+  const h = v.toastHeight;
+  if (!(h > 0) || !(v.sheetHeight > 0) || !(v.windowHeight > 0)) return { sink: null, band: 0 };
+  const top = v.sheetTop - gap - h;
+  if (top + h / 2 >= v.windowHeight * TOAST_REACH_FROM) return { sink: null, band: 0 };
+  return { sink: Math.max(0, Math.round(v.sheetHeight - v.lift)), band: toastBand(v.lift, h) };
+}
+
+/** What a finger did on a toast's body when it let go (`toastGesture`). */
+export type ToastGesture = 'tap' | 'dismiss' | 'back';
+
+/** A movement under this, both ways, is a tap: a tap on the toast's words dismisses it. */
+export const TOAST_TAP_SLOP = 8;
+/** A drag down this far, or sideways `TOAST_SWIPE_X` (or 30% of the toast's width, the smaller), dismisses it. */
+export const TOAST_SWIPE_Y = 24;
+export const TOAST_SWIPE_X = 80;
+/** A flick: this fast (px per ms) down or sideways, after at least `TOAST_TAP_SLOP` of travel that way. */
+export const TOAST_FLICK_V = 0.5;
+
+/**
+ * What a finger lifted from the toast's body did: a tap (it dismisses the toast), a flick or drag down or sideways far
+ * or fast enough (it dismisses it), or too little (the toast settles back where it rests). Upward moves count for
+ * nothing: the toast only leaves downwards or to a side. `dx`, `dy` and `vx`, `vy` are PanResponder's gesture state.
+ */
+export function toastGesture(g: { dx: number; dy: number; vx: number; vy: number }, width: number): ToastGesture {
+  const ax = Math.abs(g.dx);
+  if (ax < TOAST_TAP_SLOP && Math.abs(g.dy) < TOAST_TAP_SLOP) return 'tap';
+  const sideways = Math.min(TOAST_SWIPE_X, width > 0 ? width * 0.3 : TOAST_SWIPE_X);
+  if (g.dy >= TOAST_SWIPE_Y || (g.dy >= TOAST_TAP_SLOP && g.vy >= TOAST_FLICK_V)) return 'dismiss';
+  if (ax >= sideways || (ax >= TOAST_TAP_SLOP && Math.abs(g.vx) >= TOAST_FLICK_V)) return 'dismiss';
+  return 'back';
 }
 
 /**
- * When no band anywhere on a screen is clear of controls (a list whose rows are each a control, as the diary's are:
- * its widest gap was 33 px, under a 44 px toast with its 8 px of room each side), the screen makes one where the
- * toast always rests: its scroll area ends `clear` px above the toast while the toast shows, so nothing a person can
- * press lies under the toast (a tap on its body went through to the + or the trash can under it), and nothing on
- * screen moves (the rows under the band leave the scroll area's view and are a scroll away). This is how far up from
- * the window's bottom the band reaches.
+ * The toast always rests in one place, just above the screen's bottom chrome. When a control of the screen's scroll
+ * area lies under that place (`toastCovers`: a diary row, a "+", a card's link), the screen makes room: its scroll
+ * area ends `clear` px above the toast while the toast shows, so nothing a person can press lies under the toast and
+ * nothing on screen moves (the rows under the band leave the scroll area's view and are a scroll away). This is how
+ * far up from the window's (or a sheet's) bottom the band reaches.
  */
 export function toastBand(resting: number, toastHeight: number, clear = TOAST_CLEAR): number {
   if (!(toastHeight > 0) || !(resting >= 0)) return 0;

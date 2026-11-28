@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Platform, TextInput, useWindowDimensions, View } from 'react-native';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, Easing, PanResponder, type PanResponderInstance, Platform, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
 
@@ -8,7 +8,7 @@ import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, isReducedMotion, MAX_CONTENT_WIDTH, motion, useLargeText, useTheme, type ThemeColors } from '@/theme';
 
 import { figure } from './decorative';
-import { type ControlBox, TOAST_CLEAR, TOAST_GAP, toastBand, toastBottom, toastHighSettled, toastOutOfReach, toastPlaceAmong, toastReachTop, toastSpot, type WindowBox } from './keyboardInset';
+import { type ControlBox, sheetToastPlace, TOAST_GAP, toastBand, toastBottom, toastCovers, toastCoversAmong, toastGesture, type WindowBox } from './keyboardInset';
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
 import { controlsIn } from './toastControls';
@@ -25,9 +25,9 @@ export interface ToastOptions {
    */
   tint?: keyof ThemeColors | (string & {});
   /**
-   * The same news in fewer words, drawn instead of `message` while text is large (`useLargeText`), where a
-   * toast of four lines finds no clear band beside the control it rose from (Today's glass at 320 x 640). The
-   * spoken label is still the whole `message`.
+   * The same news in fewer words, drawn instead of `message` while text is large (`useLargeText`), so the toast
+   * keeps to two lines over the screen's bottom chrome (Today's glass at 320 x 640). The spoken label is still the
+   * whole `message`.
    */
   short?: string;
 }
@@ -51,11 +51,12 @@ interface ToastState {
   /** Raised inside `toastToScreen`: shown by the screen once every sheet has gone, never in a sheet. */
   toScreen?: boolean;
   /**
-   * While a toast shows on a screen with no band clear of controls: that screen (its element id) and how far up from
-   * the window's bottom its scroll area gives way (`toastBand`), and the place it was made for (a keyboard that opens
-   * or closes is another place, so the band is made again). Cleared with the toast.
+   * While a toast shows over a control of a screen's scroll area: that screen (its element id, or a sheet's layer id)
+   * and how far up from the window's (the sheet's) bottom its scroll area gives way (`toastBand`), and the place it was
+   * made for (a keyboard that opens or closes is another place, so the band is made again). In a sheet whose top is
+   * high, `sink` is how far below the sheet's top edge the toast rests (`sheetToastPlace`). Cleared with the toast.
    */
-  band: { scope: string; fromBottom: number; key?: string } | null;
+  band: { scope: string; fromBottom: number; key?: string; sink?: number } | null;
   /** Open sheets that carry their own host, newest last. The newest one shows the toast. */
   sheetHosts: number[];
   /**
@@ -134,12 +135,18 @@ export function useToastDock(height: number, active = true, keyboard?: { cover: 
 }
 
 /**
- * How far up from the window's bottom this screen's scroll area gives way while a toast shows (0: not at all). A
- * toast that finds no band clear of controls anywhere on the screen (`toastPlaceAmong` says 'none') asks for one
- * where it rests (`toastBand`); `Screen` ends its scroll area there, so no control is under the toast.
+ * How far up from the window's bottom this screen's scroll area gives way while a toast shows (0: not at all). The
+ * toast always rests in one place; when a control of the screen lies under it (`toastCovers`), it asks for this band
+ * (`toastBand`) and `Screen` ends its scroll area there, so no control is under the toast and nothing moves. A `Sheet`
+ * reads the same for its body, by its layer id, while its toast rests at its bottom.
  */
 export function useToastBand(scope: string): number {
   return useToast((s) => (s.band && s.band.scope === scope ? s.band.fromBottom : 0));
+}
+
+/** A sheet's toast: how far below the sheet's top edge it rests (0: above the sheet). `Sheet` moves its toast layer there. */
+export function useToastSink(scope: string): number {
+  return useToast((s) => (s.band && s.band.scope === scope ? (s.band.sink ?? 0) : 0));
 }
 
 /**
@@ -151,21 +158,21 @@ export function useToastBand(scope: string): number {
 export const TOAST_ACTION_GUARD_MS = 600;
 
 /**
- * How long a toast stays on screen. A message alone: 2.2 s. One with an action (Undo): 10 s on a phone,
- * 20 s while a screen reader runs, and on Android never less than the person's own "Time to take action"
- * setting; 12 s in a browser (which cannot tell whether a screen reader runs). Whatever the length, the
- * timer stops while the action has the focus or a finger, or a mouse rests on the toast, and starts again
- * with at least `TOAST_RESUME_MS` left (WCAG 2.2.1), so an Undo never leaves from under the person.
+ * How long a toast stays on screen. A message alone: 2.2 s. One with an action (Undo): 5 s on a phone and in a
+ * browser; 20 s while a screen reader runs (natively: a browser cannot tell), and on Android never less than the
+ * person's own "Time to take action" setting. Whatever the length, the timer stops while the action has the focus
+ * or a finger, a finger is on the toast, or a mouse rests on it, and starts again with at least `TOAST_RESUME_MS`
+ * left (WCAG 2.2.1), so an Undo never leaves from under the person. A toast can always be put away sooner: a flick
+ * down or sideways, a tap on its words, Escape on the web, or the accessibility action "Dismiss".
  */
 export const TOAST_MS = 2200;
-export const TOAST_ACTION_MS = 10000;
+export const TOAST_ACTION_MS = 5000;
 export const TOAST_READER_MS = 20000;
-export const TOAST_WEB_ACTION_MS = 12000;
-export const TOAST_RESUME_MS = 4000;
+export const TOAST_RESUME_MS = 2000;
 
 async function lifetime(action: boolean): Promise<number> {
   if (!action) return TOAST_MS;
-  if (Platform.OS === 'web') return TOAST_WEB_ACTION_MS;
+  if (Platform.OS === 'web') return TOAST_ACTION_MS;
   const reader = await AccessibilityInfo.isScreenReaderEnabled().catch(() => false);
   const ms = reader ? TOAST_READER_MS : TOAST_ACTION_MS;
   const recommended = (AccessibilityInfo as { getRecommendedTimeoutMillis?: (ms: number) => Promise<number> }).getRecommendedTimeoutMillis;
@@ -236,7 +243,7 @@ function returnFocus() {
   el?.focus();
 }
 
-/** The controls a toast keeps clear of: everything a person can press, type in or pick. */
+/** The controls a toast is never over: everything a person can press, type in or pick. */
 const CONTROLS = 'button,a[href],input,textarea,select,[role="button"],[role="link"],[role="switch"],[role="checkbox"],[role="radio"],[role="tab"],[role="slider"],[role="adjustable"],[tabindex="0"]';
 
 function controlBoxes(scope: Element, skip: Element, skipFields = false): ControlBox[] {
@@ -282,28 +289,49 @@ let shownAt = 0;
  */
 const monotonicNow = () => (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now());
 
+/** Where a sheet's toast may rest: the sheet tells its host (the layer id it reads its band by, and its box). */
+export interface SheetToastBox {
+  /** The sheet's layer id: its body reads its band by it (`useToastBand`), its toast layer its sink (`useToastSink`). */
+  scope: string;
+  /** The window's height less what the keyboard covers, the sheet's top edge in the window, and its height. */
+  windowHeight: number;
+  top: number;
+  height: number;
+  /** How far above the sheet's bottom edge the toast's bottom rests when it rests in the sheet (above its footer). */
+  lift: number;
+}
+
 /**
  * Shows the current toast: an ink cup (square shoulders, round base) with a
  * 3 px level line along its top edge in the colour of what was logged.
  *
  * Mounted once at the app root ('screen'), and once inside every open Sheet
  * ('sheet'): a native modal covers the app's own layer, so a sheet has to show
- * the toast itself. On a screen it rests 12 px above the bottom chrome the
- * screen reported with `useToastDock` (tab bar, footer or home indicator);
- * when a control lies there, in the lowest band clear of every control with
- * its action in thumb reach (`toastSpot`: in a browser every control on the
- * page, on a phone the kit's controls of the focused screen, measured in the
- * window, ./toastControls and `toastBottomAmong`). While the on-screen keyboard is up it
- * rests 12 px above the footer that rides on the keyboard, or 12 px above the
- * keyboard when the screen has no footer, by the same measure the screen pads
- * itself with, and moves above the focused field when it would cover it and
- * there is room. The root host is outside every ScrollView, so a tap on its
- * action is never taken for a tap that dismisses the keyboard (only a
- * ScrollView does that, by its keyboardShouldPersistTaps). In a sheet it sits in the layout right
- * above the sheet's top edge (in a browser, inside the sheet in its lowest clear band when that edge is
- * out of thumb reach), and the host underneath steps aside so there is only ever one toast on screen.
+ * the toast itself. On a screen it always rests in one place: 12 px above the
+ * bottom chrome the screen reported with `useToastDock` (tab bar, footer or
+ * home indicator). While the on-screen keyboard is up it rests 12 px above the
+ * footer that rides on the keyboard, or 12 px above the keyboard when the
+ * screen has no footer, by the same measure the screen pads itself with, and
+ * moves above the focused field when it would cover it and there is room
+ * (`toastBottom`). It is drawn at once. When a control of the screen lies under
+ * that place (`toastCovers`: in a browser every control of the focused screen,
+ * cut to what its scroll area shows; on a phone the kit's controls of the
+ * focused screen, ./toastControls), the screen's scroll area ends 8 px above
+ * the toast while it shows (`toastBand`, `useToastBand`), so nothing is under
+ * it and nothing moves. The root host is outside every ScrollView, so a tap on
+ * its action is never taken for a tap that dismisses the keyboard (only a
+ * ScrollView does that, by its keyboardShouldPersistTaps).
+ *
+ * In a sheet it sits just above the sheet's top edge, or, on a sheet whose top is high in the window, at the
+ * bottom of the sheet above its footer, with the sheet's body ending 8 px above it (`sheetToastPlace`); the host
+ * underneath steps aside so there is only ever one toast on screen.
+ *
+ * A person can put it away at any time: a flick or drag down or sideways (it follows the finger and settles back
+ * when the move was too small; `toastGesture`), a tap on its words (not on its action), Escape on the web (while no
+ * sheet is open: with one, Escape closes the sheet), and the
+ * accessibility action "Dismiss" (VoiceOver's escape gesture too).
  */
-export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sheet' }) {
+export function ToastHost({ placement = 'screen', sheet }: { placement?: 'screen' | 'sheet'; sheet?: SheetToastBox }) {
   const { colors, radius } = useTheme();
   const insets = useSafeAreaInsets();
   const { id, message, actionLabel, onAction, tint, short, toScreen, hide } = useToast();
@@ -315,7 +343,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
   const inSheet = placement === 'sheet';
   const docks = useToast((s) => s.docks);
   const last = docks.length ? docks[docks.length - 1] : null;
-  // The screen whose controls the toast keeps clear of: the newest dock that names one (the tab bar's
+  // The screen whose controls the toast is never over: the newest dock that names one (the tab bar's
   // own dock, registered beside a tab screen's, names none).
   const scopeId = [...docks].reverse().find((d) => d.scope)?.scope;
   const placed = last ? { dock: last.height, ridesKeyboard: last.rides, cover: last.cover } : { dock: insets.bottom, ridesKeyboard: false, cover: 0 };
@@ -326,12 +354,15 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
   const [field, setField] = useState<{ top: number; bottom: number; hostBottom: number; key: string } | null>(null);
   const key = `${id}:${placed.cover}:${placed.dock}`;
   const [toastH, setToastH] = useState(0);
+  const [toastW, setToastW] = useState(0);
   const outer = useRef<React.ComponentRef<typeof View>>(null);
   const toastRef = useRef<React.ComponentRef<typeof View>>(null);
   const bottomNow = useRef(0);
   const [anim] = useState(() => new Animated.Value(0));
+  // Where a finger has dragged the toast (it follows the finger on its way to being flicked away).
+  const [drag] = useState(() => new Animated.ValueXY({ x: 0, y: 0 }));
   const [hostId] = useState(() => ++hostSeq);
-  // The toast whose action was pressed: it is on its way out and takes no second press.
+  // The toast that is on its way out (its action pressed, or put away): it takes no second press.
   const [closingId, setClosingId] = useState(0);
   const life = useRef<Life>({ id: 0, holds: new Set(), left: 0, deadline: 0 });
   // Whether keyboard focus is on the action (web): it goes back where it came from when the toast leaves.
@@ -353,6 +384,49 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
   // A toast handed to the screen (`toastToScreen`) waits for every sheet to go and is shown by the screen.
   const active = inSheet ? !toScreen && (top === hostId || !sheetHosts.includes(hostId)) : sheetHosts.length === 0;
 
+  // Puts this toast away now (a flick, a tap on its words, Escape, "Dismiss"): it fades and sinks as it always leaves.
+  const dismiss = () => {
+    if (closingId === id || useToast.getState().id !== id || !useToast.getState().message) return;
+    setClosingId(id);
+    closeToast(anim, id, hide);
+  };
+  // The responder below is made once; it reaches this render's functions through a ref set after each render.
+  const toastBox = () => (outer.current as unknown as HTMLElement | null)?.querySelector?.('[data-testid="toast"]')?.getBoundingClientRect();
+  const gesture = useRef({ dismiss, width: 0, box: toastBox });
+  useEffect(() => {
+    gesture.current = { dismiss, width: toastW, box: toastBox };
+  });
+  // Made once, after the first render (the responder reads this render's functions through the ref above).
+  const [pan, setPan] = useState<PanResponderInstance | null>(null);
+  useEffect(() => {
+    const settle = () => {
+      if (isReducedMotion()) return drag.setValue({ x: 0, y: 0 });
+      Animated.timing(drag, { toValue: { x: 0, y: 0 }, duration: motion.duration.fade, easing: Easing.bezier(...motion.easing.enter), useNativeDriver: Platform.OS !== 'web' }).start();
+    };
+    setPan(PanResponder.create({
+      // A touch on the words (the action, deeper, takes its own touch first), or a move that starts on the action.
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 6 || g.dy > 6,
+      onPanResponderGrant: () => holdLife(life.current, 'finger'),
+      onPanResponderMove: (_e, g) => {
+        // It follows the finger down or sideways (never up); under reduced motion it stays still and just goes.
+        if (!isReducedMotion()) drag.setValue({ x: g.dx, y: Math.max(0, g.dy) });
+      },
+      onPanResponderRelease: (_e, g) => {
+        releaseLife(life.current, 'finger');
+        const did = toastGesture(g, gesture.current.width);
+        if (did === 'back') return settle();
+        // Web: the browser sends a click after a tap; the toast is gone by then, so it would land on what was under it.
+        if (did === 'tap') swallowClick(gesture.current.box());
+        gesture.current.dismiss();
+      },
+      onPanResponderTerminate: () => {
+        releaseLife(life.current, 'finger');
+        settle();
+      },
+    }));
+  }, [drag]);
+
   useEffect(() => {
     if (!message || !active) return;
     if (announcedId !== id) {
@@ -366,6 +440,8 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       if (Platform.OS === 'web') speakIn(live.current, line);
       else AccessibilityInfo.announceForAccessibility(line);
     }
+    // A new toast stands where it rests, whatever a finger did to the one before.
+    drag.setValue({ x: 0, y: 0 });
     // Rises 16 px and fades in, ease-out, no bounce; instant under reduced motion. A toast raised while the
     // one before is fading out rises back from where that fade had got to.
     if (isReducedMotion()) anim.setValue(1);
@@ -386,12 +462,12 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       l.timer = undefined;
       l.close = undefined;
     };
-  }, [id, message, actionLabel, anim, hide, active]);
+  }, [id, message, actionLabel, anim, drag, hide, active]);
 
-  // Web: a mouse resting on the toast holds its timer, wherever on the toast it rests.
+  // Web: a mouse resting on the toast holds its timer, wherever on the toast it rests; Escape puts it away.
   const shownNow = !!message && active;
   useEffect(() => {
-    if (!shownNow || Platform.OS !== 'web' || typeof document === 'undefined') return;
+    if (!shownNow || Platform.OS !== 'web' || typeof document === 'undefined' || typeof window === 'undefined') return;
     watchFocus();
     const onMove = (e: PointerEvent) => {
       if (e.pointerType !== 'mouse') return;
@@ -401,12 +477,21 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       if (over) holdLife(life.current, 'hover');
       else releaseLife(life.current, 'hover');
     };
+    // Escape puts a screen's toast away. While a sheet is open Escape is the sheet's (it closes the sheet, and the
+    // toast fades with it): a toast a sheet shows may have been raised before the sheet opened.
+    const onKey = (e: KeyboardEvent) => {
+      if (inSheet || e.key !== 'Escape' || useToast.getState().id !== id) return;
+      e.stopImmediatePropagation();
+      gesture.current.dismiss();
+    };
     document.addEventListener('pointermove', onMove);
+    window.addEventListener('keyup', onKey, true);
     return () => {
       document.removeEventListener('pointermove', onMove);
+      window.removeEventListener('keyup', onKey, true);
       life.current.holds.delete('hover');
     };
-  }, [shownNow, id]);
+  }, [shownNow, id, inSheet]);
 
   // Web: the live region holds nothing once its toast has gone (the words are said once, as it arrives).
   useEffect(() => {
@@ -449,148 +534,81 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
     keyboardUp && field && field.key === key && toastH > 0 ? { top: field.top, bottom: field.bottom, toastHeight: toastH, limit: field.hostBottom - insets.top } : null,
     TOAST_GAP,
   );
-  // Never over a control. Once the toast is laid out, it rests in the lowest band clear of every control on
-  // the screen (or, in a browser, in the sheet), its action within thumb reach (`toastSpot`); it is drawn
-  // only once that place is known, so it never shows for a frame over a button. A browser asks the page for
-  // its controls; a phone measures the kit controls of the focused screen (./toastControls,
-  // `toastBottomAmong`). A phone's sheet keeps its toast just above the sheet's top edge.
-  const placeKey = `${key}:${inSheet ? 'sheet' : (scopeId ?? '')}:${winH}:${drawn}`;
-  const [spot, setSpot] = useState<{ key: string; bottom: number | null } | null>(null);
-  // With the keyboard up the toast keeps its place over the footer riding on the keyboard (or over the keyboard), and
-  // in a browser, when a control lies under that place, the screen gives way under it as with no clear band (a list
-  // of result rows over food search's footer). A phone with the keyboard up keeps the toast where it rests.
-  const placing = shownNow && (Platform.OS === 'web' || (!inSheet && !keyboardUp));
   useEffect(() => {
-    if (!placing) return;
-    // A band made for another place (the keyboard has opened or closed since) is let go before this one is looked for.
+    bottomNow.current = resting;
+  }, [resting]);
+
+  // A screen's toast always rests where it is (`resting`) and is drawn at once. When a control of the screen lies under
+  // it, the screen's scroll area ends 8 px above the toast while it shows (`toastBand`), so nothing is under it and
+  // nothing moves. A browser asks the page; a phone measures the focused screen's kit controls (./toastControls). With
+  // the keyboard up and no footer riding on it (Water's "Other amount"), the toast stands over the keyboard beside the
+  // field being typed in and asks for no band (it would put that field out of view); there it can be flicked away. A
+  // phone with the keyboard up asks for none either (the screen is already padded for the keyboard).
+  const bandKey = `${key}:${scopeId ?? ''}:${winH}:${drawn}:${resting}`;
+  const wantsBand = shownNow && !inSheet && !!scopeId && (keyboardUp ? Platform.OS === 'web' && placed.ridesKeyboard : true);
+  // Web: looked at before the browser paints, so the toast's first frame already has the room it needs.
+  useLayoutEffect(() => {
+    if (!wantsBand) return;
+    // A band made for another place (the keyboard has opened or closed since) is let go first.
     const made = useToast.getState().band;
-    if (made && made.scope === scopeId && made.key !== placeKey) useToast.setState({ band: null });
-    // A toast that is never laid out is shown where it always rests rather than kept out of sight.
-    if (toastH <= 0) {
-      const late = setTimeout(() => setSpot({ key: placeKey, bottom: null }), PLACE_LATE_MS);
-      return () => clearTimeout(late);
-    }
-    // Whether the last look's place is out of thumb reach (`toastOutOfReach`): provisional until it settles, below.
-    let high = false;
-    // Phones: the focused screen's kit controls, measured in the window, and the same rule as the web.
-    const placeOnPhone = async (): Promise<number | null | 'none'> => {
-      if (!scopeId) return null;
-      const [host, box] = await Promise.all([measureBox(outer.current), measureRect(toastRef.current)]);
-      if (!host || !box) return null;
-      const rects = await Promise.all(controlsIn(scopeId).map((n) => measureRect(n)));
-      // With no clear band in thumb reach, any clear band below the status bar, rather than over a control.
-      const windowBottom = host.y + host.h + bottomNow.current;
-      const at = toastPlaceAmong({ windowBottom, resting, toast: box, controls: rects.filter((r): r is WindowBox => !!r), above: insets.top });
-      if (typeof at === 'number') high = toastOutOfReach(windowBottom - at - Math.round(box.height), windowBottom, Math.round(box.height));
-      return at;
-    };
-    // The place, as a bottom offset (null: where it always rests), 'none' when no band on the screen is clear (the
-    // screen then makes one), or 'wait' while the screen it belongs to is not laid out yet (a screen coming back
-    // into view after the one that raised the toast).
-    const place = (): number | null | 'none' | 'wait' | Promise<number | null | 'none'> => {
-      if (Platform.OS !== 'web') return withTimeout(placeOnPhone(), PLACE_LATE_MS, null);
-      const host = outer.current as unknown as HTMLElement | null;
-      const toastEl = host?.querySelector?.('[data-testid="toast"]');
-      if (!host || !toastEl || typeof window === 'undefined') return null;
-      const H = window.innerHeight;
-      const r = toastEl.getBoundingClientRect();
-      const h = Math.round(r.height);
-      if (!inSheet) {
-        const scope = scopeId ? document.getElementById(scopeId) : null;
-        const box = scope?.getBoundingClientRect();
-        if (!scope || !box || box.height < 1 || box.width < 1) return 'wait';
-        if (keyboardUp) {
-          // Only where it rests, just above the footer riding on the keyboard: clear, or the screen gives way under it
-          // (food search's result rows). With no footer (Water's "Other amount") it rests over the keyboard beside
-          // the field being typed in, which it keeps clear of by itself, and a field is never put out of view.
-          if (!placed.ridesKeyboard) return null;
-          const at = H - resting - h;
-          return toastSpot({ lowest: at, highest: at, height: h, left: r.left, right: r.right, controls: controlBoxes(scope, host, true) }) === null ? 'none' : null;
-        }
-        // With no clear band in thumb reach, any clear band under the screen's header, rather than over a control.
-        const head = scope.querySelector('[data-testid="screen-header"], [data-testid="tab-header"]')?.getBoundingClientRect();
-        const above = Math.max(box.top, head ? head.bottom + TOAST_CLEAR : 0, insets.top);
-        const top = toastSpot({ lowest: H - resting - h, highest: toastReachTop(H, h), height: h, left: r.left, right: r.right, controls: controlBoxes(scope, host), above });
-        if (top === null) return 'none';
-        high = toastOutOfReach(top, H, h);
-        return H - top - h;
-      }
-      // In a sheet: just above its top edge while that is within thumb reach; else the lowest clear band in it.
-      let sheet: Element | null = null;
-      for (let a: Element | null = host.parentElement; a && !sheet; a = a.parentElement) {
-        const found = a.querySelectorAll('[data-testid="sheet"]');
-        sheet = found.length ? found[found.length - 1] : null;
-      }
-      if (!sheet) return null;
-      const sheetTop = sheet.getBoundingClientRect().top;
-      if (sheetTop - TOAST_GAP - h >= toastReachTop(H, h)) return null;
-      const top = toastSpot({ lowest: H - Math.max(insets.bottom, TOAST_GAP) - h, highest: Math.max(toastReachTop(H, h), sheetTop), height: h, left: r.left, right: r.right, controls: controlBoxes(sheet, host) });
-      // Measured from the sheet's top edge, where this host sits in the layout.
-      return top === null ? null : Math.round(sheetTop - (top + h));
-    };
-    let tries = 0;
-    let looked = false;
-    let stopped = false;
-    // Before the toast is first drawn, a place out of thumb reach is provisional: a screen still arriving (a diary
-    // mounted fresh after a direct link) shows the band under its header clear before its week strip is drawn, then
-    // no band clear once it is. The toast stays hidden and looks again until two looks in a row agree on that place
-    // or a look finds another (`toastHighSettled`), so it appears once, where it stays.
-    let drawnOnce = false;
-    let looks = 0;
-    let highAt: number | null = null;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const run = () => {
-      high = false;
-      void Promise.resolve(place()).then((at) => {
-        if (stopped) return;
-        if (at === 'wait' && tries++ < 12) {
-          timer = setTimeout(run, 80);
-          return;
-        }
-        looks += 1;
-        if (!drawnOnce && typeof at === 'number' && high && !toastHighSettled(at, highAt, looks)) {
-          highAt = at;
-          looked = true;
-          timer = setTimeout(run, PLACE_AGAIN_MS);
-          return;
-        }
-        drawnOnce = true;
-        if (at === 'none' && scopeId && toastH > 0) {
-          // No band on the screen is clear of controls: the screen makes one where the toast rests (its scroll area
-          // ends 8 px above it, `toastBand`), and the toast is drawn there once the screen has given way (two frames).
-          const fromBottom = toastBand(resting, toastH);
-          useToast.setState((st) => ({ band: { scope: scopeId, key: placeKey, fromBottom: Math.max(fromBottom, st.band?.scope === scopeId && st.band.key === placeKey ? st.band.fromBottom : 0) } }));
-          timer = setTimeout(() => {
-            if (stopped) return;
-            setSpot({ key: placeKey, bottom: null });
-            if (!looked) {
-              looked = true;
-              timer = setTimeout(run, PLACE_AGAIN_MS);
-            }
-          }, 34);
-          return;
-        }
-        setSpot({ key: placeKey, bottom: at === 'wait' || at === 'none' ? null : at });
-        // One more look once the screen has settled (a list that was still arriving, a screen fading in).
-        if (!looked) {
-          looked = true;
-          timer = setTimeout(run, PLACE_AGAIN_MS);
-        }
+    if (made && made.scope === scopeId && made.key !== bandKey) useToast.setState({ band: null });
+    const makeBand = (h: number) => {
+      if (!scopeId || !(h > 0)) return;
+      const fromBottom = toastBand(resting, h);
+      useToast.setState((st) => {
+        const same = st.band?.scope === scopeId && st.band.key === bandKey;
+        if (same && st.band!.fromBottom >= fromBottom) return {};
+        return { band: { scope: scopeId, key: bandKey, fromBottom: Math.max(fromBottom, same ? st.band!.fromBottom : 0) } };
       });
     };
-    const frame = requestAnimationFrame(run);
+    let stopped = false;
+    const look = () => {
+      if (Platform.OS === 'web') {
+        const host = outer.current as unknown as HTMLElement | null;
+        const toastEl = host?.querySelector?.('[data-testid="toast"]');
+        const scope = scopeId ? document.getElementById(scopeId) : null;
+        if (!host || !toastEl || !scope || typeof window === 'undefined') return;
+        const r = toastEl.getBoundingClientRect();
+        const h = Math.round(r.height);
+        // Where it rests, whatever its rise-in has got to (the rise moves it, not its place).
+        const at = window.innerHeight - resting - h;
+        if (toastCovers({ top: at, height: h, left: r.left, right: r.right, controls: controlBoxes(scope, host, keyboardUp) })) makeBand(h);
+        return;
+      }
+      void (async () => {
+        if (!scopeId) return;
+        const [hostBox, box] = await Promise.all([measureBox(outer.current), measureRect(toastRef.current)]);
+        if (stopped || !hostBox || !box) return;
+        const rects = await Promise.all(controlsIn(scopeId).map((n) => measureRect(n)));
+        if (stopped) return;
+        const windowBottom = hostBox.y + hostBox.h + resting;
+        if (toastCoversAmong({ windowBottom, resting, toast: box, controls: rects.filter((r): r is WindowBox => !!r) })) makeBand(Math.round(box.height));
+      })();
+    };
+    look();
+    // Once more after the screen has settled (a list still arriving, a screen fading in): the band only ever grows.
+    const again = setTimeout(look, LOOK_AGAIN_MS);
     return () => {
       stopped = true;
-      cancelAnimationFrame(frame);
-      clearTimeout(timer);
+      clearTimeout(again);
     };
-  }, [placing, placeKey, toastH, resting, inSheet, scopeId, insets.bottom, insets.top, keyboardUp, placed.ridesKeyboard]);
-  const spotNow = spot && spot.key === placeKey ? spot : null;
-  const hidden = placing && !spotNow;
-  const bottom = !inSheet && spotNow?.bottom != null ? spotNow.bottom : resting;
+  }, [wantsBand, bandKey, toastH, keyboardUp, resting, scopeId]);
+
+  // A sheet's toast: above the sheet's top edge, or at its bottom when that edge is high (`sheetToastPlace`).
+  const sheetPlace = inSheet && sheet ? sheetToastPlace({ windowHeight: sheet.windowHeight, sheetTop: sheet.top, sheetHeight: sheet.height, toastHeight: toastH, lift: sheet.lift }) : null;
+  const sheetScope = sheet?.scope;
+  const sink = shownNow && sheetPlace?.sink != null ? sheetPlace.sink : null;
+  const sheetBand = sink != null && sheetPlace ? sheetPlace.band : 0;
   useEffect(() => {
-    bottomNow.current = bottom;
-  }, [bottom]);
+    if (!sheetScope) return;
+    const st = useToast.getState();
+    if (sink == null) {
+      if (st.band?.scope === sheetScope) useToast.setState({ band: null });
+      return;
+    }
+    if (st.band?.scope === sheetScope && st.band.sink === sink && st.band.fromBottom === sheetBand) return;
+    useToast.setState({ band: { scope: sheetScope, key: `${id}`, fromBottom: sheetBand, sink } });
+  }, [sheetScope, sink, sheetBand, id]);
 
   // Web: one polite live region per host, mounted while the host is (the app's root, an open sheet). Its words are
   // written by `speakIn`, never rendered, and it stays the same element whether a toast shows or not (the same
@@ -604,6 +622,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       </>
     );
   }
+  const spokenMessage = spokenUnits(withoutMarks(message));
   return (
     <>
     {region}
@@ -612,21 +631,24 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       pointerEvents="box-none"
       style={[
         inSheet
-          ? spotNow?.bottom != null
-            ? { position: 'absolute', left: 0, right: 0, bottom: spotNow.bottom, alignItems: 'center', paddingHorizontal: side }
-            : { alignSelf: 'stretch', alignItems: 'center', paddingHorizontal: side, marginBottom: 12 }
-          : { position: 'absolute', left: 0, right: 0, bottom, alignItems: 'center', paddingHorizontal: side },
-        hidden ? { opacity: 0 } : null,
+          ? // Above the sheet's top edge; in the sheet, its layer (moved down by `useToastSink`) carries it there.
+            { alignSelf: 'stretch', alignItems: 'center', paddingHorizontal: side, marginBottom: sink != null ? 0 : 12 }
+          : { position: 'absolute', left: 0, right: 0, bottom: resting, alignItems: 'center', paddingHorizontal: side },
+        // A sheet's toast is drawn once it is laid out, so it never shows for a frame above a sheet it rests in.
+        inSheet && toastH <= 0 ? { opacity: 0 } : null,
       ]}>
-      {/* Only the action takes a touch: a tap on the toast's ink body goes through to what is under it (Today's
-          "+ 250 ml" sits just above the resting toast at 360 x 740, and a second glass must still log). */}
       <Animated.View
         ref={toastRef}
         testID="toast"
-        pointerEvents={closingId === id ? 'none' : 'box-none'}
+        // The toast takes its own touches: a tap on its words or a flick puts it away. On its way out it takes none.
+        pointerEvents={closingId === id ? 'none' : 'auto'}
+        {...pan?.panHandlers}
         // Android reads the toast as it appears; the web reads the host's live region instead (above).
         accessibilityLiveRegion={Platform.OS === 'web' ? undefined : 'polite'}
-        onLayout={(e) => setToastH(Math.round(e.nativeEvent.layout.height))}
+        onLayout={(e) => {
+          setToastH(Math.round(e.nativeEvent.layout.height));
+          setToastW(Math.round(e.nativeEvent.layout.width));
+        }}
         style={{
           maxWidth: MAX_CONTENT_WIDTH - 2 * side,
           flexDirection: 'row',
@@ -640,15 +662,26 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
           paddingTop: 13,
           paddingBottom: 11,
           opacity: anim,
-          transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+          transform: [{ translateX: drag.x }, { translateY: Animated.add(anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }), drag.y) }],
+          // Web: a finger dragging the toast moves the toast, never the page under it.
+          ...(Platform.OS === 'web' ? ({ touchAction: 'none', cursor: 'default' } as object) : null),
         }}>
         {/* The level line: what was logged, in its own colour. */}
         <View
           pointerEvents="none"
           style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, borderTopLeftRadius: radius.shoulder, borderTopRightRadius: radius.shoulder, backgroundColor: tint ? ((colors as unknown as Record<string, string>)[tint] ?? tint) : colors.primary }}
         />
-        <View pointerEvents="none" style={{ flexShrink: 1 }}>
-          <Text variant="label" color={colors.bg} {...figure(spokenUnits(withoutMarks(message)))}>
+        <View
+          pointerEvents="none"
+          style={{ flexShrink: 1 }}
+          {...figure(spokenMessage)}
+          // A screen reader puts it away with the action "Dismiss" (or VoiceOver's escape gesture).
+          accessibilityActions={DISMISS_ACTIONS}
+          onAccessibilityAction={(e) => {
+            if (e.nativeEvent.actionName === 'dismiss') dismiss();
+          }}
+          onAccessibilityEscape={dismiss}>
+          <Text variant="label" color={colors.bg}>
             {drawn}
           </Text>
         </View>
@@ -657,8 +690,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
             testID="toast-action"
             accessibilityLabel={actionLabel}
             // Wider to touch, never taller: the action is already 44 px tall inside the toast's own box, so its touch
-            // area ends where the toast does and the toast's 8 px of clear room (`toastSpot`) reaches the touch area
-            // of the control it rests beside (Today's "+ 250 ml"), which an area 10 px taller used to cover.
+            // area ends where the toast does.
             hitSlop={{ left: 10, right: 10, top: 0, bottom: 0 }}
             // The timer waits while the action has the focus or a finger on it.
             onFocus={() => {
@@ -693,6 +725,26 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
     </>
   );
 }
+
+/**
+ * Web: the click a browser sends after a tap on the toast's words would land on whatever lies under the toast once it
+ * has gone (its screen's scroll area grows back at once): the next click within 500 ms inside the box the toast had
+ * is caught before anything hears it. A click anywhere else is a new tap and goes through.
+ */
+function swallowClick(box: DOMRect | null | undefined) {
+  if (Platform.OS !== 'web' || typeof window === 'undefined' || !box) return;
+  const stop = (e: MouseEvent) => {
+    if (e.clientX < box.left - 2 || e.clientX > box.right + 2 || e.clientY < box.top - 2 || e.clientY > box.bottom + 2) return;
+    e.preventDefault();
+    e.stopPropagation();
+    window.removeEventListener('click', stop, true);
+  };
+  window.addEventListener('click', stop, true);
+  setTimeout(() => window.removeEventListener('click', stop, true), 500);
+}
+
+/** The one accessibility action a toast's words carry. */
+const DISMISS_ACTIONS = [{ name: 'dismiss', label: 'Dismiss' }];
 
 /** Web: puts `text` in a live region as a new text node (read out once), or empties it. */
 function speakIn(node: unknown, text: string) {
@@ -756,27 +808,8 @@ function measureRect(node: unknown): Promise<WindowBox | null> {
   });
 }
 
-/** How long a toast may wait for its place before it shows where it always rests. */
-const PLACE_LATE_MS = 400;
-/** When a toast looks at its place again: once after it is drawn (the screen settling), and while a high place is provisional. */
-const PLACE_AGAIN_MS = 450;
-
-/** A promise's answer, or `fallback` when it has not come within `ms` (a measurement a phone never answers). */
-function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
-  return new Promise((resolve) => {
-    const t = setTimeout(() => resolve(fallback), ms);
-    p.then(
-      (v) => {
-        clearTimeout(t);
-        resolve(v);
-      },
-      () => {
-        clearTimeout(t);
-        resolve(fallback);
-      },
-    );
-  });
-}
+/** When a toast looks again at what lies under it, once the screen has settled (it is drawn at once either way). */
+const LOOK_AGAIN_MS = 450;
 
 /**
  * The focused text field, as distances from the bottom of the toast's host (the app's root), and

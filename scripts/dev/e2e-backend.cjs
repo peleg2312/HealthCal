@@ -20,7 +20,8 @@
  * Doing things together (20261202000000_friends_together.sql): the "together" block drives circles, buddies, notes
  * and saved meals shown on three devices; "no together" turns them off on the stand-in (POST /__together, as
  * `mock-backend.cjs --no-together` starts it) and proves the app calm on a server without them, then puts the switch
- * back. `--only=together` and `--only=no-together` run one of them alone.
+ * back. `--only=together` and `--only=no-together` run one of them alone. "together screens" (`--only=together-screens`)
+ * taps the same through the Friends screens and Saved meals, and proves them gone on a server without it.
  */
 const { chromium } = require('playwright');
 const path = require('node:path');
@@ -606,11 +607,180 @@ async function friendsWithoutTogether(browser, buildSeed) {
   }
 }
 
+
+// ------------------------------------------------------------- doing things together, on the screens
+// The Friends screens for circles, buddies, notes and saved meals, tapped as a person would on two devices: start a
+// circle (its step says what counts and what a circle of two gives away), join it, ask to log together and accept,
+// send a note (its buttons wait once it is used up), mute notes from a friend, save a friend's saved meal to my
+// meals with one Undo, show a saved meal from /food/meals, and leave the circle. Then, on a server without any of
+// it, every one of those controls is simply not there and nothing raises an error. `--only=together-screens`.
+async function friendsTogetherScreens(browser, buildSeed) {
+  const { toastActionReady } = require('./toastGuard.cjs');
+  const idFor = (id) => String(id).replace(/[^A-Za-z0-9-]/g, '').toLowerCase();
+  const switchTogether = (on) => fetch(`${API}/__together`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ on }) }).then((r) => r.json());
+  const wasOn = (await server()).togetherOn !== false;
+  await switchTogether(true);
+  const kai = await signUpDevice(browser, buildSeed, 'Kai');
+  const lea = await signUpDevice(browser, buildSeed, 'Lea');
+  await befriendDevices(kai, lea);
+  const K = kai.d;
+  const L = lea.d;
+  const visible = (d, id) => d.page.getByTestId(id).first().isVisible().catch(() => false);
+  const waitFor = (d, id, timeout = 15000) => d.page.getByTestId(id).first().waitFor({ state: 'visible', timeout }).then(() => true).catch(() => false);
+  try {
+    // Kai starts a circle with Lea from Friends.
+    await K.go('/friends');
+    const offered = await waitFor(K, 'together-start-open');
+    await K.tap('together-start-open');
+    await K.tap(`together-who-${idFor(lea.id)}`);
+    const counts = await K.text('together-start-counts');
+    const button = await K.text('together-start-confirm');
+    check(
+      'together screens: Friends offers a circle; its step says what counts, that members see names, and what a circle of two gives away, and the button names who',
+      offered && /active minutes this week count/.test(counts) && /names/.test(counts) && /circle of two/.test(counts) && button === 'Ask Lea',
+      `${button} | ${counts.slice(0, 80)}`,
+    );
+    await K.tap('together-start-confirm');
+    await K.page.waitForTimeout(1200);
+    let srv = await server();
+    check('together screens: the circle is started with Lea asked', srv.circleMembers.some((m) => m.user_id === lea.id && m.status === 'invited'));
+
+    // Lea joins from her Friends: the join step says the same before anything counts.
+    await L.go('/friends');
+    const invited = await waitFor(L, 'together-invite-join');
+    await L.tap('together-invite-join');
+    const joinCounts = await L.text('together-join-counts');
+    await L.tap('together-join-confirm');
+    const card = await waitFor(L, 'together-card');
+    const total = card ? await L.text('together-total') : '';
+    const line = card ? await L.text('together-line') : '';
+    const cardText = card ? (await L.page.getByTestId('together-card').first().innerText()).replace(/\s+/g, ' ') : '';
+    check(
+      'together screens: Lea joins after the step that says what counts; the card shows one total and names, never one person’s figure',
+      invited && /circle of two/.test(joinCounts) && /^\d[\d,]* of \d[\d,]* active min$/.test(total) && /^Kai and you · /.test(line) && (cardText.match(/\d+/g) || []).length <= 3,
+      `${total} | ${line} | ${cardText.slice(0, 120)}`,
+    );
+
+    // Logging together: Kai asks on Lea's page, Lea accepts on Kai's.
+    await K.go(`/friends/friend?id=${lea.id}`);
+    await waitFor(K, 'buddy-ask');
+    await K.tap('buddy-ask');
+    const explain = await K.text('buddy-explain');
+    await K.tap('buddy-ask-confirm');
+    const asked = await waitFor(K, 'buddy-asked');
+    await L.go(`/friends/friend?id=${kai.id}`);
+    const inviteShown = await waitFor(L, 'buddy-invite');
+    await L.tap('buddy-accept');
+    await L.tap('buddy-accept-confirm');
+    const buddyCard = await waitFor(L, 'buddy-card');
+    const days = await L.page.locator('[data-testid^="buddy-day-"]').count();
+    check(
+      'together screens: logging together is asked, accepted after what it shows (never what was eaten), and drawn as the week in seven cups',
+      /never what or how much/.test(explain) && asked && inviteShown && buddyCard && days === 7,
+      `${asked} ${inviteShown} ${buddyCard} ${days}`,
+    );
+
+    // A note: one tap; then its buttons wait and say so. Lea reads it beside the cheers.
+    await K.go(`/friends/friend?id=${lea.id}`);
+    await waitFor(K, 'note-walk_later');
+    await K.tap('note-walk_later');
+    await K.page.waitForTimeout(1200);
+    const noteLine = await K.text('notes-line');
+    const waits = (await K.page.getByTestId('note-nice_week').first().getAttribute('aria-disabled')) === 'true';
+    await L.go('/friends');
+    await waitFor(L, 'friends-cheers-open');
+    const chip = await L.text('friends-cheers-open');
+    await L.tap('friends-cheers-open');
+    const received = await L.text('friends-note-received-0');
+    check(
+      'together screens: a note is sent in one tap, the buttons then wait and say why, and it arrives as a sentence beside the cheers',
+      /You sent “Walk later\?” today/.test(noteLine) && waits && /1 note/.test(chip) && /Kai sent “Walk later\?”/.test(received),
+      `${noteLine} | ${waits} | ${chip} | ${received}`,
+    );
+    await L.page.keyboard.press('Escape');
+
+    // Lea turns notes from Kai off in Manage; Kai is told nothing.
+    await L.go(`/friends/friend?id=${kai.id}`);
+    await waitFor(L, 'friend-manage');
+    await L.tap('friend-manage');
+    await waitFor(L, 'friend-notes-on');
+    await L.tap('friend-notes-on');
+    await L.page.waitForTimeout(1200);
+    srv = await server();
+    const pref = Object.entries(srv.friendPrefs || {}).find(([k]) => k === `${lea.id}:${kai.id}`);
+    check('together screens: notes from one friend are turned off in Manage, on the server, silently', !!pref && pref[1].notes === false, JSON.stringify(pref || null).slice(0, 120));
+    await L.page.keyboard.press('Escape');
+
+    // Kai shows a saved meal from Saved meals; Lea saves it to her meals from the row, with one Undo.
+    await K.go('/food/meals');
+    const showCup = await waitFor(K, 'saved-meal-show-0');
+    await K.tap('saved-meal-show-0');
+    await K.tap(`show-saved-who-${idFor(lea.id)}`);
+    const never = await K.text('show-saved-never');
+    await K.tap('show-saved-confirm');
+    await K.page.waitForTimeout(1500);
+    srv = await server();
+    const shownSaved = (srv.sharedMeals || []).filter((m) => m.owner === kai.id && m.kind === 'saved');
+    check('together screens: "Show to friends" on a saved meal shows it to the friend picked, saying what is never shown', showCup && /Never shown/.test(never) && shownSaved.length === 1, `${showCup} ${shownSaved.length}`);
+    await L.go('/friends');
+    const savedRow = await waitFor(L, 'friends-saved-0');
+    const before = await L.page.evaluate(() => Object.values(window.__healthcal.getState().savedMeals).filter((m) => !m.deleted).length);
+    await L.tap('friends-saved-0-save');
+    const toastText = (await L.text('toast')).replace(/\s+/g, ' ');
+    const after = await L.page.evaluate(() => Object.values(window.__healthcal.getState().savedMeals).filter((m) => !m.deleted).map((m) => m.name));
+    await toastActionReady(L.page);
+    await L.tap('toast-action');
+    const undone = await L.page.evaluate(() => Object.values(window.__healthcal.getState().savedMeals).filter((m) => !m.deleted).length);
+    check(
+      'together screens: "Save to my meals" makes one saved meal named for the friend, one toast with Undo, and Undo takes it back',
+      savedRow && after.length === before + 1 && after.some((n) => /^Kai’s /.test(n)) && /Saved “Kai’s /.test(toastText) && undone === before,
+      `${before} -> ${after.length} -> ${undone} | ${toastText}`,
+    );
+
+    // Kai leaves the circle, confirmed first; Lea's cup goes on.
+    await K.go('/friends');
+    await waitFor(K, 'together-open');
+    await K.tap('together-open');
+    await K.tap('together-leave');
+    await K.tap('confirm-yes');
+    await K.page.waitForTimeout(1500);
+    srv = await server();
+    check(
+      'together screens: leaving is confirmed, then quiet: Kai is out, Lea is still in, and Friends offers a new circle',
+      srv.circleMembers.some((m) => m.user_id === kai.id && m.status === 'declined') && srv.circleMembers.some((m) => m.user_id === lea.id && m.status === 'joined') && (await waitFor(K, 'together-start-open')),
+    );
+
+    // On a server without it: every control is simply gone, with no error and no toast.
+    await switchTogether(false);
+    await K.go('/friends');
+    await K.page.waitForTimeout(1200);
+    const friendsCalm = !(await visible(K, 'together')) && !(await visible(K, 'friends-saved')) && !(await visible(K, 'friends-error-banner')) && !(await visible(K, 'toast'));
+    await K.go(`/friends/friend?id=${lea.id}`);
+    await K.page.waitForTimeout(1200);
+    await waitFor(K, 'friend-manage');
+    const pageCalm = !(await visible(K, 'buddy-ask')) && !(await visible(K, 'buddy-asked')) && !(await visible(K, 'notes-card')) && !(await visible(K, 'buddy-card')) && !(await visible(K, 'toast'));
+    await K.tap('friend-manage');
+    const manageCalm = !(await visible(K, 'friend-notes-on')) && !(await visible(K, 'buddy-stop'));
+    await K.go('/food/meals');
+    await K.page.waitForTimeout(1200);
+    const mealsCalm = !(await visible(K, 'saved-meal-show-0')) && (await visible(K, 'saved-meal-log-0'));
+    check('together screens: on a server without it, Friends, a friend’s page, Manage and Saved meals show none of it, and no error', friendsCalm && pageCalm && manageCalm && mealsCalm, `${friendsCalm} ${pageCalm} ${manageCalm} ${mealsCalm}`);
+    check('together screens: no runtime errors on either device', K.errors.length === 0 && L.errors.length === 0, [...K.errors, ...L.errors].join(' | ').slice(0, 200));
+  } finally {
+    await switchTogether(wasOn);
+    await friendsApi(K, 'leaveSocial').catch(() => null);
+    await friendsApi(L, 'leaveSocial').catch(() => null);
+    await K.page.context().close();
+    await L.page.context().close();
+  }
+}
+
 (async () => {
   const { buildSeed } = await import('./seed.mjs');
   const browser = await chromium.launch();
-  if (flags.only === 'no-meals' || flags.only === 'together' || flags.only === 'no-together') {
+  if (flags.only === 'no-meals' || flags.only === 'together' || flags.only === 'no-together' || flags.only === 'together-screens') {
     if (flags.only === 'no-meals') await friendsWithoutMeals(browser, buildSeed);
+    if (flags.only === 'together-screens') await friendsTogetherScreens(browser, buildSeed);
     if (flags.only === 'together') await friendsTogether(browser, buildSeed);
     if (flags.only === 'no-together') await friendsWithoutTogether(browser, buildSeed);
     await browser.close();
@@ -1021,6 +1191,7 @@ async function friendsWithoutTogether(browser, buildSeed) {
   await friendsWithoutMeals(browser, buildSeed);
   await friendsTogether(browser, buildSeed);
   await friendsWithoutTogether(browser, buildSeed);
+  await friendsTogetherScreens(browser, buildSeed);
 
   // ------------------------------------------------------------- friends
   // A second person (Sam) on another device. Both turn friends on, Sam adds Alex by code, Alex accepts.

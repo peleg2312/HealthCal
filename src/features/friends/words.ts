@@ -419,10 +419,9 @@ export const OUT_OF_CIRCLE = 'You are out of the circle. Nobody was told.';
 export const WHAT_FILLS = 'What fills the cup';
 export const WHO_TO_ASK = 'Who to ask';
 export const WHO_TO_ASK_NOTE = 'Pick 1 to 5 friends. Each joins when they accept.';
-export const GOAL_FOR_WEEK = 'Goal for the week';
 export const GOAL_NOTE = 'Suggested for the number of people picked.';
-/** A goal choice: "480 active min", "20 days". */
-export const goalChoice = (kind: TogetherKind, n: number) => (kind === 'minutes' ? `${formatNumber(n)} active min` : `${n} days`);
+/** A goal in words: "480 active min", "20 days logged". */
+export const goalChoice = (kind: TogetherKind, n: number) => `${formatNumber(n)} ${togetherUnit(kind)}`;
 /** The start button names who: "Ask Maya and Sam", "Ask 4 friends", or "Pick who to ask". */
 export function askButton(names: readonly string[]): string {
   if (!names.length) return 'Pick who to ask';
@@ -494,8 +493,8 @@ export const NOTE_WORDS: Record<NoteKind, string> = { thinking_of_you: 'Thinking
 /** The notes card's heading: "Send Maya a note". */
 export const noteTo = (name: string) => `Send ${isolateRtl(name)} a note`;
 export const notesLine = (name: string) => `One note a day. ${isolateRtl(name)} can turn notes off, and you are not told.`;
-/** Once today's note to this friend is sent: "Sent today: “Walk later?”. Another can go tomorrow." */
-export const noteSentLine = (kind: NoteKind) => `Sent today: “${NOTE_WORDS[kind]}”. Another can go tomorrow.`;
+/** Once today's note to this friend is sent: "You sent “Walk later?” today. Another can go tomorrow." */
+export const noteSentLine = (kind: NoteKind) => `You sent “${NOTE_WORDS[kind]}” today. Another can go tomorrow.`;
 export const NOTES_DAY_FULL = 'Five notes sent today. More can go tomorrow.';
 export const noteSentToast = (name: string) => `Note sent to ${name}`;
 /** A note button's name: its words, then who it goes to ("Walk later?, send to Maya"), or that it went today. */
@@ -544,3 +543,5 @@ export const savedStoppedToast = (name: string) => `${name} is no longer shown`;
 export const savedTheyShow = (name: string) => `Saved meals ${isolateRtl(name)} shows you`;
 /** A cheer for a saved meal the user shows, as the end of a sentence: "your Chicken bowl". */
 export const savedCheerTarget = (name: string) => `your ${isolateRtl(name)}`;
+/** Over the goal choices, so each choice is its number alone: "Goal, active minutes a week". */
+export const goalHeading = (kind: TogetherKind) => `Goal, ${togetherUnitSpoken(kind)} a week`;

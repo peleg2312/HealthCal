@@ -8,12 +8,12 @@ import { spokenUnits } from '@/lib/spokenUnits';
 import { MAX_CONTENT_WIDTH, motion, sheetShadow, useReducedMotion, useTheme } from '@/theme';
 
 import { Button } from './Button';
-import { keyboardCover, revealDelta } from './keyboardInset';
+import { keyboardCover, revealDelta, scrollGivesUp } from './keyboardInset';
 import { ease } from './motion';
 import { backClosesSheet, heldWrites, OWN_BACK_MS, ownBacks } from './sheetHistory';
 import { useShortWindow } from './shortWindow';
 import { Text } from './Text';
-import { ToastHost } from './Toast';
+import { ToastHost, useToastBand, useToastSink } from './Toast';
 import { ToastScope } from './toastControls';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -531,6 +531,22 @@ export function Sheet({
   const backdropStyle = useAnimatedStyle(() => ({ opacity: open.get() * (1 - Math.min(0.6, Math.max(0, drag.get()) / (travel + 24))) }));
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - open.get()) * (travel + 24) + drag.get() }] }));
   const toastStyle = useAnimatedStyle(() => ({ opacity: open.get() }));
+  // Its toast rests just above its top edge, or, on a sheet whose top is high, at its bottom over its footer, the body
+  // then ending 8 px above it (`sheetToastPlace`): the toast layer moves down by `sink`, the body gives way by `band`.
+  const [footerH, setFooterH] = useState(0);
+  const bottomPad = Math.max(insets.bottom, spacing.lg);
+  const pinnedFoot = !short && !!(footer || (asking && unsaved));
+  const toastLift = pinnedFoot ? bottomPad + footerH + 4 : bottomPad;
+  const toastSink = useToastSink(layerId);
+  const toastBand = useToastBand(layerId);
+  const bodyGivesUp = scrollGivesUp(toastBand, bottomPad + (pinnedFoot ? footerH : 0));
+  // The body's height before it gave way: it gives way by getting shorter, so the sheet keeps its height and nothing
+  // moves (the body's last rows are a scroll away while the toast shows).
+  const [bodyH, setBodyH] = useState(0);
+  const bodyGiving = bodyGivesUp > 0 && bodyH > 0 ? { marginBottom: bodyGivesUp, maxHeight: Math.max(0, bodyH - bodyGivesUp) } : null;
+  const onBodyLayout = (e: { nativeEvent: { layout: { height: number } } }) => {
+    if (!bodyGivesUp) setBodyH(Math.round(e.nativeEvent.layout.height));
+  };
   const titleView = title ? (
     <>
       <Text variant="h2" nativeID={titleId} style={{ paddingHorizontal: spacing.xl, paddingBottom: subtitle ? 2 : spacing.md }}>
@@ -552,7 +568,7 @@ export function Sheet({
   const footerView =
     asking && unsaved ? (
       // Asked in the sheet itself, in place of its footer: one sheet on screen at a time.
-      <View testID="sheet-discard" style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: 10 }}>
+      <View testID="sheet-discard" onLayout={(e) => setFooterH(Math.round(e.nativeEvent.layout.height))} style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: 10 }}>
         <Text variant="bodyStrong" testID="sheet-discard-title" accessibilityLiveRegion="polite">
           {unsaved}
         </Text>
@@ -568,7 +584,7 @@ export function Sheet({
         <Button testID="sheet-discard-keep" title="Keep editing" variant="secondary" onPress={() => setAsking(false)} />
       </View>
     ) : footer ? (
-      <View testID="sheet-footer" style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm }}>
+      <View testID="sheet-footer" onLayout={(e) => setFooterH(Math.round(e.nativeEvent.layout.height))} style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm }}>
         {footer}
       </View>
     ) : null;
@@ -599,11 +615,15 @@ export function Sheet({
           onPress={requestClose}
           style={[{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: colors.overlay }, backdropStyle]}
         />
-        {/* A native modal covers the app's own toast layer, so the sheet shows toasts itself, just above its top edge.
-            It fades with the sheet: closing, the toast leaves with it (then rises again over the screen's tab bar
-            or footer) instead of hanging in mid-air while the sheet slides away. */}
-        <Animated.View pointerEvents="box-none" style={[{ zIndex: 2 }, toastStyle]}>
-          <ToastHost placement="sheet" />
+        {/* A native modal covers the app's own toast layer, so the sheet shows toasts itself, just above its top edge
+            (or at its bottom, its layer pulled down over the sheet by `toastSink`, a real box so a phone delivers its
+            touches). It fades with the sheet: closing, the toast leaves with it (then rises again over the screen's
+            tab bar or footer) instead of hanging in mid-air while the sheet slides away. */}
+        <Animated.View pointerEvents="box-none" style={[{ zIndex: 2, marginBottom: -toastSink }, toastStyle]}>
+          <ToastHost
+            placement="sheet"
+            sheet={{ scope: layerId, windowHeight: winH - keyboard, top: winH - keyboard - sheetH, height: sheetH, lift: toastLift }}
+          />
         </Animated.View>
         <Animated.View
           testID="sheet"
@@ -639,13 +659,13 @@ export function Sheet({
             {short ? null : titleView}
           </View>
           {short ? (
-            <ScrollView ref={body} testID="sheet-body" keyboardShouldPersistTaps="handled">
+            <ScrollView ref={body} testID="sheet-body" keyboardShouldPersistTaps="handled" onLayout={onBodyLayout} style={bodyGiving}>
               {titleView}
               <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md }}>{children}</View>
               {footerView}
             </ScrollView>
           ) : (
-            <ScrollView ref={body} testID="sheet-body" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md }}>
+            <ScrollView ref={body} testID="sheet-body" keyboardShouldPersistTaps="handled" onLayout={onBodyLayout} style={bodyGiving} contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md }}>
               {children}
             </ScrollView>
           )}

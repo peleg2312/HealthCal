@@ -58,13 +58,21 @@
  *               21 px or more with words, outside a card, in the first 160 px under the header)
  *   toast       a toast that covers a control in an open sheet, or with no sheet open a control of
  *               the focused screen (its scroll area, pinned header and footer) or of the tab bar, or
- *               that starts above the top of the screen: judged after each tap and at the capture,
- *               always at the real window height (never against the page grown to its full height);
- *               a control is measured by what of it shows, its box cut by every ancestor that clips
- *               (overflow not visible), so a tile scrolled out of a sheet's body, or a row its screen's
- *               scroll area no longer shows (the band a screen makes when no band is clear), is not
- *               under the toast; a toast not drawn yet (its host at opacity 0 while the kit places
- *               it) is not judged
+ *               that starts above the top of the screen, or, with no sheet open, a screen's toast
+ *               that is not in its one place (its bottom 12 px above the tab bar's + cup, the
+ *               focused screen's pinned footer or the window's bottom: more than 32 px above that,
+ *               or reaching into it): judged after each tap and at the capture, always at the real
+ *               window height (never against the page grown to its full height); a control is
+ *               measured by what of it shows, its box cut by every ancestor that clips (overflow not
+ *               visible), so a tile scrolled out of a sheet's body, or a row its screen's scroll
+ *               area no longer shows (the band a screen makes under its toast), is not under the
+ *               toast. Fixed controls (the tab bar, a pinned header or footer, a sheet's footer)
+ *               are judged by their whole box: the toast is never over one. The one exception, by
+ *               design: with the keyboard up and no footer riding on it (Water's "Other amount"),
+ *               the toast stands over the keyboard beside the field being typed in and the scroll
+ *               area does not give way (that would hide the field), so it is not judged against
+ *               controls there; it can be flicked away. A toast not drawn yet (its host at opacity
+ *               0) is not judged
  * Text cut with no ellipsis is `cut`, and so are a field's placeholder wider than the field, a number
  * field's value wider than the field (a long name in a text field scrolls as fields do), and a clamped
  * name whose box is taller than its clamp (the lines after the ellipsis show under it). A name
@@ -1014,14 +1022,17 @@ function headerScan() {
 }
 
 /**
- * Runs in the page: whether a toast now on screen covers a control. With a sheet open the
- * sheet's controls are judged; otherwise every control of the focused screen (the screen whose
- * content lies under the toast: its scroll area, its pinned header and footer) and the tab bar.
- * A control is measured by the part of it that shows: its box cut by every ancestor whose
- * overflow is not visible (a scroll area, a sheet's scrolling body), so a row scrolled out of the
- * scroll area's view (a screen that ended its scroll area above the toast, as the kit does when
- * no band is clear) or a tile scrolled up out of a sheet's body, under its title, is not
- * "covered" by a toast resting over it. A toast not drawn yet (opacity 0 while it is placed) covers nothing.
+ * Runs in the page: whether a toast now on screen covers a control, or is not in its one place. With a
+ * sheet open the sheet's controls are judged; otherwise every control of the focused screen (the screen
+ * whose content lies under the toast: its scroll area, its pinned header and footer) and the tab bar.
+ * A control is measured by the part of it that shows: its box cut by every ancestor whose overflow is
+ * not visible (a scroll area, a sheet's scrolling body), so a row scrolled out of the scroll area's view
+ * (a screen ends its scroll area 8 px above its toast while a control would lie under it) or a tile
+ * scrolled up out of a sheet's body, under its title, is not "covered" by a toast resting over it. A
+ * fixed control is judged by its whole box. With no sheet open the toast must rest in its one place:
+ * 12 px above the tab bar's + cup, the focused screen's pinned footer or the window's bottom. With the
+ * keyboard up and no footer riding on it the toast is not judged against controls (it stands beside the
+ * field being typed in and can be flicked away). A toast not drawn yet (opacity 0) covers nothing.
  */
 function toastScan() {
   const t = document.querySelector('[data-testid="toast"]');
@@ -1052,6 +1063,18 @@ function toastScan() {
     return screens.pop() || null;
   };
   const screen = sheet ? null : focusedScreen();
+  // Its one place: 12 px above the bottom chrome of the screen showing (the + cup stands 14 px proud of the tab bar).
+  const vv = window.visualViewport;
+  const keyboardUp = !!vv && vv.height < window.innerHeight - 120;
+  const footer = screen ? [...screen.querySelectorAll('[data-testid="screen-footer"]')].find(visibleBox) : null;
+  if (!sheet && !keyboardUp) {
+    const bar = [...document.querySelectorAll('[data-testid="tab-bar"]')].find(visibleBox);
+    const plus = [...document.querySelectorAll('[data-testid="tab-add"]')].find(visibleBox);
+    const chrome = footer ? footer.getBoundingClientRect().top : bar ? Math.min(bar.getBoundingClientRect().top, plus ? plus.getBoundingClientRect().top : Infinity) : window.innerHeight;
+    const gap = chrome - tr.bottom;
+    if (gap > 32 || gap < 4) out.push(`toast "${msg}" rests ${Math.round(gap)}px above the bottom chrome, not in its place (12 px)`);
+  }
+  if (!sheet && keyboardUp && !footer) return out;
   const roots = sheet ? [sheet] : [...(screen ? [screen] : document.querySelectorAll('[data-testid="screen-footer"]')), ...document.querySelectorAll('[data-testid="tab-bar"]')];
   const isControl = (el) => el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || ['button', 'link', 'switch', 'tab', 'checkbox', 'radio', 'slider'].includes(el.getAttribute('role'));
   // What of a control shows: its box cut by every ancestor that clips its content (overflow not visible,

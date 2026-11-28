@@ -58,25 +58,26 @@ const SCROLLED_SHEET = ({ scrolled = false, toastTop = null } = {}) => `
 </body>`;
 
 /**
- * A screen (the kit's `Screen`, `id="screen-<n>"`) with a scroll area and a toast resting over a row of it: the
- * diary after a delete, its Undo toast over Lunch's "Log lunch" (KIT3, P3-I2-C1: the scan once judged only a
- * sheet, a pinned footer and the tab bar, so it called this clean). With `band` the scroll area ends 8 px above
- * the toast, as the kit's screen does when no band is clear (`toastBand`): the row leaves the scroll area's view
- * and nothing that shows is under the toast. With `covered` a second screen is pushed over the first (a pushed
- * screen over a tab that stays mounted): only the screen under the toast is judged. With `placing` the toast's host
- * is at opacity 0, as the kit's is while it works out the toast's place: a toast not drawn yet covers nothing.
+ * A screen (the kit's `Screen`, `id="screen-<n>"`) with a scroll area and a toast resting in its one place (12 px
+ * above the bottom of the 844 px window, no chrome) over a row of it: the diary after a delete, its Undo toast over
+ * Lunch's "Log lunch" (KIT3, P3-I2-C1: the scan once judged only a sheet, a pinned footer and the tab bar, so it
+ * called this clean). With `band` the scroll area ends 8 px above the toast, as the kit's screen does while a
+ * control would lie under it (`toastBand`): the row leaves the scroll area's view and nothing that shows is under
+ * the toast. With `covered` a second screen is pushed over the first (a pushed screen over a tab that stays
+ * mounted): only the screen under the toast is judged. With `placing` the toast's host is at opacity 0: a toast not
+ * drawn yet covers nothing. With `top` the toast stands higher than its place (the old rule's band higher up).
  */
-const SCREEN_TOAST = ({ band = false, covered = false, placing = false } = {}) => `
+const SCREEN_TOAST = ({ band = false, covered = false, placing = false, top = 788 } = {}) => `
 <body style="margin:0;font:15px/20px sans-serif;background:#fff;color:#111">
   <div id="screen-1" style="position:fixed;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column">
-    <div style="${band ? 'height:572px' : 'flex:1 1 auto;min-height:0'};overflow-y:auto">
-      <div style="height:570px">Breakfast</div>
+    <div style="${band ? 'height:780px' : 'flex:1 1 auto;min-height:0'};overflow-y:auto">
+      <div style="height:${top === 788 ? 770 : 570}px">Breakfast</div>
       <button data-testid="meal-add-lunch" style="display:block;width:100%;height:48px">Log lunch</button>
       <div style="height:800px">Dinner</div>
     </div>
   </div>
   ${covered ? '<div id="screen-2" style="position:fixed;left:0;right:0;top:0;bottom:0;background:#fff"><p>Water</p></div>' : ''}
-  <div style="position:fixed;left:0;right:0;top:0;height:0${placing ? ';opacity:0' : ''}"><div data-testid="toast" style="position:fixed;left:20px;right:20px;top:580px;height:44px;background:#111;color:#fff">Almonds removed from lunch <span role="button">Undo</span></div></div>
+  <div style="position:fixed;left:0;right:0;top:0;height:0${placing ? ';opacity:0' : ''}"><div data-testid="toast" style="position:fixed;left:20px;right:20px;top:${top}px;height:44px;background:#111;color:#fff">Almonds removed from lunch <span role="button">Undo</span></div></div>
 </body>`;
 
 /**
@@ -138,7 +139,15 @@ const cases = [
   { name: 'toast over a row its scroll area no longer shows is fine (the band the screen makes)', html: SCREEN_TOAST({ band: true }), run: 'toast', expect: '' },
   { name: 'a screen covered by the focused one is not judged under the toast', html: SCREEN_TOAST({ covered: true }), run: 'toast', expect: '' },
   // The same toast over the same control while the kit is still placing it (its host at opacity 0): not drawn, not judged.
-  { name: 'a toast not drawn yet (its host at opacity 0 while it is placed) is not judged', html: SCREEN_TOAST({ placing: true }), run: 'toast', expect: '' },
+  { name: 'a toast not drawn yet (its host at opacity 0) is not judged', html: SCREEN_TOAST({ placing: true }), run: 'toast', expect: '' },
+  // The toast has one place: a screen's toast standing higher up (the old band search) is found.
+  { name: "a screen's toast higher than its one place is found", html: SCREEN_TOAST({ band: false, top: 400 }), run: 'toast', expect: 'not in its place' },
+  {
+    name: 'a toast 12 px above the tab bar\'s + cup is in its place',
+    html: '<body style="margin:0"><div id="screen-1" style="position:fixed;inset:0"><p>Today</p></div><div data-testid="tab-bar" style="position:fixed;left:0;right:0;bottom:0;height:70px"><button data-testid="tab-add" style="position:absolute;left:160px;top:-14px;width:60px;height:60px">+</button></div><div data-testid="toast" style="position:fixed;left:20px;right:20px;top:704px;height:44px;background:#000;color:#fff">250 ml added</div></body>',
+    run: 'toast',
+    expect: '',
+  },
   { name: 'the page behind a sheet is not judged', html: sheetPage(), run: 'layoutSheet', expect: '' },
   { name: 'the page alone is judged', html: sheetPage().replace(/<div style="position:fixed;left:0;right:0;bottom:0[\s\S]*$/, '</body>'), run: 'layoutPage', expect: 'over' },
   {
@@ -590,7 +599,7 @@ async function runCase(page, c) {
   await real.addStyleTag({ content: '[data-testid="sheet"] { padding-bottom: 0 !important } [data-testid="sheet-body"] > div { padding-bottom: 0 !important }' });
   await real.waitForTimeout(100);
   judge('real + sheet: no space under the last control', await real.evaluate(sheetScan), 'from the bottom of the screen');
-  // Log water from the sheet: a one-tap log closes the sheet and hands its toast (Undo, 12 s in a browser) to the
+  // Log water from the sheet: a one-tap log closes the sheet and hands its toast (Undo, 5 s) to the
   // screen below (`toastToScreen`), so the sheet opened again while that toast shows draws none of it.
   await real.reload({ waitUntil: 'networkidle' });
   await real.getByTestId('tab-add').first().click({ timeout: 15000 });
@@ -609,8 +618,8 @@ async function runCase(page, c) {
     judge('real + sheet has a 250 ml water button', [], 'a button');
   }
   // A toast the + sheet keeps (Repeat leaves the sheet open, its toast with it): at 19:00 the demo's dinner is empty and
-  // yesterday's is there, so "Repeat yesterday's dinner" shows. The sheet takes the toast just above its top edge, over
-  // nothing; pushed onto the sheet it covers the sheet's controls.
+  // yesterday's is there, so "Repeat yesterday's dinner" shows. The sheet takes the toast just above its top edge, or on a
+  // tall sheet at its bottom with its body ending above it, over nothing; pushed onto the sheet it covers its controls.
   const evening = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', isMobile: true, hasTouch: true });
   const dinnerTime = new Date();
   dinnerTime.setHours(19, 0, 0, 0);
@@ -626,7 +635,15 @@ async function runCase(page, c) {
     await kept.getByTestId('toast').first().waitFor({ timeout: 10000 }).catch(() => {});
     await kept.waitForTimeout(500);
     judge('real toast the + sheet keeps (Repeat) sits clear', await kept.evaluate(toastScan), '');
-    await kept.addStyleTag({ content: '[data-testid="toast"] { transform: translateY(420px) !important }' });
+    // Moved onto the sheet's search row, wherever the toast rests (over the sheet's top edge or, on a tall sheet, at
+    // its bottom with the body ending above it).
+    await kept.evaluate(() => {
+      const t = [...document.querySelectorAll('[data-testid="toast"]')].find((e) => e.getBoundingClientRect().height > 0);
+      const row = document.querySelector('[data-testid="sheet"] [data-testid="quick-search"]');
+      if (!t || !row) return;
+      const dy = row.getBoundingClientRect().top - t.getBoundingClientRect().top;
+      t.style.setProperty('transform', `translateY(${dy}px)`, 'important');
+    });
     await kept.waitForTimeout(100);
     judge('real toast pushed onto the sheet', await kept.evaluate(toastScan), 'covers');
   } else {

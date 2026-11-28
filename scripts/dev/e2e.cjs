@@ -377,7 +377,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   // quick second tap meant for "+ 250 ml" never undoes the first glass. Timed in the page from the moment the toast's
   // action is drawn to the finger going down on it; these two taps go straight to the button, past toastGuard.cjs.
   {
-    // An action toast stays 12 s in a browser (react-native-web reports a screen reader as on), 4.5 s on a phone.
+    // An action toast stays 5 s (20 s natively with a screen reader running).
     await page.locator('[data-testid="toast"]').first().waitFor({ state: 'detached', timeout: 16000 });
     await page.evaluate(() => {
       window.__toastAt = null;
@@ -407,6 +407,71 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const late = await undoAt(700);
     s = await stored();
     check('toast guard: Undo tapped at 700 ms takes the glass back', late >= 700 && live(s.water).length === glassesBefore, `tapped ${late} ms after the toast appeared, ${live(s.water).length} glasses`);
+  }
+
+  // The toast has one place, 12 px above the screen's bottom chrome (here the tab bar's + cup), stays 5 s with an
+  // action, and a person can put it away: a flick down or sideways, a tap on its words, Escape (src/ui/Toast.tsx,
+  // `toastGesture` in src/ui/keyboardInset.ts). Putting it away never undoes what it reports.
+  {
+    const cdp = await context.newCDPSession(page);
+    const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+    const toastNow = () => page.evaluate(() => {
+      const t = [...document.querySelectorAll('[data-testid="toast"]')].find((e) => e.getBoundingClientRect().height > 0);
+      const plus = document.querySelector('[data-testid="tab-add"]')?.getBoundingClientRect();
+      return t ? { top: t.getBoundingClientRect().top, bottom: t.getBoundingClientRect().bottom, plusTop: plus ? plus.top : null } : null;
+    });
+    const gone = () => page.locator('[data-testid="toast"]').first().waitFor({ state: 'detached', timeout: 1500 }).then(() => true, () => false);
+    const glass = async () => {
+      await page.locator('[data-testid="toast"]').first().waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+      // Past the glass's own double-tap guard (ONE_TAP_GUARD_MS), so this tap logs a glass of its own.
+      await page.waitForTimeout(1000);
+      await page.getByTestId('today-water-250').first().click({ timeout: 15000 });
+      await page.locator('[data-testid="toast"]').first().waitFor({ state: 'visible', timeout: 3000 });
+      await page.waitForTimeout(200);
+    };
+    const count = async () => live((await stored()).water).length;
+    await glass();
+    const at = await toastNow();
+    check('toast: it rests in its one place, 12 px above the tab bar\'s + cup', !!at && at.plusTop != null && Math.abs(at.plusTop - at.bottom - 12) <= 1, at ? `${Math.round(at.plusTop - at.bottom)} px above the +` : 'no toast');
+    const glasses = await count();
+    await touch('touchStart', 60, at.top + 16);
+    for (let i = 1; i <= 5; i++) {
+      await touch('touchMove', 60, at.top + 16 + i * 10);
+      await page.waitForTimeout(16);
+    }
+    await touch('touchEnd');
+    check('toast: a flick down puts it away, and the glass stays', (await gone()) && (await count()) === glasses, `${glasses} -> ${await count()} glasses`);
+    await glass();
+    const side = await toastNow();
+    await touch('touchStart', 60, side.top + 16);
+    for (let i = 1; i <= 6; i++) {
+      await touch('touchMove', 60 + i * 18, side.top + 16);
+      await page.waitForTimeout(16);
+    }
+    await touch('touchEnd');
+    check('toast: a flick sideways puts it away', await gone());
+    await glass();
+    const words = await toastNow();
+    await page.touchscreen.tap(60, words.top + 20);
+    check('toast: a tap on its words puts it away', await gone());
+    await page.waitForTimeout(300);
+    const after = await page.evaluate(() => ({ path: location.pathname, sheets: document.querySelectorAll('[data-testid="sheet"]').length }));
+    check('toast: that tap reaches nothing under the toast', after.path === '/' && after.sheets === 0, JSON.stringify(after));
+    await glass();
+    await page.keyboard.press('Escape');
+    check('toast: Escape puts it away', await gone());
+    await glass();
+    const t0 = Date.now();
+    await page.locator('[data-testid="toast"]').first().waitFor({ state: 'detached', timeout: 12000 }).catch(() => {});
+    const lasted = Date.now() - t0 + 200;
+    check('toast: one with Undo stays about 5 s', lasted >= 4700 && lasted <= 6500, `${lasted} ms`);
+    // Leave the day as it was before this block.
+    const extra = (await count()) - glasses;
+    if (extra > 0) await page.evaluate((n) => {
+      const st = window.__healthcal.getState();
+      const rows = Object.values(st.water).filter((w) => !w.deleted).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))).slice(0, n);
+      for (const r of rows) st.remove('water', r.id);
+    }, extra);
   }
 
   // --------------------------------------------------------------- diary

@@ -52,7 +52,7 @@ function strings(): string[] {
   }
   // Together, buddies, notes and saved meals.
   for (const kind of ['minutes', 'days'] as const) {
-    out.push(W.togetherKindWord(kind), W.goalChoice(kind, 480), W.lastWeekLine(kind, 328, 600), W.goalSavedToast(kind, 480), W.countsLine(kind), W.togetherSpoken(kind, 412, 600, false), W.togetherSpoken(kind, 600, 600, true));
+    out.push(W.goalHeading(kind), W.togetherKindWord(kind), W.goalChoice(kind, 480), W.lastWeekLine(kind, 328, 600), W.goalSavedToast(kind, 480), W.countsLine(kind), W.togetherSpoken(kind, 412, 600, false), W.togetherSpoken(kind, 600, 600, true));
     for (const n of NAMES) out.push(W.circleInviteLine(kind, 600, n));
   }
   for (const n of NAMES) {

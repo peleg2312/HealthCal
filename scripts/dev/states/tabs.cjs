@@ -40,11 +40,12 @@ function isoDay(n) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// Today's one-tap glass, at the foot of the day card: the toast rests clear of the "+ 250 ml" it answers and of every
-// other control at 360 x 740, 390 x 844 and 320 x 640, never on it (no small-target finding). It names the new total
-// (`waterAddedToast` with `waterOfGoal`) and keeps to two lines at 320.
+// Today's one-tap glass, at the foot of the day card: the toast rests in its one place, 12 px above the tab bar's + cup,
+// and Today's scroll area ends 8 px above it while a control would lie under it, so nothing that shows is under it at
+// 360 x 740, 390 x 844 and 320 x 640 (the toast scan judges both). It names the new total (`waterAddedToast` with
+// `waterOfGoal`) and keeps to two lines at 320.
 const water = [
-  { id: 'today-water-toast', route: '/', taps: ['^today-water-', { wait: 300 }], waitFor: 'toast', note: 'a glass on Today: "250 ml added to Water · 1.48 of 3.3 L" under the "+ 250 ml" just pressed' },
+  { id: 'today-water-toast', route: '/', taps: ['^today-water-', { wait: 300 }], waitFor: 'toast', note: 'a glass on Today: "250 ml added to Water · 1.48 of 3.3 L" over the tab bar, the page ending above it' },
   { id: 'today-water-toast-reached', route: '/', values: { water: 0.95 }, taps: ['^today-water-', { wait: 300 }], waitFor: 'toast', note: 'the glass that reaches the goal: the total and "goal reached"' },
   { id: 'today-water-toast-imperial', route: '/', imperial: true, taps: ['^today-water-', { wait: 300 }], waitFor: 'toast', note: 'the same in fl oz' },
   { id: 'today-water-toast-past', route: '/', taps: [`today-day-${isoDay(-1)}`, '^today-water-', { wait: 300 }], waitFor: 'toast', note: 'a glass on yesterday, picked on the strip: the day and the total, two lines at 320 (on a Monday the strip shows only today)' },

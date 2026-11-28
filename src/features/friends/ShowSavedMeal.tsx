@@ -7,7 +7,7 @@
  */
 import { EyeOff, Lock, Users } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { RowEmoji } from '@/features/food/components';
 import { LangIconButton } from '@/features/food/langName';
@@ -52,10 +52,10 @@ export function useCanShowSaved(): boolean {
 }
 
 /** The cup on a saved meal's card: the people mark, named by what it does ("Show Chicken bowl to friends"). */
-export function ShowSavedCup({ meal, testID, onPress }: { meal: SavedMeal; testID: string; onPress: () => void }) {
+export function ShowSavedCup({ meal, testID, onPress, style }: { meal: SavedMeal; testID: string; onPress: () => void; style?: StyleProp<ViewStyle> }) {
   const { colors } = useTheme();
   return (
-    <LangIconButton testID={testID} accessibilityLabel={withoutMarks(showSavedTitle(meal.name))} tone="clear" onPress={onPress}>
+    <LangIconButton testID={testID} accessibilityLabel={withoutMarks(showSavedTitle(meal.name))} tone="clear" onPress={onPress} style={style}>
       <Users size={18} color={colors.textSecondary} />
     </LangIconButton>
   );
