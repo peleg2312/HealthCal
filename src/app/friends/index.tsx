@@ -304,7 +304,13 @@ export default function FriendsScreen() {
             </View>
           ) : (
             <Card testID="friends-feed-empty">
-              <EmptyState title={FEED_EMPTY_TITLE} message={mealWords ? FEED_EMPTY : FEED_EMPTY_WORKOUTS} action={me.mealsAllowed ? 'Show a meal from the diary' : undefined} onAction={me.mealsAllowed ? () => router.push('/diary' as never) : undefined} />
+              {/* The diary is the way to show a meal, unless the shortcut above already offers today's. */}
+              <EmptyState
+                title={FEED_EMPTY_TITLE}
+                message={mealWords ? FEED_EMPTY : FEED_EMPTY_WORKOUTS}
+                action={me.mealsAllowed && !shortcut ? 'Show a meal from the diary' : undefined}
+                onAction={me.mealsAllowed && !shortcut ? () => router.push('/diary' as never) : undefined}
+              />
             </Card>
           )}
         </View>

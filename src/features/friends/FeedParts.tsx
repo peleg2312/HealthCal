@@ -1,7 +1,7 @@
 /**
  * The Friends screen's parts: the row of people with Invite at its end, the cheers chip beside "Recent", and the
- * feed as one card per day of compact rows (one row per meal or workout: who and what on one line, the foods'
- * heads or the length on the next, Cheer and, on a meal, "+" as small cups at the end). Every person is an
+ * feed as one card per day of compact rows (one row per meal or workout: who and what (two lines at most), the foods'
+ * heads or the length under it, Cheer and, on a meal, "+" as small cups at the end). Every person is an
  * initials cup in their own tint; a short level line inside a cup means something new since the last look.
  * Nothing here shows a figure beside another person's, so nothing reads as a league table.
  *
@@ -156,7 +156,7 @@ export function FeedRow({
   const spoken = `${drawn}${detail ? `, ${withoutMarks(detail)}` : ''}${onOpen ? `. ${item.kind === 'meal' ? 'Open the meal' : `Open ${who}’s page`}` : ''}`;
   const words = (
     <View style={{ flex: 1, minWidth: 0 }}>
-      <Text variant="body" numberOfLines={large ? 3 : 1}>
+      <Text variant="body" numberOfLines={large ? 4 : 2}>
         {today ? null : (
           <Text variant="bodyStrong" style={{ fontFamily: fonts.semibold }}>
             {isolateRtl(item.displayName)}
