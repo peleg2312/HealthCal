@@ -1,46 +1,58 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { RefreshCw, Settings } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { RefreshCw, Settings, Users } from 'lucide-react-native';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, RefreshControl, View } from 'react-native';
 
 import { CheersList, IncomingRequests, InviteCard, Loading, OutgoingRequests } from '@/features/friends/components';
 import { markFriendsSeen } from '@/features/friends/attention';
 import type { FeedItem } from '@/features/friends/contract';
-import { feedKey, friendsWithNew, localFeed } from '@/features/friends/feed';
-import { AboutYouCard, CheersLine, FeedWorkoutCard, itemRole, listRole, PeopleRow } from '@/features/friends/FeedParts';
+import { feedByDay, feedKey, friendsWithNew, localFeed, newTodayCount } from '@/features/friends/feed';
+import { FeedDayCard, FeedRow, PeopleRow, RecentTitle } from '@/features/friends/FeedParts';
 import { readFeedSeen, writeFeedSeen } from '@/features/friends/feedSeen';
 import { FriendMealSheet, type OpenMeal } from '@/features/friends/FriendMealSheet';
 import { inviteFromParams, invitePath } from '@/features/friends/link';
-import { FeedMealCard } from '@/features/friends/MealCard';
-import { ownMealsByRef } from '@/features/friends/meals';
+import { buildSharedMeal, ownMealsByRef } from '@/features/friends/meals';
 import { mealsOverview } from '@/features/friends/overview';
 import { SetupForm } from '@/features/friends/SetupForm';
 import { copyText, shareInvite } from '@/features/friends/share';
+import { useShowMealStep } from '@/features/friends/ShowMeal';
+import { showShortcutMeal } from '@/features/friends/showNow';
 import { formatCode, ownWorkoutsByRef, WORKOUT_WINDOW_DAYS } from '@/features/friends/summary';
 import { cheerCaption } from '@/features/friends/week';
 import {
-  aboutYouLine,
   CHEERS_TITLE,
-  cheersSummary,
   cheerWhat,
   FEED_EMPTY,
   FEED_EMPTY_TITLE,
   FEED_EMPTY_WORKOUTS,
-  RECENT,
-  RECENT_SPAN,
+  feedNewsLine,
+  MENU_SHOW_LINE,
   SCREEN_SUBTITLE,
   SCREEN_SUBTITLE_WORKOUTS,
   SCREEN_TITLE,
   SETTINGS_OPEN,
+  showShortcutTitle,
   SIGNED_OUT_LINE,
 } from '@/features/friends/words';
 import { timeAgo } from '@/features/settings/format';
 import { addDays } from '@/lib/dates';
+import { mealForTime } from '@/lib/nutrition';
 import { cheerFriend, cheerMeal, refreshFriends, removeFriend, respondToRequest, undoDecline, useFriends, type FriendRequest } from '@/services/friends';
 import { useNow, useToday } from '@/store/clock';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import { Button, Card, EmptyState, goBack, Header, IconButton, Screen, SectionTitle, Sheet, Text, toast } from '@/ui';
+import type { FoodEntry, ISODate, MealType } from '@/types';
+import { Button, Card, EmptyState, goBack, Header, IconButton, ListRow, Screen, SectionTitle, Sheet, Text, toast } from '@/ui';
+
+/** The diary menu's own show step, in a sheet of its own, for the shortcut's meal. */
+function ShowNowSheet({ meal, date, entries, onClose }: { meal: MealType | null; date: ISODate; entries: FoodEntry[]; onClose: () => void }) {
+  const show = useShowMealStep({ open: !!meal, meal, date, entries, onClose });
+  return (
+    <Sheet visible={!!meal && !!show.body} onClose={onClose} title={show.title} subtitle={show.subtitle} footer={show.footer}>
+      {show.body}
+    </Sheet>
+  );
+}
 
 export default function FriendsScreen() {
   const { colors, spacing } = useTheme();
@@ -53,10 +65,14 @@ export default function FriendsScreen() {
   const today = useToday();
   const now = useNow();
   const activities = useLive('activities');
+  const foodEntries = useLive('foodEntries');
 
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [cheersOpen, setCheersOpen] = useState(false);
+  // The shortcut's show step, for the meal it named when tapped (the meal of the hour can turn while it is open).
+  const [showFor, setShowFor] = useState<MealType | null>(null);
+  const todayEntries = foodEntries.filter((e) => e.date === today);
   const [openMeal, setOpenMeal] = useState<{ meal: OpenMeal; adding: boolean } | null>(null);
   // What the feed held at the last look, read once as the screen opens (before this look is written).
   const [seenBefore, setSeenBefore] = useState<Set<string> | null | undefined>(undefined);
@@ -73,7 +89,7 @@ export default function FriendsScreen() {
 
   // mealWords: meals are named only where they work for this person (never on a server without them, nor under 18).
   const { me, friends, feed, myMeals, mealWords } = mealsOverview(overview);
-  const shown = useMemo(() => localFeed({ feed, today, seeMeals: !!me?.mealsAllowed && !!me?.mealSettings.see, friends }), [feed, today, me, friends]);
+  const shown = localFeed({ feed, today, seeMeals: !!me?.mealsAllowed && !!me?.mealSettings.see, friends });
   // What this screen shows is no longer new: the count on the tab headers' Friends button clears, and the feed's keys are kept for the next look.
   const ready = status === 'ready' && !!me;
   const cheersShown = ready ? (overview?.cheers.length ?? 0) : -1;
@@ -84,19 +100,27 @@ export default function FriendsScreen() {
   useEffect(() => {
     if (ready && seenBefore !== undefined) writeFeedSeen(feedKeys ? feedKeys.split('|') : []);
   }, [ready, seenBefore, feedKeys]);
-  const newIds = useMemo(() => friendsWithNew(shown, seenBefore ?? null), [shown, seenBefore]);
+  const newIds = friendsWithNew(shown, seenBefore ?? null);
+  const days = feedByDay(shown);
+  // The header's news: today's items not seen at the last look (read once as the screen opened).
+  const newToday = newTodayCount(shown, seenBefore ?? null, today);
+
+  // "Show today's lunch to friends": the meal of the hour while it has food, is not shown yet and someone can be picked.
+  const hourMeal = mealForTime(now);
+  const shortcut = showShortcutMeal({
+    mealsAllowed: !!me?.mealsAllowed,
+    pickable: friends.filter((f) => f.shareMeals).length,
+    meal: hourMeal,
+    hasFood: buildSharedMeal({ entries: todayEntries, day: today, meal: hourMeal, showKcal: false }).length > 0,
+    shownNow: myMeals.some((m) => m.day === today && m.meal === hourMeal),
+  });
 
   // Cheers name a workout or a meal by the reference friends saw; map it back with the same key.
   const shareKey = me?.shareKey ?? '';
-  const ownWorkouts = useMemo(() => {
-    const since = addDays(today, -(2 * WORKOUT_WINDOW_DAYS + 7));
-    return ownWorkoutsByRef(activities.filter((a) => a.date >= since), shareKey);
-  }, [activities, shareKey, today]);
-  const ownMeals = useMemo(() => {
-    const byRef = ownMealsByRef(shareKey, today);
-    for (const m of myMeals) byRef.set(m.ref, { day: m.day, meal: m.meal });
-    return byRef;
-  }, [shareKey, today, myMeals]);
+  const since = addDays(today, -(2 * WORKOUT_WINDOW_DAYS + 7));
+  const ownWorkouts = ownWorkoutsByRef(activities.filter((a) => a.date >= since), shareKey);
+  const ownMeals = ownMealsByRef(shareKey, today);
+  for (const m of myMeals) ownMeals.set(m.ref, { day: m.day, meal: m.meal });
   const describe = (ref: string) => cheerWhat(ref, { workouts: ownWorkouts, meals: ownMeals }, today);
 
   const pull = async () => {
@@ -145,7 +169,9 @@ export default function FriendsScreen() {
     </IconButton>
   ) : null;
 
-  const header = <Header title={SCREEN_TITLE} subtitle={mealWords ? SCREEN_SUBTITLE : SCREEN_SUBTITLE_WORKOUTS} right={headerRight} />;
+  // Once friends are on, the line under the title is news ("3 friends · 2 new today"); before, what the screen holds.
+  const subtitle = status === 'ready' && me ? feedNewsLine(friends.length, newToday) : mealWords ? SCREEN_SUBTITLE : SCREEN_SUBTITLE_WORKOUTS;
+  const header = <Header title={SCREEN_TITLE} subtitle={subtitle} right={headerRight} />;
   const scrollProps = Platform.OS === 'web' ? undefined : { refreshControl: <RefreshControl refreshing={refreshing} onRefresh={pull} tintColor={colors.textSecondary} /> };
 
   // ------------------------------------------------ states without a card
@@ -203,8 +229,9 @@ export default function FriendsScreen() {
   // ------------------------------------------------ the full screen
   const { incoming, outgoing, cheers } = overview;
   const copyCode = () => void copyText(formatCode(me.code), 'Code copied');
-  const viewerNames = [...new Set(myMeals.flatMap((m) => m.viewers.map((v) => v.displayName)))];
   const units = profile.units;
+  const openAdd = () => router.push('/friends/add' as never);
+  const openMeal_ = (item: Extract<FeedItem, { kind: 'meal' }>, adding: boolean) => setOpenMeal({ meal: { owner: item, meal: item, cheered: item.cheered }, adding });
 
   return (
     <Screen header={header} testID="friends-screen" scrollProps={scrollProps}>
@@ -219,54 +246,61 @@ export default function FriendsScreen() {
         </Card>
       ) : null}
 
-      {/* What needs an answer first, then the people, the cheers in one line, and the feed. */}
+      {/* What needs an answer first, then the people (Invite last), then the feed by day with the cheers beside its title. */}
       {incoming.length ? <IncomingRequests requests={incoming} busy={busy} onAccept={accept} onDecline={decline} /> : null}
 
       {friends.length ? (
-        <PeopleRow people={friends} newIds={newIds} onOpen={(id) => router.push(`/friends/friend?id=${encodeURIComponent(id)}` as never)} onAdd={() => router.push('/friends/add' as never)} />
+        <PeopleRow people={friends} newIds={newIds} onOpen={(id) => router.push(`/friends/friend?id=${encodeURIComponent(id)}` as never)} onAdd={openAdd} />
       ) : (
-        <>
-          <InviteCard code={me.code} sharing={me.sharing} onShare={() => void shareInvite(me.code)} onCopy={copyCode} />
-          <Card testID="friends-empty">
-            <EmptyState title="No friends yet" message="Share your code or enter a friend's. What they show you appears here once they accept." action="Add a friend" onAction={() => router.push('/friends/add' as never)} />
-          </Card>
-        </>
+        <InviteCard code={me.code} sharing={me.sharing} onShare={() => void shareInvite(me.code)} onCopy={copyCode} onEnter={openAdd} />
       )}
 
-      {cheers.length ? <CheersLine count={cheers.length} summary={cheersSummary(cheers, (c) => describe(c.ref))} onPress={() => setCheersOpen(true)} /> : null}
+      {/* A shared "Together this week" card belongs here, under the people and above the feed. */}
+
+      {friends.length && shortcut ? (
+        <Card padding={0} testID="friends-show-now-card">
+          <ListRow
+            testID="friends-show-now"
+            style={{ paddingHorizontal: spacing.lg }}
+            title={showShortcutTitle(shortcut)}
+            subtitle={MENU_SHOW_LINE}
+            left={<Users size={20} color={colors.text} />}
+            onPress={() => setShowFor(shortcut)}
+          />
+        </Card>
+      ) : null}
 
       {friends.length ? (
         <View style={{ gap: spacing.md }}>
-          <SectionTitle title={RECENT} action={RECENT_SPAN} />
-          {shown.length ? (
-            <View {...listRole} testID="friends-feed" style={{ gap: spacing.lg }}>
-              {shown.map((item, i) => {
-                const key = feedKey(item);
-                // Stable test ids by place: the n-th meal and the n-th workout of the feed.
-                const nth = shown.slice(0, i).filter((x) => x.kind === item.kind).length;
-                return (
-                  <View key={key} {...itemRole}>
-                    {item.kind === 'meal' ? (
-                      <FeedMealCard
+          <RecentTitle cheers={cheers.length} onCheers={() => setCheersOpen(true)} />
+          {days.length ? (
+            <View testID="friends-feed" style={{ gap: spacing.lg }}>
+              {days.map((d) => (
+                <FeedDayCard key={d.day} day={d} today={today} testID={`friends-feed-day-${d.day}`}>
+                  {(item) => {
+                    // Stable test ids by place: the n-th meal and the n-th workout of the whole feed.
+                    const nth = shown.slice(0, shown.indexOf(item)).filter((x) => x.kind === item.kind).length;
+                    return item.kind === 'meal' ? (
+                      <FeedRow
+                        item={item}
+                        units={units}
                         testID={`friends-feed-meal-${nth}`}
-                        name={item.displayName}
-                        avatar={item.avatar}
-                        meal={item.meal}
-                        day={item.day}
-                        today={today}
-                        items={item.items}
-                        showKcal={item.showKcal}
-                        cheered={item.cheered}
-                        onOpen={() => setOpenMeal({ meal: { owner: item, meal: item, cheered: item.cheered }, adding: false })}
-                        onAdd={() => setOpenMeal({ meal: { owner: item, meal: item, cheered: item.cheered }, adding: true })}
+                        onOpen={() => openMeal_(item, false)}
+                        onAdd={() => openMeal_(item, true)}
                         onCheer={() => void cheerItem(item)}
                       />
                     ) : (
-                      <FeedWorkoutCard testID={`friends-feed-workout-${nth}`} item={item} today={today} units={units} onCheer={() => void cheerItem(item)} />
-                    )}
-                  </View>
-                );
-              })}
+                      <FeedRow
+                        item={item}
+                        units={units}
+                        testID={`friends-feed-workout-${nth}`}
+                        onOpen={() => router.push(`/friends/friend?id=${encodeURIComponent(item.userId)}` as never)}
+                        onCheer={() => void cheerItem(item)}
+                      />
+                    );
+                  }}
+                </FeedDayCard>
+              ))}
             </View>
           ) : (
             <Card testID="friends-feed-empty">
@@ -283,11 +317,10 @@ export default function FriendsScreen() {
         </View>
       ) : null}
 
-      {friends.length ? <AboutYouCard line={aboutYouLine(me.sharing, myMeals.length, viewerNames, me.mealsAllowed)} code={me.code} onPrivacy={() => router.push('/friends/settings' as never)} onCopy={copyCode} /> : null}
-
       <Sheet visible={cheersOpen} onClose={() => setCheersOpen(false)} title={CHEERS_TITLE}>
         <CheersList cheers={cheers} describe={(c) => describe(c.ref)} when={(c) => cheerCaption(c.ref, timeAgo(c.createdAt, now))} />
       </Sheet>
+      <ShowNowSheet meal={showFor} date={today} entries={todayEntries} onClose={() => setShowFor(null)} />
       <FriendMealSheet
         open={openMeal?.meal ?? null}
         startAdding={!!openMeal?.adding}

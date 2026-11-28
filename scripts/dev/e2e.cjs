@@ -2785,16 +2785,19 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     check('sheet history: Friends shows a friend from the store (no backend)', person && (await where()) === '/friends', await where());
     await stap('friends-person-friend-sam');
     await fill();
-    const page = await sp.getByTestId('friends-remove').first().waitFor({ timeout: 10000 }).then(() => true, () => false);
+    const page = await sp.getByTestId('friend-manage').first().waitFor({ timeout: 10000 }).then(() => true, () => false);
     const at = await where();
+    // Remove sits in the friend's Manage sheet: one tap there closes that sheet and opens "Remove Sam?" (a sheet pair).
+    await stap('friend-manage');
+    await sp.waitForTimeout(500);
     await stap('friends-remove');
     // Past the sheet's own wait before it adds its entry (120 ms).
     await sp.waitForTimeout(500);
-    const removeOpen = (await shown('confirm-yes')) && (await sp.getByText('Remove Sam?').count()) > 0;
-    check('sheet history: a friend’s page opens "Remove Sam?"', page && at === '/friends/friend?id=friend-sam' && removeOpen, `${at}, question ${removeOpen}`);
+    const removeOpen = (await shown('confirm-yes')) && (await sp.getByText('Remove Sam?').count()) > 0 && !(await shown('friend-manage-sheet'));
+    check('sheet history: a friend’s Manage sheet hands over to "Remove Sam?"', page && at === '/friends/friend?id=friend-sam' && removeOpen, `${at}, question ${removeOpen}`);
     await sp.goBack();
     await sp.waitForTimeout(500);
-    check("sheet history: the browser's Back closes it, the address unchanged and the page as it was", !(await shown('confirm-yes')) && (await where()) === at && (await shown('friends-remove')), `${await where()}, question ${await shown('confirm-yes')}`);
+    check("sheet history: the browser's Back closes it, the address unchanged and the page as it was", !(await shown('confirm-yes')) && (await where()) === at && (await shown('friend-manage')) && !(await shown('friend-manage-sheet')), `${await where()}, question ${await shown('confirm-yes')}`);
     // Back to Friends (the hidden screens under a pushed one keep their own header-back in the page).
     await sp.goBack();
     await sp.waitForTimeout(500);

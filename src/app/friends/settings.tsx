@@ -9,7 +9,12 @@ import type { MealSettings, MySharedMeal } from '@/features/friends/contract';
 import { MEAL_TYPES } from '@/features/friends/meals';
 import { cleanAvatar } from '@/features/friends/week';
 import {
+  ABOUT_YOU,
+  aboutYouLine,
   ALWAYS_SHOW,
+  ALWAYS_SHOW_HINT,
+  GROUP_MEALS,
+  GROUP_YOU,
   AUDIENCE_NOTE,
   AUDIENCE_SAVE,
   AUDIENCE_TITLE,
@@ -29,7 +34,7 @@ import {
   NEVER_SHARED,
   NOTHING_SHOWN,
   SEE_MEALS,
-  SEE_MEALS_OFF,
+  SEE_MEALS_ON,
   SETTINGS_SUBTITLE,
   SETTINGS_TITLE,
   SHOW_KCAL_OFF,
@@ -40,17 +45,54 @@ import {
   stoppedToast,
   STOPPED_ALL,
   UNDER_18,
-  WHAT_YOU_SEE,
   WHO_SEES_MEALS,
-  YOUR_MEALS,
-  YOUR_WEEK,
 } from '@/features/friends/words';
 import { withoutMarks } from '@/lib/bidi';
 import { leaveSocial, refreshFriends, setMealAudience, setMealSettings, setupSocial, showMeal, stopAllMeals, stopMeal, useFriends, type SocialSharing } from '@/services/friends';
 import { useNow, useToday } from '@/store/clock';
-import { useLargeText, useTheme } from '@/theme';
+import { cup, fonts, useLargeText, useTheme } from '@/theme';
 import type { MealType } from '@/types';
-import { Button, Card, Chip, ChipWrap, ConfirmSheet, decorative, Divider, EmptyState, goBack, haptic, Header, ListRow, Screen, SectionTitle, Sheet, Text, toast } from '@/ui';
+import { Button, Card, Chip, ChipWrap, ConfirmSheet, CupKey, decorative, Divider, EmptyState, goBack, haptic, Header, ListRow, PressableScale, Screen, SectionTitle, Sheet, Text, toast } from '@/ui';
+
+/**
+ * One meal of "Always show these meals": a tick box drawn as a tile. Chosen, it wears the app's selected mark (a
+ * 2 px ink outline, the level line across its top and the small filled ink cup at its end, as `OptionRow`); not
+ * chosen, a hairline and secondary words, with the cup's room kept empty so nothing moves on a tap.
+ */
+function MealTile({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID: string }) {
+  const { colors, radius, spacing } = useTheme();
+  return (
+    <PressableScale
+      testID={testID}
+      onPress={onPress}
+      feedback="select"
+      scaleTo={0.985}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: on }}
+      aria-checked={on}
+      accessibilityLabel={label}
+      focusRing="inside"
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        minHeight: 44,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 6,
+        ...cup(radius.tile, 5),
+        borderWidth: on ? 2 : 1,
+        margin: on ? 0 : 1,
+        borderColor: on ? colors.text : colors.borderStrong,
+        overflow: 'hidden',
+      }}>
+      {on ? <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: colors.rim }} /> : null}
+      <Text variant={on ? 'bodyStrong' : 'body'} color={on ? 'text' : 'textSecondary'} style={{ flex: 1, fontFamily: on ? fonts.semibold : undefined }}>
+        {label}
+      </Text>
+      <View style={{ width: 12, alignItems: 'center' }}>{on ? <CupKey color={colors.text} size={12} /> : null}</View>
+    </PressableScale>
+  );
+}
 
 const WEEK_NAMES: Record<keyof SocialSharing, string> = { minutes: 'your active minutes', streak: 'your streak', workouts: 'your recent workouts' };
 
@@ -150,37 +192,52 @@ export default function FriendsSettingsScreen() {
 
   return (
     <Screen header={header} testID="friends-settings">
-      <View style={{ gap: spacing.sm }}>
-        <NameField testID="friends-settings-name" value={name} onChange={setName} />
-        {name.trim() && name.trim() !== me.displayName ? (
-          <Button
-            testID="friends-settings-name-save"
-            title="Save name"
-            size="sm"
-            full={false}
-            loading={savingName}
-            onPress={async () => {
-              setSavingName(true);
-              const ok = await saveCard({ displayName: name.trim() }, `Friends now see you as ${name.trim()}`);
-              if (!ok) setName(me.displayName);
-              setSavingName(false);
-            }}
-          />
-        ) : null}
-      </View>
+      {/* What friends see of you, in one paragraph, and what is never shared: the summary first. */}
+      <Card testID="friends-settings-about">
+        <Text variant="bodyStrong" accessibilityRole="header" {...({ 'aria-level': 2 } as object)} style={{ fontFamily: fonts.semibold }}>
+          {ABOUT_YOU}
+        </Text>
+        <Text variant="body" color="textSecondary" testID="friends-settings-about-line" style={{ marginTop: 2 }}>
+          {aboutYouLine(me.sharing, myMeals.length, [...new Set(myMeals.flatMap((m) => m.viewers.map((v) => v.displayName)))], me.mealsAllowed, false)}
+        </Text>
+        <View testID="friends-settings-never" style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+          {decorative(<Lock size={16} color={colors.textSecondary} strokeWidth={2} style={{ marginTop: 3 }} />)}
+          <Text variant="body" color="textSecondary" style={{ flex: 1 }}>
+            {NEVER_SHARED}
+          </Text>
+        </View>
+      </Card>
 
       <View style={{ gap: spacing.md }}>
-        <SectionTitle title={YOUR_WEEK} />
+        <SectionTitle title={GROUP_YOU} />
         <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }} testID="friends-settings-week">
+          <View style={{ gap: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
+            <NameField testID="friends-settings-name" value={name} onChange={setName} />
+            {name.trim() && name.trim() !== me.displayName ? (
+              <Button
+                testID="friends-settings-name-save"
+                title="Save name"
+                size="sm"
+                full={false}
+                loading={savingName}
+                onPress={async () => {
+                  setSavingName(true);
+                  const ok = await saveCard({ displayName: name.trim() }, `Friends now see you as ${name.trim()}`);
+                  if (!ok) setName(me.displayName);
+                  setSavingName(false);
+                }}
+              />
+            ) : null}
+          </View>
           {(
             [
               ['minutes', 'Active minutes', 'Weekly total and sessions'],
               ['streak', 'Logging streak', 'Days in a row you logged'],
               ['workouts', 'Recent workouts', 'Name, length and distance, last two weeks'],
             ] as const
-          ).map(([key, title, subtitle], i) => (
+          ).map(([key, title, subtitle]) => (
             <React.Fragment key={key}>
-              {i > 0 ? <Divider /> : null}
+              <Divider />
               <SharingRow
                 testID={`friends-share-${key}`}
                 title={title}
@@ -196,7 +253,7 @@ export default function FriendsSettingsScreen() {
       {me.mealsAllowed ? (
         <>
           <View style={{ gap: spacing.md }}>
-            <SectionTitle title={YOUR_MEALS} />
+            <SectionTitle title={GROUP_MEALS} />
             <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }} testID="friends-settings-meals">
               <View style={{ flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.md }}>
                 {decorative(<Users size={18} color={colors.textSecondary} strokeWidth={1.9} style={{ marginTop: 1 }} />)}
@@ -219,23 +276,29 @@ export default function FriendsSettingsScreen() {
               <Divider />
               <View style={{ paddingVertical: spacing.md, gap: spacing.sm }}>
                 <View>
-                  <Text variant="bodyStrong">{ALWAYS_SHOW}</Text>
+                  <Text variant="bodyStrong" nativeID="friends-auto-title">
+                    {ALWAYS_SHOW}
+                  </Text>
                   <Text variant="caption" color="textSecondary" testID="friends-settings-auto-line">
-                    {autoLine(me.mealSettings.auto)}
+                    {me.mealSettings.auto.length ? autoLine(me.mealSettings.auto) : ALWAYS_SHOW_HINT}
                   </Text>
                 </View>
-                {/* Two by two, each chip half the row (one a row with large text), so no chip is left alone on a line. */}
-                <View style={{ gap: spacing.sm }}>
+                {/* Two by two, each tile half the row (one a row with large text), so no tile is left alone on a line. */}
+                <View style={{ gap: spacing.sm }} {...({ role: 'group', 'aria-labelledby': 'friends-auto-title' } as object)}>
                   {(large ? MEAL_TYPES.map((m) => [m]) : [MEAL_TYPES.slice(0, 2), MEAL_TYPES.slice(2)]).map((row) => (
                     <View key={row[0]} style={{ flexDirection: 'row', gap: spacing.sm }}>
                       {row.map((m) => (
                         <View key={m} style={{ flex: 1 }}>
-                          <Chip testID={`friends-settings-auto-${m}`} label={mealChip(m)} selected={me.mealSettings.auto.includes(m)} onPress={() => toggleAuto(m)} style={{ justifyContent: 'center' }} />
+                          <MealTile testID={`friends-settings-auto-${m}`} label={mealChip(m)} on={me.mealSettings.auto.includes(m)} onPress={() => toggleAuto(m)} />
                         </View>
                       ))}
                     </View>
                   ))}
                 </View>
+              </View>
+              <Divider />
+              <View testID="friends-settings-see">
+                <SharingRow testID="friends-settings-see-meals" title={SEE_MEALS} subtitle={SEE_MEALS_ON} value={me.mealSettings.see} onChange={(v) => void saveMeals({ see: v }, v ? 'Friends’ meals are in your feed' : 'Friends’ meals are out of your feed')} />
               </View>
             </Card>
           </View>
@@ -270,43 +333,32 @@ export default function FriendsSettingsScreen() {
               <Button testID="friends-stop-all" title={STOP_ALL} variant="ghost" size="sm" full={false} style={{ alignSelf: 'center' }} icon={<EyeOff size={18} color={colors.actionInk} />} onPress={() => setConfirmStopAll(true)} />
             ) : null}
           </View>
-
-          <View style={{ gap: spacing.md }}>
-            <SectionTitle title={WHAT_YOU_SEE} />
-            <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }} testID="friends-settings-see">
-              <SharingRow testID="friends-settings-see-meals" title={SEE_MEALS} subtitle={SEE_MEALS_OFF} value={me.mealSettings.see} onChange={(v) => void saveMeals({ see: v }, v ? 'Friends’ meals are in your feed' : 'Friends’ meals are out of your feed')} />
-            </Card>
-          </View>
         </>
       ) : (
         // A server without meals yet (an app update can reach the phone first) says so; otherwise it is the age.
-        <Card tone="alt" testID={mealsAvailable ? 'friends-settings-under-18' : 'friends-settings-meals-not-yet'}>
+        <Card testID={mealsAvailable ? 'friends-settings-under-18' : 'friends-settings-meals-not-yet'}>
           <Text variant="body" color="text">
             {mealsAvailable ? UNDER_18 : MEALS_NOT_YET}
           </Text>
         </Card>
       )}
 
-      <Card tone="alt" testID="friends-settings-never">
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          {decorative(<Lock size={16} color={colors.textSecondary} strokeWidth={2} style={{ marginTop: 3 }} />)}
-          <Text variant="body" color="textSecondary" style={{ flex: 1, fontSize: 14, lineHeight: 20 }}>
-            {NEVER_SHARED}
+      {/* Last and quiet: a row in the danger colour, confirmed before anything is removed. */}
+      <Card padding={0} testID="friends-settings-leave">
+        <PressableScale
+          testID="friends-leave"
+          focusRing="inside"
+          accessibilityLabel={`${LEAVE_TITLE}. ${leaveNote(mealWords)}`}
+          onPress={() => setConfirmLeave(true)}
+          style={{ minHeight: 56, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, justifyContent: 'center' }}>
+          <Text variant="bodyStrong" color="danger">
+            {LEAVE_TITLE}
           </Text>
-        </View>
+          <Text variant="caption" color="textSecondary">
+            {leaveNote(mealWords)}
+          </Text>
+        </PressableScale>
       </Card>
-
-      <View style={{ gap: spacing.md }}>
-        <SectionTitle title={LEAVE_TITLE} />
-        <Card testID="friends-settings-leave">
-          <View style={{ gap: spacing.md }}>
-            <Text variant="body" color="textSecondary">
-              {leaveNote(mealWords)}
-            </Text>
-            <Button testID="friends-leave" title={LEAVE_TITLE} variant="danger" size="md" onPress={() => setConfirmLeave(true)} />
-          </View>
-        </Card>
-      </View>
 
       <Sheet
         visible={audienceOpen}

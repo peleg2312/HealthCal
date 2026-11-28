@@ -1,17 +1,78 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ClipboardPaste, Info } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Copy, Info, Share as ShareIcon } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
-import { Loading } from '@/features/friends/components';
+import { Loading, useNarrow } from '@/features/friends/components';
 import { inviteFromParams, invitePath } from '@/features/friends/link';
 import { clearPendingInvite, savePendingInvite } from '@/features/friends/pendingInvite';
-import { pasteText } from '@/features/friends/share';
+import { QrCode } from '@/features/friends/QrCode';
+import { copyText, inviteLink, pasteText, shareInvite } from '@/features/friends/share';
 import { formatCode, isCompleteCode, normalizeCode } from '@/features/friends/summary';
 import { outcomeMessage } from '@/features/friends/week';
+import {
+  ADD_SUBTITLE,
+  CODE_LABEL,
+  CODE_PLACEHOLDER,
+  CODE_PLACEHOLDER_SHORT,
+  COPY,
+  DECLINED_NOTE,
+  HELP,
+  INVITE_NOTE,
+  NOBODY_SEARCHES,
+  OR_THEIR_CODE,
+  PASTE,
+  QR_LABEL,
+  SHARE_INVITE,
+  YOUR_INVITE,
+} from '@/features/friends/words';
 import { refreshFriends, requestFriend, useFriends } from '@/services/friends';
-import { useTheme } from '@/theme';
-import { Button, Card, CupKey, DECORATIVE, EmptyState, goBack, Header, IconButton, Screen, Text, TextField, toast } from '@/ui';
+import { fonts, useLargeText, useTheme } from '@/theme';
+import { Button, Card, CupKey, DECORATIVE, EmptyState, goBack, Header, Screen, SectionTitle, Text, TextField, toast, useGrownText } from '@/ui';
+
+/**
+ * Your invite, first: the QR code of your invite link beside your code, large, then Share invite link and Copy.
+ * A friend next to you points their phone's camera at the code (the app's own camera reads barcodes only, so
+ * there is no scanner here); one far away gets the link.
+ */
+function YourInvite({ code }: { code: string }) {
+  const { colors, spacing } = useTheme();
+  const narrow = useNarrow();
+  const large = useLargeText();
+  const c = normalizeCode(code);
+  const qr = narrow ? 112 : 128;
+  const big = narrow ? 30 : 34;
+  return (
+    <Card testID="friends-add-invite">
+      <Text variant="overline" color="textSecondary" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
+        {YOUR_INVITE}
+      </Text>
+      <View style={{ flexDirection: large ? 'column' : 'row', alignItems: large ? 'flex-start' : 'center', gap: spacing.lg, marginTop: spacing.md }}>
+        <QrCode testID="friends-add-qr" value={inviteLink(c)} size={qr} label={QR_LABEL} />
+        {/* The code with its Copy under it, beside the QR code; Share invite link takes the card's width below. */}
+        <View style={{ gap: spacing.sm, alignItems: 'flex-start' }}>
+          <Text testID="friends-add-code" selectable accessibilityLabel={`Your invite code: ${c.split('').join(' ')}`} style={{ fontFamily: fonts.extrabold, fontSize: big, lineHeight: big + 8, letterSpacing: 1, color: colors.text, fontVariant: ['tabular-nums'] }}>
+            {`${c.slice(0, 4)}\n${c.slice(4)}`}
+          </Text>
+          <Button
+            testID="friends-add-copy"
+            title={COPY}
+            variant="secondary"
+            size="sm"
+            full={false}
+            accessibilityLabel={`${COPY} code ${formatCode(c)}`}
+            icon={<Copy color={colors.text} />}
+            onPress={() => void copyText(formatCode(c), 'Code copied')}
+          />
+        </View>
+      </View>
+      <Button testID="friends-add-share" title={SHARE_INVITE} variant="secondary" size="md" style={{ marginTop: spacing.lg }} icon={<ShareIcon color={colors.text} />} onPress={() => void shareInvite(c)} />
+      <Text variant="body" color="textSecondary" style={{ marginTop: spacing.md }}>
+        {INVITE_NOTE}
+      </Text>
+    </Card>
+  );
+}
 
 type Result = { title: string; message: string; good: boolean; outcome: string } | null;
 
@@ -24,6 +85,10 @@ export default function AddFriendScreen() {
   const [lastParam, setLastParam] = useState(linked);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<Result>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const narrow = useNarrow();
+  const grown = useGrownText();
+  const shortPlaceholder = narrow || grown;
   const status = useFriends((s) => s.status);
   const overview = useFriends((s) => s.overview);
 
@@ -46,7 +111,7 @@ export default function AddFriendScreen() {
   // Codes are drawn from an alphabet without look-alikes, so one of these is a typo.
   const lookalike = /[ILO01]/.test(code);
   const goBackToFriends = () => (router.canGoBack() ? router.back() : router.replace('/friends' as never));
-  const header = <Header title="Add a friend" subtitle="By code or invite link" close onBack={goBackToFriends} />;
+  const header = <Header title="Add a friend" subtitle={ADD_SUBTITLE} close onBack={goBackToFriends} />;
 
   const send = async () => {
     if (!complete) return;
@@ -120,9 +185,7 @@ export default function AddFriendScreen() {
           <Button testID="friends-add-send" title="Send request" disabled={!complete} loading={sending} onPress={() => void send()} />
         )
       }>
-      <Text variant="body" color="textSecondary">
-        Enter the 8-character code from their Friends screen.
-      </Text>
+      {overview?.me ? <YourInvite code={overview.me.code} /> : null}
 
       {needsSetup && !result ? (
         <Card tone="alt" testID="friends-add-needs-setup">
@@ -133,30 +196,29 @@ export default function AddFriendScreen() {
         </Card>
       ) : null}
 
-      <TextField
-        testID="friends-add-input"
-        label="Friend's code"
-        value={formatCode(code)}
-        onChangeText={(t) => {
-          setCode(normalizeCode(t));
-          setResult(null);
-        }}
-        placeholder="ABCD 2345"
-        autoCapitalize="characters"
-        autoCorrect={false}
-        autoComplete="off"
-        spellCheck={false}
-        maxLength={9}
-        returnKeyType="send"
-        onSubmitEditing={() => void send()}
-        error={lookalike ? 'Codes never use I, L, O, 0 or 1. Check the letters.' : null}
-        hint={complete ? 'Ready to send' : `${code.length} of 8 characters`}
-        right={
-          <IconButton testID="friends-add-paste" tone="clear" size={36} accessibilityLabel="Paste a code" onPress={() => void paste()}>
-            <ClipboardPaste size={20} color={colors.textSecondary} strokeWidth={1.9} />
-          </IconButton>
-        }
-      />
+      <View style={{ gap: spacing.md }}>
+        <SectionTitle title={OR_THEIR_CODE} />
+        <TextField
+          testID="friends-add-input"
+          label={CODE_LABEL}
+          value={formatCode(code)}
+          onChangeText={(t) => {
+            setCode(normalizeCode(t));
+            setResult(null);
+          }}
+          placeholder={shortPlaceholder ? CODE_PLACEHOLDER_SHORT : CODE_PLACEHOLDER}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          autoComplete="off"
+          spellCheck={false}
+          maxLength={9}
+          returnKeyType="send"
+          onSubmitEditing={() => void send()}
+          error={lookalike ? 'Codes never use I, L, O, 0 or 1. Check the letters.' : null}
+          hint={complete ? 'Ready to send' : `${code.length} of 8 characters`}
+          right={<Button testID="friends-add-paste" title={PASTE} variant="ghost" size="sm" full={false} accessibilityLabel={`${PASTE} a code`} onPress={() => void paste()} />}
+        />
+      </View>
 
       {result ? (
         <Card testID="friends-add-result" accessibilityLiveRegion="polite">
@@ -177,14 +239,29 @@ export default function AddFriendScreen() {
         </Card>
       ) : null}
 
-      {/* The rarer facts sit under the field, one line each. */}
+      {/* The rarer facts, folded under Help. */}
       <View style={{ gap: spacing.sm }}>
-        <Text variant="caption" color="textSecondary">
-          Nobody can find you by searching.
-        </Text>
-        <Text variant="caption" color="textSecondary" testID="friends-add-declined-note">
-          Declined someone? Their code adds them back. They were never told.
-        </Text>
+        <Button
+          testID="friends-add-help"
+          title={HELP}
+          variant="ghost"
+          size="sm"
+          full={false}
+          expanded={helpOpen}
+          style={{ alignSelf: 'flex-start' }}
+          icon={helpOpen ? <ChevronUp color={colors.actionInk} /> : <ChevronDown color={colors.actionInk} />}
+          onPress={() => setHelpOpen((o) => !o)}
+        />
+        {helpOpen ? (
+          <View style={{ gap: spacing.sm }} testID="friends-add-help-text">
+            <Text variant="body" color="textSecondary">
+              {NOBODY_SEARCHES}
+            </Text>
+            <Text variant="body" color="textSecondary" testID="friends-add-declined-note">
+              {DECLINED_NOTE}
+            </Text>
+          </View>
+        ) : null}
       </View>
     </Screen>
   );

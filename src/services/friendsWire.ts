@@ -7,7 +7,32 @@
  * friendsWire.test.ts holds them.
  */
 import { sha256Hex } from '@/lib/sha256';
-import type { FeedItem, FeedMeal, FeedWorkout, FriendPerson, ISODate, MealSettings, MealType, MySharedMeal, SharedFoodSource, SharedMealItem } from '@/types';
+import type {
+  Buddy,
+  BuddyDay,
+  BuddyInvite,
+  FeedItem,
+  FeedMeal,
+  FeedSavedMeal,
+  FeedWorkout,
+  FriendPerson,
+  ISODate,
+  MealSettings,
+  MealType,
+  MySharedMeal,
+  MySharedSavedMeal,
+  NoteKind,
+  NoteReceived,
+  NoteSent,
+  SharedFoodSource,
+  SharedMealItem,
+  SignalsWanted,
+  TogetherCircle,
+  TogetherInvite,
+  TogetherKind,
+  TogetherMember,
+  TogetherWeek,
+} from '@/types';
 
 /** The most foods a shown meal carries; more are left out. */
 export const MAX_SHARED_FOODS = 15;
@@ -237,4 +262,158 @@ export function toMyMeals(raw: unknown): MySharedMeal[] {
     });
   }
   return out;
+}
+
+// ------------------------------------------------------------------ together (20261202000000_friends_together.sql)
+// Circles, buddies, notes and saved meals shown, as the overview sends them, made safe to draw: an entry that is
+// not the expected shape is dropped, one malformed entry never takes the screen down. scripts/dev/mock-backend.cjs
+// sends the same shapes; friendsWire.test.ts holds them.
+
+const isUuidish = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 64;
+const count = (v: unknown): number => (isNumber(v) && v > 0 ? Math.round(v) : 0);
+const isKind = (v: unknown): v is TogetherKind => v === 'minutes' || v === 'days';
+/** The three kind notes, in the order offered. */
+export const NOTE_KINDS: readonly NoteKind[] = ['thinking_of_you', 'walk_later', 'nice_week'];
+const isNoteKind = (v: unknown): v is NoteKind => typeof v === 'string' && (NOTE_KINDS as readonly string[]).includes(v);
+const text = (v: unknown): string => (typeof v === 'string' ? v : '');
+const people = (v: unknown): FriendPerson[] => (Array.isArray(v) ? v.filter(isObject).map(person).filter((p) => p.userId) : []);
+
+function togetherWeek(x: unknown): TogetherWeek | null {
+  if (!isObject(x) || !isCalendarDay(x.week) || !isNumber(x.target) || x.target <= 0) return null;
+  return { week: x.week, target: Math.round(x.target), total: count(x.total) };
+}
+
+/** The user's circle (one at most today; a list so a later server can send more). */
+export function toTogether(raw: unknown): TogetherCircle[] {
+  if (!Array.isArray(raw)) return [];
+  const out: TogetherCircle[] = [];
+  for (const x of raw) {
+    if (!isObject(x) || !isUuidish(x.id) || !isKind(x.kind)) continue;
+    const week = togetherWeek(x);
+    if (!week) continue;
+    const members: TogetherMember[] = Array.isArray(x.members) ? x.members.filter(isObject).map((m) => ({ ...person(m), me: m.me === true })).filter((m) => m.userId) : [];
+    out.push({
+      id: x.id,
+      kind: x.kind,
+      ...week,
+      lastWeek: togetherWeek(x.last_week),
+      members,
+      asked: Array.isArray(x.asked) ? x.asked.filter(isUuidish) : [],
+    });
+  }
+  return out;
+}
+
+/** Invitations to a circle, newest first (the server's order). */
+export function toTogetherInvites(raw: unknown): TogetherInvite[] {
+  if (!Array.isArray(raw)) return [];
+  const out: TogetherInvite[] = [];
+  for (const x of raw) {
+    if (!isObject(x) || !isUuidish(x.id) || !isKind(x.kind) || !isNumber(x.target) || x.target <= 0 || !isObject(x.from)) continue;
+    const from = person(x.from);
+    if (!from.userId) continue;
+    out.push({ id: x.id, kind: x.kind, target: Math.round(x.target), from, members: people(x.members), createdAt: text(x.created_at) });
+  }
+  return out;
+}
+
+function buddyDay(x: unknown): BuddyDay | null {
+  if (!isObject(x) || !isCalendarDay(x.day)) return null;
+  const c = x.count;
+  return { day: x.day, count: c === 0 || c === 1 || c === 2 ? c : null };
+}
+
+/** Logging buddies: together (with the week of seven days) or asked by the user. */
+export function toBuddies(raw: unknown): Buddy[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Buddy[] = [];
+  for (const x of raw) {
+    if (!isObject(x)) continue;
+    const p = person(x);
+    if (!p.userId) continue;
+    if (x.status === 'asked') {
+      out.push({ ...p, status: 'asked' });
+      continue;
+    }
+    if (x.status !== 'together' || !isCalendarDay(x.since) || !Array.isArray(x.week)) continue;
+    const week = x.week.map(buddyDay).filter((d): d is BuddyDay => !!d);
+    if (week.length !== 7) continue;
+    out.push({ ...p, status: 'together', since: x.since, week, run: count(x.run), kept: x.kept === true });
+  }
+  return out;
+}
+
+/** Friends asking the user to log together, newest first. */
+export function toBuddyInvites(raw: unknown): BuddyInvite[] {
+  return Array.isArray(raw) ? raw.filter(isObject).map((x) => ({ ...person(x), createdAt: text(x.created_at) })).filter((x) => x.userId) : [];
+}
+
+/** Notes received, newest first. A kind this app does not know is left out. */
+export function toNotes(raw: unknown): NoteReceived[] {
+  if (!Array.isArray(raw)) return [];
+  const out: NoteReceived[] = [];
+  for (const x of raw) {
+    if (!isObject(x) || !isNoteKind(x.kind) || (typeof x.id !== 'string' && !isNumber(x.id))) continue;
+    const from = { userId: text(x.from_user), displayName: text(x.display_name), avatar: text(x.avatar) };
+    if (!from.userId) continue;
+    out.push({ ...from, id: String(x.id), kind: x.kind, createdAt: text(x.created_at) });
+  }
+  return out;
+}
+
+/** The notes the user sent today. */
+export function toNotesSent(raw: unknown): NoteSent[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isObject).flatMap((x) => (isUuidish(x.to_user) && isNoteKind(x.kind) ? [{ toUserId: x.to_user, kind: x.kind, createdAt: text(x.created_at) }] : []));
+}
+
+export const NO_SIGNALS: SignalsWanted = { minutes: false, logged: false, today: null };
+
+/** What the server wants this phone to send (absent or malformed: nothing). */
+export function toSignalsWanted(raw: unknown): SignalsWanted {
+  if (!isObject(raw)) return NO_SIGNALS;
+  return { minutes: raw.minutes === true, logged: raw.logged === true, today: isCalendarDay(raw.today) ? raw.today : null };
+}
+
+function savedPart(x: Json): { ref: string; name: string; items: SharedMealItem[]; showKcal: boolean; servings?: number } | null {
+  const name = cleanWireText(x.name, 60);
+  if (!isRef(x.ref) || !name) return null;
+  const showKcal = x.show_kcal === true;
+  const items = cleanSharedMealItems(x.items, showKcal);
+  if (!items.length) return null;
+  const servings = isNumber(x.servings) && x.servings >= 1 && x.servings <= 100 && x.servings !== 1 ? x.servings : undefined;
+  return { ref: x.ref, name, items, showKcal, ...(servings ? { servings } : null) };
+}
+
+/** Saved meals and recipes friends show the user (never in `feed`), newest first. */
+export function toSharedSavedMeals(raw: unknown): FeedSavedMeal[] {
+  if (!Array.isArray(raw)) return [];
+  const out: FeedSavedMeal[] = [];
+  for (const x of raw) {
+    if (!isObject(x) || typeof x.user_id !== 'string' || !x.user_id) continue;
+    const part = savedPart(x);
+    if (part) out.push({ kind: 'saved_meal', ...person(x), ...part, cheered: x.cheered === true });
+  }
+  return out;
+}
+
+/** The user's own saved meals showing now, newest first. */
+export function toMySavedMeals(raw: unknown): MySharedSavedMeal[] {
+  if (!Array.isArray(raw)) return [];
+  const out: MySharedSavedMeal[] = [];
+  for (const x of raw) {
+    if (!isObject(x)) continue;
+    const part = savedPart(x);
+    if (!part) continue;
+    out.push({ ...part, shownAt: text(x.shown_at), expiresAt: text(x.expires_at), viewers: people(x.viewers), cheers: count(x.cheers) });
+  }
+  return out;
+}
+
+/**
+ * The reference a saved meal shown to friends gets: the first 32 hex characters of
+ * SHA-256(shareKey + ':saved:' + savedMealId), made on the server (social_saved_ref); here for matching and tests.
+ */
+export function sharedSavedRef(shareKey: string, savedMealId: string): string {
+  return sha256Hex(`${shareKey}:saved:${savedMealId}`).slice(0, 32);
 }

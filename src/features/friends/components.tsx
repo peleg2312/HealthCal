@@ -1,4 +1,4 @@
-import { Copy, HandHeart, Lock, Share as ShareIcon, X } from 'lucide-react-native';
+import { Copy, HandHeart, Lock, Plus, Share as ShareIcon, UserPlus, X } from 'lucide-react-native';
 import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -6,14 +6,16 @@ import { PourWait } from '@/components/PourWait';
 
 import { weekdayShort } from '@/lib/dates';
 import { formatDistance } from '@/lib/units';
-import type { CheerReceived, Friend, FriendRequest, FriendWorkout, SocialSharing } from '@/services/friends';
-import { fonts, useTheme } from '@/theme';
+import type { CheerReceived, FriendRequest, FriendWorkout, SocialSharing } from '@/services/friends';
+import { cupFor, fonts, useTheme } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
-import { Avatar, Button, Card, Divider, figure, IconButton, MiniCup, Text, TextField, Toggle } from '@/ui';
+import { Avatar, Button, Card, CupKey, decorative, Divider, figure, IconButton, MiniCup, Text, TextField, Toggle } from '@/ui';
+
+import { avatarTintKey } from './avatar';
 
 import { formatCode, normalizeCode } from './summary';
-import { dayLabel, personMark, sharingSentence, type FriendDay } from './week';
-import { neverSharedLine } from './words';
+import { personMark, sharingSentence, type FriendDay } from './week';
+import { addCupLabel, cheerCupLabel, ENTER_THEIR_CODE, INVITE_LINE, INVITE_TITLE, neverSharedLine } from './words';
 
 /** Below this width (iPhone SE) the friend screens tighten up, as Today does. */
 export function useNarrow(): boolean {
@@ -25,9 +27,46 @@ export const idFor = (userId: string) => userId.replace(/[^A-Za-z0-9-]/g, '').to
 
 // ------------------------------------------------------------------ marks
 
-/** A person: a cup tile with their initials, always (never an emoji). */
-export function PersonMark({ name, avatar, size = 44 }: { name: string; avatar: string; size?: number }) {
-  return <Avatar initials={personMark(name, avatar).text} size={size} />;
+/**
+ * A person: a cup tile with their initials, always (never an emoji). With their user id the tile wears their own
+ * soft tint (`avatarTintKey`: one of the theme's six, the same on every screen), initials in `avatarInk`; without
+ * one (the person's own preview) it is the plain cup.
+ */
+export function PersonMark({ name, avatar, id, size = 44 }: { name: string; avatar: string; id?: string; size?: number }) {
+  const { colors } = useTheme();
+  const tint = avatarTintKey(id);
+  const initials = personMark(name, avatar).text;
+  if (!tint) return <Avatar initials={initials} size={size} />;
+  return (
+    <View testID={`person-mark-${tint}`} style={{ width: size, height: size, ...cupFor(size), backgroundColor: colors[tint], alignItems: 'center', justifyContent: 'center' }}>
+      <Text variant="h3" color="avatarInk" style={{ fontSize: size * 0.38, lineHeight: size * 0.5 }}>
+        {initials}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * Cheer as a 36 px cup (44 to touch) in a feed row or a friend's list: the cheer mark, or once cheered the done
+ * mark (the small filled ink cup, never a check). It shows no words, so its name says what it cheers.
+ */
+export function CheerCup({ cheered, what, onPress, testID }: { cheered: boolean; what: string; onPress: () => void; testID: string }) {
+  const { colors } = useTheme();
+  return (
+    <IconButton testID={testID} size={36} accessibilityLabel={cheerCupLabel(what, cheered)} onPress={cheered ? undefined : onPress}>
+      {cheered ? <CupKey color={colors.text} size={12} /> : <HandHeart color={colors.text} size={18} />}
+    </IconButton>
+  );
+}
+
+/** "+" as a 36 px cup on a friend's meal: opens the meal's add step ("Add Maya's lunch to my diary"). */
+export function AddCup({ what, onPress, testID }: { what: string; onPress: () => void; testID: string }) {
+  const { colors } = useTheme();
+  return (
+    <IconButton testID={testID} size={36} accessibilityLabel={addCupLabel(what)} onPress={onPress}>
+      <Plus color={colors.text} size={18} />
+    </IconButton>
+  );
 }
 
 /** Cheer, or the done state "Cheered". Instant: the store marks it at once and rolls it back if the server refuses. */
@@ -73,51 +112,28 @@ export function workoutTitle(w: FriendWorkout, units: UnitSystem): string {
   return w.distanceKm ? `${w.name} ${formatDistance(w.distanceKm, units)}` : w.name;
 }
 
-export function workoutMeta(w: FriendWorkout, today: ISODate): string {
-  return [w.date ? dayLabel(w.date, today) : null, typeof w.minutes === 'number' ? `${w.minutes} min` : null].filter(Boolean).join(' · ');
-}
-
-/** One shared workout: the activity emoji as a small content mark, what and when, and Cheer beside it (siblings, never nested). */
-export function WorkoutRow({ w, friend, today, units, onCheer }: { w: FriendWorkout; friend: Friend; today: ISODate; units: UnitSystem; onCheer: () => void }) {
-  const { spacing } = useTheme();
-  return (
-    // Cheer sits beside the workout; a name too long for that line takes the row and Cheer goes under it, at the right.
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.sm, minHeight: 56, paddingVertical: 6 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
-        <Text style={{ fontSize: 17, lineHeight: 22, minWidth: 22, textAlign: 'center' }} accessibilityElementsHidden importantForAccessibility="no">
-          {w.emoji || '·'}
-        </Text>
-        <View style={{ flexShrink: 1, minWidth: 0 }}>
-          <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
-            {workoutTitle(w, units)}
-          </Text>
-          <Text variant="caption" color="textSecondary" numberOfLines={1}>
-            {workoutMeta(w, today)}
-          </Text>
-        </View>
-      </View>
-      <View style={{ marginLeft: 'auto' }}>
-        <CheerButton
-          testID={`friends-cheer-${w.id}`}
-          cheered={friend.cheered.includes(w.id)}
-          label={`${friend.displayName}'s ${w.name.toLowerCase()}`}
-          onPress={onCheer}
-        />
-      </View>
-    </View>
-  );
-}
-
 // ------------------------------------------------------------------ invite
 
-/** The user's own code, large and readable, with Share and Copy. On surfaceAlt, so text stays text or textSecondary. */
-export function InviteCard({ code, sharing, onShare, onCopy }: { code: string; sharing: SocialSharing; onShare: () => void; onCopy: () => void }) {
+/**
+ * The empty Friends screen's card: inviting is the main action. "Invite a friend", one line, the user's own code
+ * large and readable, Share link and Copy code, "Enter their code" (Add a friend, which also shows the QR code),
+ * and what friends see. On the card surface (a tool, not a notice).
+ */
+export function InviteCard({ code, sharing, onShare, onCopy, onEnter }: { code: string; sharing: SocialSharing; onShare: () => void; onCopy: () => void; onEnter: () => void }) {
   const { colors, spacing } = useTheme();
-  const size = useNarrow() ? 34 : 44;
+  const size = useNarrow() ? 34 : 40;
   const c = normalizeCode(code);
   return (
-    <Card tone="alt" padding={spacing.xl} testID="friends-invite">
-      <Text variant="overline" color="textSecondary">
+    <Card padding={spacing.lg} testID="friends-empty">
+      <View testID="friends-invite" style={{ gap: spacing.xs }}>
+        <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
+          {INVITE_TITLE}
+        </Text>
+        <Text variant="body" color="textSecondary">
+          {INVITE_LINE}
+        </Text>
+      </View>
+      <Text variant="overline" color="textSecondary" style={{ marginTop: spacing.lg }}>
         Your invite code
       </Text>
       <Text
@@ -134,7 +150,7 @@ export function InviteCard({ code, sharing, onShare, onCopy }: { code: string; s
         {c.slice(4)}
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
-        <Button testID="friends-share" title="Share link" size="md" full={false} style={{ flexGrow: 1 }} icon={<ShareIcon size={18} color={colors.onPrimary} strokeWidth={2.2} />} onPress={onShare} />
+        <Button testID="friends-share" title="Share link" size="md" full={false} style={{ flexGrow: 1 }} icon={<ShareIcon color={colors.onPrimary} />} onPress={onShare} />
         <Button
           testID="friends-copy"
           title="Copy code"
@@ -143,12 +159,13 @@ export function InviteCard({ code, sharing, onShare, onCopy }: { code: string; s
           full={false}
           style={{ flexGrow: 1 }}
           accessibilityLabel={`Copy code ${formatCode(c)}`}
-          icon={<Copy size={18} color={colors.text} strokeWidth={2.2} />}
+          icon={<Copy color={colors.text} />}
           onPress={onCopy}
         />
       </View>
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: spacing.lg }}>
-        <Lock size={14} color={colors.textSecondary} strokeWidth={2} style={{ marginTop: 3 }} />
+      <Button testID="friends-enter-code" title={ENTER_THEIR_CODE} variant="ghost" size="sm" full={false} style={{ alignSelf: 'center', marginTop: spacing.sm }} icon={<UserPlus color={colors.actionInk} />} onPress={onEnter} />
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: spacing.sm }}>
+        {decorative(<Lock size={14} color={colors.textSecondary} strokeWidth={2} style={{ marginTop: 3 }} />)}
         <Text variant="body" color="textSecondary" style={{ flex: 1, fontSize: 14, lineHeight: 20 }} testID="friends-never-shared">
           {sharingSentence(sharing)}
         </Text>
@@ -173,7 +190,7 @@ export function IncomingRequests({ requests, busy, onAccept, onDecline }: { requ
             testID={`friends-incoming-${idFor(r.userId)}`}
             style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.sm, minHeight: 64, paddingVertical: spacing.sm }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
-              <PersonMark name={r.displayName} avatar={r.avatar} size={36} />
+              <PersonMark name={r.displayName} avatar={r.avatar} id={r.userId} size={36} />
               <View style={{ flexShrink: 1, minWidth: 0 }}>
                 <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
                   {r.displayName}
@@ -207,7 +224,7 @@ export function OutgoingRequests({ requests, busy, onCancel }: { requests: Frien
           {/* "Take back" sits beside the name; a name too long for that line takes the row and the button goes under it, at the right. */}
           <View testID={`friends-outgoing-${idFor(r.userId)}`} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.sm, minHeight: 56, paddingVertical: spacing.sm }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
-              <PersonMark name={r.displayName} avatar={r.avatar} size={36} />
+              <PersonMark name={r.displayName} avatar={r.avatar} id={r.userId} size={36} />
               <View style={{ flexShrink: 1, minWidth: 0 }}>
                 <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
                   {r.displayName}
@@ -245,7 +262,7 @@ export function CheersList({ cheers, describe, when }: { cheers: CheerReceived[]
         <React.Fragment key={`${c.fromUserId}-${c.ref}`}>
           {i > 0 ? <Divider inset={48} /> : null}
           <View testID={`friends-cheer-received-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: spacing.sm }}>
-            <PersonMark name={c.displayName} avatar={c.avatar} size={36} />
+            <PersonMark name={c.displayName} avatar={c.avatar} id={c.fromUserId} size={36} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text variant="body">
                 <Text variant="bodyStrong">{c.displayName}</Text>

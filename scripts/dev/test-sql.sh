@@ -25,3 +25,4 @@ for f in "$ROOT"/supabase/migrations/*.sql; do $PSQL -f "$f" healthcal; done
 $PSQL -f "$ROOT/supabase/tests/policies_and_sync.sql" healthcal
 $PSQL -f "$ROOT/supabase/tests/friends.sql" healthcal
 $PSQL -f "$ROOT/supabase/tests/friends_meals.sql" healthcal
+$PSQL -f "$ROOT/supabase/tests/friends_together.sql" healthcal

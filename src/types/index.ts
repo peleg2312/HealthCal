@@ -560,3 +560,121 @@ export interface MealSettings {
   /** Friends' meals in my feed (on by default). */
   see: boolean;
 }
+
+// ------------------------------------------------- friends: doing things together
+// Not synced records: they live on the server behind functions
+// (supabase/migrations/20261202000000_friends_together.sql) and are read through
+// @/services/friends. The wire format is cleaned by @/services/friendsWire.
+
+/** What a circle's cup holds: active minutes (guidelineMinutes) or days with food logged. */
+export type TogetherKind = 'minutes' | 'days';
+
+/** Someone who joined a circle. Never a figure of their own. */
+export interface TogetherMember extends FriendPerson {
+  me: boolean;
+}
+
+/** A circle's week: its target and the total everyone poured in. */
+export interface TogetherWeek {
+  /** Monday of the week. */
+  week: ISODate;
+  target: number;
+  total: number;
+}
+
+/** "Together this week": the circle the user is in. Only the circle's total, never one person's. */
+export interface TogetherCircle extends TogetherWeek {
+  id: string;
+  kind: TogetherKind;
+  /** Null in the circle's first week. */
+  lastWeek: TogetherWeek | null;
+  /** Who joined, by name. */
+  members: TogetherMember[];
+  /** Friends the user invited who have not joined (a decline looks the same). */
+  asked: string[];
+}
+
+/** An invitation to a circle. */
+export interface TogetherInvite {
+  id: string;
+  kind: TogetherKind;
+  target: number;
+  from: FriendPerson;
+  members: FriendPerson[];
+  createdAt: ISODateTime;
+}
+
+/** One day of a logging buddy's week: how many of the two logged anything (null before the pair or still to come). */
+export interface BuddyDay {
+  day: ISODate;
+  count: 0 | 1 | 2 | null;
+}
+
+/** A logging buddy: together, or asked by the user and waiting (a decline looks the same). */
+export type Buddy = FriendPerson &
+  (
+    | {
+        status: 'together';
+        /** The first day the pair counts. */
+        since: ISODate;
+        /** Monday to Sunday of the user's week. */
+        week: BuddyDay[];
+        /** Days both logged in a row; one missed day a week is kept. */
+        run: number;
+        /** A missed day of this week was kept. */
+        kept: boolean;
+      }
+    | { status: 'asked' }
+  );
+
+/** A friend asking the user to log together. */
+export interface BuddyInvite extends FriendPerson {
+  createdAt: ISODateTime;
+}
+
+/** The three kind notes. No free text. */
+export type NoteKind = 'thinking_of_you' | 'walk_later' | 'nice_week';
+
+export interface NoteReceived extends FriendPerson {
+  id: string;
+  kind: NoteKind;
+  createdAt: ISODateTime;
+}
+
+/** A note the user sent today (one a day to each friend). */
+export interface NoteSent {
+  toUserId: string;
+  kind: NoteKind;
+  createdAt: ISODateTime;
+}
+
+/** What the server wants this phone to send for circles and buddies, and the day its figures are for. */
+export interface SignalsWanted {
+  minutes: boolean;
+  logged: boolean;
+  today: ISODate | null;
+}
+
+/** A saved meal or recipe shown to friends: a name and foods, never a day. */
+export interface SharedSavedMeal {
+  ref: string;
+  name: string;
+  items: SharedMealItem[];
+  showKcal: boolean;
+  /** How many servings the foods make (a recipe); absent is one. */
+  servings?: number;
+}
+
+/** A friend's saved meal or recipe shown to the user. */
+export interface FeedSavedMeal extends SharedSavedMeal, FriendPerson {
+  kind: 'saved_meal';
+  cheered: boolean;
+}
+
+/** One of the user's own saved meals showing now. */
+export interface MySharedSavedMeal extends SharedSavedMeal {
+  shownAt: ISODateTime;
+  expiresAt: ISODateTime;
+  viewers: FriendPerson[];
+  cheers: number;
+}

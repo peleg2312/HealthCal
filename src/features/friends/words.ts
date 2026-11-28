@@ -22,6 +22,9 @@ export const SETTINGS_TITLE = 'Friends settings';
 export const SETTINGS_SUBTITLE = 'What friends see';
 export const SETTINGS_OPEN = 'Friends settings and privacy';
 export const ADD = 'Add';
+/** The people row's last cup, opening Add a friend (your invite and their code). */
+export const INVITE = 'Invite';
+export const INVITE_OPEN = 'Invite a friend or enter their code';
 export const ADD_FRIEND = 'Add a friend';
 export const RECENT = 'Recent';
 export const RECENT_SPAN = 'Last 7 days';
@@ -48,7 +51,7 @@ export const WHO_SEES = 'Who sees it';
 export const WHO_NOTE = 'The friends you pick, remembered for next time.';
 export const NOBODY_TO_PICK = 'Each friend is switched off for your meals. Turn one on from their page, in Between you.';
 export const SHOW_KCAL = 'Show calories';
-export const SHOW_KCAL_OFF = 'Off: foods and portions, no calories';
+export const SHOW_KCAL_OFF = 'Foods and their portions';
 export const SHOW_KCAL_ON = 'Each food with its calories';
 export const NEVER_SHOWN = 'Never shown: your day’s total, budget, weight, notes or the time you ate. It leaves their feed after 7 days, or when you stop.';
 export const PICK_FIRST = 'Pick who sees it';
@@ -80,7 +83,6 @@ export const STOP = 'Stop';
 export const STOP_ALL = 'Stop showing all meals';
 export const WHAT_YOU_SEE = 'What you see';
 export const SEE_MEALS = 'Friends’ meals in my feed';
-export const SEE_MEALS_OFF = 'Off: workouts and cheers';
 export const NEVER_SHARED = 'Never shared, whatever you choose here: your weight, body measurements, notes, heart rate, the time of day, your day’s total and your budget.';
 export const LEAVE_TITLE = 'Turn friends off';
 export const LEAVE_NOTE = 'Removes your card, every friendship, every cheer and every meal you show. Your own data on this phone is not touched.';
@@ -183,7 +185,7 @@ export function mealCheerTarget(found: { day: ISODate; meal: MealType } | undefi
  * What friends see of you, in one paragraph: the parts of the week shared, the meals shown now and to whom,
  * and what is never shared.
  */
-export function aboutYouLine(sharing: { workouts: boolean; streak: boolean; minutes: boolean }, shown: number, viewers: readonly string[], mealsAllowed: boolean): string {
+export function aboutYouLine(sharing: { workouts: boolean; streak: boolean; minutes: boolean }, shown: number, viewers: readonly string[], mealsAllowed: boolean, withNever = true): string {
   const parts = [sharing.minutes ? 'active minutes' : null, sharing.workouts ? 'workouts' : null, sharing.streak ? 'streak' : null].filter(Boolean) as string[];
   const week = parts.length === 0 ? 'Your name.' : parts.length === 1 ? `Your ${parts[0]}.` : `Your ${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}.`;
   const meals = !mealsAllowed
@@ -191,7 +193,7 @@ export function aboutYouLine(sharing: { workouts: boolean; streak: boolean; minu
     : shown === 0
       ? ' A meal when you show one.'
       : ` A meal when you show one: ${shown} showing now${viewers.length ? `, to ${namesLine(viewers)}` : ''}.`;
-  return `${week}${meals} Never your weight or your day’s total.`;
+  return `${week}${meals}${withNever ? ' Never your weight or your day’s total.' : ''}`;
 }
 
 /** "Nobody picked yet", "Maya and Sam". */
@@ -230,11 +232,9 @@ export const friendsSince = (date: string | null) => (date ? `Friends since ${da
 export const mealsTheyShow = (name: string) => `Meals ${isolateRtl(name)} shows you`;
 
 /** The first switch under "Between you". */
-export const seesMyMealsTitle = (name: string) => `${isolateRtl(name)} sees meals I show`;
-export const seesMyMealsLine = (name: string) => `Off: ${isolateRtl(name)} is left out of every meal you show`;
+export const seesMyMealsTitle = (name: string) => `${isolateRtl(name)} can see meals I show`;
 /** The second switch. */
 export const theirMealsTitle = (name: string) => `${isolateRtl(name)}’s meals in my feed`;
-export const THEIR_MEALS_OFF = 'Off: their workouts and cheers';
 
 /** Under Remove friend; the meal sentence only where meals work for this person (`mealsInWords`). */
 export const removeNote = (name: string, meals = true) => `${isolateRtl(name)} is not told.${meals ? ' Meals between you stop showing at once.' : ''}`;
@@ -275,3 +275,83 @@ export function cheerWhat(ref: string, own: { workouts: Map<string, { name: stri
   if (meal) return mealCheerTarget(own.meals.get(meal), today);
   return cheerTarget(ref, own.workouts, today);
 }
+
+// ------------------------------------------------------------------ the feed, round 2
+
+/**
+ * The Friends header's line: news, not a description. "3 friends · 2 new today", "1 friend", "No friends yet".
+ * `newToday` counts today's items not seen at the last look (`newTodayCount`), never a figure about anyone.
+ */
+export function feedNewsLine(friends: number, newToday: number): string {
+  if (friends === 0) return 'No friends yet';
+  const who = `${friends} ${friends === 1 ? 'friend' : 'friends'}`;
+  return newToday > 0 ? `${who} · ${newToday} new today` : who;
+}
+
+/** What a feed item is, as the object of a sentence: "Maya’s lunch", "Maya’s running". */
+export function itemWhat(name: string, item: { kind: 'meal'; meal: MealType } | { kind: 'workout'; name: string }): string {
+  const what = item.kind === 'meal' ? (item.meal === 'snack' ? 'snacks' : MEAL_LABEL[item.meal].toLowerCase()) : item.name.toLowerCase();
+  return `${name}’s ${what}`;
+}
+
+/** A Cheer cup's name (it shows no words): "Cheer Maya’s lunch", or once done "You cheered Maya’s lunch". */
+export const cheerCupLabel = (what: string, cheered: boolean) => (cheered ? `You cheered ${what}` : `Cheer ${what}`);
+
+/** The "+" cup's name on a friend's meal: "Add Maya’s lunch to my diary". */
+export const addCupLabel = (what: string) => `Add ${what} to my diary`;
+
+/** The cheers chip's name: its words, then where it leads ("3 cheers for you. See who cheered"). */
+export const cheersChipLabel = (n: number) => `${cheersTitle(n)}. See who cheered`;
+
+/** The empty Friends screen: the invite is the main action. */
+export const INVITE_TITLE = 'Invite a friend';
+export const INVITE_LINE = 'Send your link or show your code. What friends show you appears here once you are friends.';
+export const ENTER_THEIR_CODE = 'Enter their code';
+
+// ------------------------------------------------------------------ show a meal from Friends
+
+/** The shortcut on Friends: "Show today’s lunch to friends". */
+export const showShortcutTitle = (meal: MealType) => `Show today’s ${meal === 'snack' ? 'snacks' : MEAL_LABEL[meal].toLowerCase()} to friends`;
+
+// ------------------------------------------------------------------ add a friend, both ways
+
+export const ADD_SUBTITLE = 'Invite or enter a code';
+export const YOUR_INVITE = 'Your invite';
+/** The invite goes out through the phone's share sheet, so here the word is "share". */
+export const SHARE_INVITE = 'Share invite link';
+export const COPY = 'Copy';
+export const INVITE_NOTE = 'Next to someone? They point their phone’s camera at this code. A friend is added once you accept.';
+export const QR_LABEL = 'QR code of your invite link';
+export const OR_THEIR_CODE = 'Or enter their code';
+export const CODE_LABEL = 'Their code';
+/** Says the shape, never a code that could be read as one already typed. */
+export const CODE_PLACEHOLDER = '8 letters and digits';
+export const CODE_PLACEHOLDER_SHORT = '8 characters';
+export const PASTE = 'Paste';
+export const HELP = 'Help';
+export const NOBODY_SEARCHES = 'Nobody can find you by searching. Friends add you by your code or your link.';
+export const DECLINED_NOTE = 'Declined someone? Their code adds them back. They were never told.';
+
+// ------------------------------------------------------------------ a friend's page, round 2
+
+/** The overline of their week card: "Maya’s week". */
+export const weekOf = (name: string) => `${isolateRtl(name)}’s week`;
+/** The section with their meals and workouts together: "Maya shows you". */
+export const theyShowYou = (name: string) => `${isolateRtl(name)} shows you`;
+export const MANAGE = 'Manage';
+/** The Manage row's line: what is behind it. */
+export const manageLine = (meals: boolean) => (meals ? 'Meals between you, or remove' : 'Remove friend');
+/** The Manage sheet's title: "You and Maya". */
+export const manageTitle = (name: string) => `You and ${isolateRtl(name)}`;
+/** The two switches, worded for what On does. */
+export const seesMyMealsOn = (name: string) => `${isolateRtl(name)} is offered each time you show a meal`;
+export const theirMealsOn = (name: string) => `Meals ${isolateRtl(name)} shows you appear in Friends`;
+/** Nothing shown by this friend in the last 7 days. */
+export const nothingShownYet = (name: string) => `Nothing from ${isolateRtl(name)} in the last 7 days.`;
+
+// ------------------------------------------------------------------ settings, round 2
+
+export const GROUP_YOU = 'You';
+export const GROUP_MEALS = 'Meals';
+export const SEE_MEALS_ON = 'Meals friends show you appear with their workouts';
+export const ALWAYS_SHOW_HINT = 'Tap a meal to show it each day as you log it.';

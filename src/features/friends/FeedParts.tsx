@@ -1,23 +1,29 @@
 /**
- * The Friends screen's parts: the row of people with Add at its end, the one-line cheers card, a shown
- * workout's card and the quiet card about what friends see of you. Every person is an initials cup; a
- * short level line inside a cup means something new since the last look. Nothing here shows a figure
- * beside another person's, so nothing reads as a league table.
+ * The Friends screen's parts: the row of people with Invite at its end, the cheers chip beside "Recent", and the
+ * feed as one card per day of compact rows (one row per meal or workout: who and what on one line, the foods'
+ * heads or the length on the next, Cheer and, on a meal, "+" as small cups at the end). Every person is an
+ * initials cup in their own tint; a short level line inside a cup means something new since the last look.
+ * Nothing here shows a figure beside another person's, so nothing reads as a league table.
+ *
+ * Room left for what comes next: a shared "Together this week" card goes between the people row and "Recent"
+ * (the screen's own order), and a meal row can take one more cup ("Save to my meals") beside "+".
  */
-import { ChevronRight, Copy, HandHeart, Lock, UserPlus } from 'lucide-react-native';
+import { HandHeart, UserPlus } from 'lucide-react-native';
 import React from 'react';
 import { Platform, ScrollView, View } from 'react-native';
 
+import { MEAL_LABEL } from '@/lib/nutrition';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { cupFor, fonts, useLargeText, useTheme } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
-import { Avatar, Button, Card, decorative, DECORATIVE, PressableScale, Text } from '@/ui';
+import { Button, Card, Divider, DECORATIVE, figure, PressableScale, Text } from '@/ui';
 
-import { CheerButton, idFor, PersonMark, workoutMeta, workoutTitle } from './components';
-import type { FeedWorkout } from './contract';
-import { formatCode } from './summary';
-import { personMark } from './week';
-import { ABOUT_YOU, ADD, ADD_FRIEND, cheersTitle, PRIVACY } from './words';
+import { AddCup, CheerCup, idFor, PersonMark, workoutTitle } from './components';
+import type { FeedItem } from './contract';
+import { feedKey, type FeedDay } from './feed';
+import { mealFoodsLine } from './MealCard';
+import { dayLabel } from './week';
+import { cheersChipLabel, cheersTitle, INVITE, INVITE_OPEN, itemWhat, RECENT } from './words';
 
 const CUP = 56;
 const CELL = 72;
@@ -27,12 +33,12 @@ export const listRole = Platform.OS === 'web' ? ({ role: 'list' } as const) : nu
 export const itemRole = Platform.OS === 'web' ? ({ role: 'listitem' } as const) : null;
 
 /** One person in the row: their initials cup, the level line inside it when something is new, the name under it. */
-function PersonCell({ name, avatar, isNew, onPress, testID }: { name: string; avatar: string; isNew: boolean; onPress: () => void; testID: string }) {
+function PersonCell({ userId, name, avatar, isNew, onPress, testID }: { userId: string; name: string; avatar: string; isNew: boolean; onPress: () => void; testID: string }) {
   const { colors } = useTheme();
   return (
     <PressableScale testID={testID} onPress={onPress} accessibilityLabel={`${withoutMarks(name)}${isNew ? ', something new' : ''}. Open their page`} style={{ width: CELL, alignItems: 'center', gap: 6 }}>
       <View>
-        <Avatar initials={personMark(name, avatar).text} size={CUP} />
+        <PersonMark name={name} avatar={avatar} id={userId} size={CUP} />
         {isNew ? (
           // The level line, low inside the cup: something new since the last look. Never a number.
           <View testID={`${testID}-new`} pointerEvents="none" style={{ position: 'absolute', left: CUP / 2 - 12, width: 24, bottom: 10, height: 3, borderRadius: 1.5, backgroundColor: colors.rim }} />
@@ -45,38 +51,34 @@ function PersonCell({ name, avatar, isNew, onPress, testID }: { name: string; av
   );
 }
 
-/** The last cup of the row: an empty dashed cup with the add-person mark, "Add". */
-function AddCell({ onPress }: { onPress: () => void }) {
+/** The last cup of the row: an empty dashed cup with the add-person mark, "Invite" (Add a friend: your invite and their code). */
+function InviteCell({ onPress }: { onPress: () => void }) {
   const { colors } = useTheme();
   return (
-    <PressableScale testID="friends-add-open" onPress={onPress} accessibilityLabel={ADD_FRIEND} style={{ width: CELL, alignItems: 'center', gap: 6 }}>
+    <PressableScale testID="friends-add-open" onPress={onPress} accessibilityLabel={`${INVITE}. ${INVITE_OPEN}`} style={{ width: CELL, alignItems: 'center', gap: 6 }}>
       <View style={{ width: CUP, height: CUP, ...cupFor(CUP), borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.dashEdge, alignItems: 'center', justifyContent: 'center' }}>
         <UserPlus size={22} color={colors.text} strokeWidth={1.9} {...DECORATIVE} />
       </View>
       <Text variant="caption" color="text" numberOfLines={1}>
-        {ADD}
+        {INVITE}
       </Text>
     </PressableScale>
   );
 }
 
-/** "Your friends · 3", then one row of people that scrolls sideways when it is long, "Add" always last. */
+/** One row of people that scrolls sideways when it is long, "Invite" always last. The header's line counts them. */
 export function PeopleRow({ people, newIds, onOpen, onAdd }: { people: { userId: string; displayName: string; avatar: string }[]; newIds: ReadonlySet<string>; onOpen: (userId: string) => void; onAdd: () => void }) {
-  const { spacing } = useTheme();
   return (
-    <View style={{ gap: spacing.sm }} testID="friends-people">
-      <Text variant="overline" color="textSecondary" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
-        {`Your friends · ${people.length}`}
-      </Text>
+    <View testID="friends-people">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20, flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 20 - (CELL - CUP) / 2, gap: 4 }}>
-        <View {...listRole} style={{ flexDirection: 'row', gap: 4 }}>
+        <View {...listRole} {...(Platform.OS === 'web' ? ({ 'aria-label': `Your friends, ${people.length}` } as object) : null)} style={{ flexDirection: 'row', gap: 4 }}>
           {people.map((p) => (
             <View key={p.userId} {...itemRole}>
-              <PersonCell name={p.displayName} avatar={p.avatar} isNew={newIds.has(p.userId)} onPress={() => onOpen(p.userId)} testID={`friends-person-${idFor(p.userId)}`} />
+              <PersonCell userId={p.userId} name={p.displayName} avatar={p.avatar} isNew={newIds.has(p.userId)} onPress={() => onOpen(p.userId)} testID={`friends-person-${idFor(p.userId)}`} />
             </View>
           ))}
           <View {...itemRole}>
-            <AddCell onPress={onAdd} />
+            <InviteCell onPress={onAdd} />
           </View>
         </View>
       </ScrollView>
@@ -84,104 +86,132 @@ export function PeopleRow({ people, newIds, onOpen, onAdd }: { people: { userId:
   );
 }
 
-/** One row for the cheers received: how many, and who cheered what; a tap opens the list. */
-export function CheersLine({ count, summary, onPress }: { count: number; summary: string; onPress: () => void }) {
+/** "Recent", a level-2 heading, with the cheers received as one chip at its end ("3 cheers for you") that opens the list. */
+export function RecentTitle({ cheers, onCheers }: { cheers: number; onCheers: () => void }) {
   const { colors, spacing } = useTheme();
-  const large = useLargeText();
   return (
-    <Card padding={0} testID="friends-cheers">
-      <PressableScale
-        testID="friends-cheers-open"
-        onPress={onPress}
-        focusRing="inside"
-        accessibilityLabel={`${cheersTitle(count)}. ${withoutMarks(summary)}. See all`}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, minHeight: 64 }}>
-        <Avatar size={40}>{decorative(<HandHeart size={20} color={colors.primaryInk} strokeWidth={1.9} />)}</Avatar>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text variant="bodyStrong" style={{ fontFamily: fonts.semibold }}>
-            {cheersTitle(count)}
-          </Text>
-          <Text variant="caption" color="textSecondary" numberOfLines={large ? 5 : 2}>
-            {summary}
-          </Text>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.md, rowGap: spacing.sm, marginTop: 4 }}>
+      <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
+        {RECENT}
+      </Text>
+      {cheers > 0 ? (
+        <View testID="friends-cheers" style={{ marginLeft: 'auto' }}>
+          <Button
+            testID="friends-cheers-open"
+            title={cheersTitle(cheers)}
+            variant="secondary"
+            size="sm"
+            full={false}
+            accessibilityLabel={cheersChipLabel(cheers)}
+            icon={<HandHeart color={colors.text} />}
+            onPress={onCheers}
+          />
         </View>
-        {decorative(<ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.9} />)}
-      </PressableScale>
-    </Card>
+      ) : null}
+    </View>
   );
 }
 
-/** A friend's shared workout in the feed: who, the activity and distance, the day and length, and Cheer beside it. */
-export function FeedWorkoutCard({ item, today, units, onCheer, testID }: { item: FeedWorkout; today: ISODate; units: UnitSystem; onCheer: () => void; testID: string }) {
+/** A feed row's two lines: "Maya · Lunch" and the foods' heads, or "Maya · Running 7.2 km" and "42 min". */
+function rowLines(item: FeedItem, units: UnitSystem): { what: string; detail: string } {
+  if (item.kind === 'meal') return { what: MEAL_LABEL[item.meal], detail: mealFoodsLine(item.items) };
+  const w = { id: item.ref, name: item.name, emoji: item.emoji, minutes: item.minutes, date: item.day, ...(item.distanceKm ? { distanceKm: item.distanceKm } : null) };
+  return { what: workoutTitle(w, units), detail: typeof item.minutes === 'number' ? `${item.minutes} min` : '' };
+}
+
+/**
+ * One meal or workout: the person's cup, who and what, one line under it (cut to one line; the meal's sheet has
+ * every food and portion), then Cheer and, on a meal, "+" as 36 px cups (siblings of the row, never inside it).
+ * A meal's row opens its sheet; a workout's opens the friend's page. With large text the cups go under the words.
+ */
+export function FeedRow({
+  item,
+  units,
+  testID,
+  onOpen,
+  onCheer,
+  onAdd,
+  today,
+  cheerTestID,
+}: {
+  item: FeedItem;
+  units: UnitSystem;
+  testID: string;
+  onOpen?: () => void;
+  onCheer: () => void;
+  onAdd?: () => void;
+  /** On a friend's own page: no cup and no name, and the day after what ("Breakfast · Today"). */
+  today?: ISODate;
+  /** The Cheer cup's own test id, where it keeps an older one (`<testID>-cheer` by default). */
+  cheerTestID?: string;
+}) {
   const { spacing } = useTheme();
   const large = useLargeText();
-  const w = { id: item.ref, name: item.name, emoji: item.emoji, minutes: item.minutes, date: item.day, ...(item.distanceKm ? { distanceKm: item.distanceKm } : null) };
-  const cheer = <CheerButton testID={`${testID}-cheer`} cheered={item.cheered} label={`${withoutMarks(item.displayName)}'s ${item.name.toLowerCase()}`} onPress={onCheer} />;
-  return (
-    <Card padding={spacing.lg} testID={testID}>
-      {/* Cheer sits on the name's line, so the activity and its day take the card's whole width under it, and a
-          distance never parts from its activity on a 320 px phone. With large text Cheer takes a line of its own. */}
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-        <PersonMark name={item.displayName} avatar={item.avatar} size={40} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: large ? undefined : 36, marginBottom: large ? 0 : 4 }}>
-            <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold, flex: 1, minWidth: 0 }}>
-              {isolateRtl(item.displayName)}
-            </Text>
-            {large ? null : cheer}
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}>
-            {item.emoji ? (
-              // A content mark: the activity's emoji, small and silent (its name follows in words).
-              <View {...DECORATIVE}>
-                <Text style={{ fontSize: 15, lineHeight: 22 }}>{item.emoji}</Text>
-              </View>
-            ) : null}
-            <Text variant="body" style={{ flexShrink: 1 }}>
-              {workoutTitle(w, units)}
-            </Text>
-          </View>
-          <Text variant="caption" color="textSecondary">
-            {workoutMeta(w, today)}
+  const lines = rowLines(item, units);
+  const what = today ? `${lines.what} · ${dayLabel(item.day, today)}` : lines.what;
+  const { detail } = lines;
+  const who = withoutMarks(item.displayName);
+  const target = itemWhat(who, item.kind === 'meal' ? { kind: 'meal', meal: item.meal } : { kind: 'workout', name: item.name });
+  const drawn = today ? withoutMarks(what) : `${who} · ${withoutMarks(what)}`;
+  const spoken = `${drawn}${detail ? `, ${withoutMarks(detail)}` : ''}${onOpen ? `. ${item.kind === 'meal' ? 'Open the meal' : `Open ${who}’s page`}` : ''}`;
+  const words = (
+    <View style={{ flex: 1, minWidth: 0 }}>
+      <Text variant="body" numberOfLines={large ? 3 : 1}>
+        {today ? null : (
+          <Text variant="bodyStrong" style={{ fontFamily: fonts.semibold }}>
+            {isolateRtl(item.displayName)}
           </Text>
-          {large ? <View style={{ alignSelf: 'flex-end', marginTop: spacing.sm }}>{cheer}</View> : null}
-        </View>
+        )}
+        {today ? what : ` · ${what}`}
+      </Text>
+      {detail ? (
+        <Text variant="caption" color="textSecondary" numberOfLines={large ? 3 : 1} testID={`${testID}-detail`}>
+          {detail}
+        </Text>
+      ) : null}
+    </View>
+  );
+  const body = { flex: large ? undefined : 1, flexBasis: large ? ('100%' as const) : undefined, minWidth: 0, flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.md, minHeight: 60, paddingVertical: spacing.sm, paddingLeft: spacing.lg };
+  const main = onOpen ? (
+    <PressableScale testID={`${testID}-open`} onPress={onOpen} focusRing="inside" scaleTo={0.99} accessibilityLabel={spoken} style={body}>
+      {today ? null : <PersonMark name={item.displayName} avatar={item.avatar} id={item.userId} size={36} />}
+      {words}
+    </PressableScale>
+  ) : (
+    <View style={body} {...figure(spoken)}>
+      {today ? null : <PersonMark name={item.displayName} avatar={item.avatar} id={item.userId} size={36} />}
+      {words}
+    </View>
+  );
+  return (
+    <View testID={testID} style={{ flexDirection: 'row', flexWrap: large ? 'wrap' : 'nowrap', alignItems: 'center', columnGap: spacing.sm, paddingRight: spacing.lg, paddingBottom: large ? spacing.sm : 0 }}>
+      {main}
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginLeft: large ? 'auto' : 0 }}>
+        <CheerCup testID={cheerTestID ?? `${testID}-cheer`} cheered={item.cheered} what={target} onPress={onCheer} />
+        {item.kind === 'meal' && onAdd ? <AddCup testID={`${testID}-add`} what={target} onPress={onAdd} /> : null}
       </View>
-    </Card>
+    </View>
   );
 }
 
-/** At the end of the screen: what friends see of you, then Privacy and your code. On surfaceAlt, in text and textSecondary. */
-export function AboutYouCard({ line, code, onPrivacy, onCopy }: { line: string; code: string; onPrivacy: () => void; onCopy: () => void }) {
-  const { colors, spacing } = useTheme();
-  const shown = formatCode(code);
+/** One day of the feed: its name as a small heading ("Today", "Yesterday", "Thursday") over one card of rows. */
+export function FeedDayCard({ day, today, children, testID }: { day: FeedDay; today: ISODate; children: (item: FeedItem, index: number) => React.ReactNode; testID: string }) {
+  const { spacing } = useTheme();
   return (
-    <Card tone="alt" padding={spacing.lg} testID="friends-about-you">
-      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-        {decorative(<Lock size={18} color={colors.textSecondary} strokeWidth={1.9} style={{ marginTop: 2 }} />)}
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text variant="bodyStrong" accessibilityRole="header" {...({ 'aria-level': 2 } as object)} style={{ fontFamily: fonts.semibold }}>
-            {ABOUT_YOU}
-          </Text>
-          <Text variant="body" color="textSecondary" testID="friends-never-shared" style={{ fontSize: 14, lineHeight: 20 }}>
-            {line}
-          </Text>
+    <View style={{ gap: spacing.sm }} testID={testID}>
+      <Text variant="label" color="textSecondary" accessibilityRole="header" {...({ 'aria-level': 3 } as object)}>
+        {dayLabel(day.day, today)}
+      </Text>
+      <Card padding={0}>
+        <View {...listRole}>
+          {day.items.map((item, i) => (
+            <View key={feedKey(item)} {...itemRole}>
+              {i > 0 ? <Divider inset={spacing.lg} /> : null}
+              {children(item, i)}
+            </View>
+          ))}
         </View>
-      </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
-        <Button testID="friends-privacy" title={PRIVACY} variant="secondary" size="sm" full={false} style={{ flexGrow: 1 }} icon={<Lock size={18} color={colors.text} />} onPress={onPrivacy} />
-        <Button
-          testID="friends-copy"
-          title={`Code ${shown}`}
-          variant="secondary"
-          size="sm"
-          full={false}
-          style={{ flexGrow: 2 }}
-          accessibilityLabel={`Copy code ${shown}`}
-          icon={<Copy size={18} color={colors.text} />}
-          onPress={onCopy}
-        />
-      </View>
-    </Card>
+      </Card>
+    </View>
   );
 }

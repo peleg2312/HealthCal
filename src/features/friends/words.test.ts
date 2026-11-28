@@ -38,9 +38,15 @@ function strings(): string[] {
   out.push(W.showLine(TODAY, TODAY, 3), W.cheersTitle(1), W.cheersTitle(4), `Maya: ${W.mealCheerTarget(undefined, TODAY)}`);
   out.push(W.cheersSummary([{ displayName: 'Maya', ref: 'a' }, { displayName: 'Sam', ref: 'a' }, { displayName: 'Jo', ref: 'b' }], (c) => (c.ref === 'a' ? 'your lunch' : 'your run')));
   for (const auto of [[], ['lunch'], ['breakfast', 'dinner'], MEALS] as MealType[][]) out.push(W.autoLine(auto));
-  out.push(W.friendsSince('Nov 2'), W.friendsSince(null), W.mealsTheyShow('Maya'), W.seesMyMealsTitle('Maya'), W.seesMyMealsLine('Maya'), W.theirMealsTitle('Maya'), W.removeNote('Maya'), W.addNote('Maya'));
+  out.push(W.friendsSince('Nov 2'), W.friendsSince(null), W.mealsTheyShow('Maya'), W.seesMyMealsTitle('Maya'), W.seesMyMealsOn('Maya'), W.theirMealsOn('Maya'), W.weekOf('Maya'), W.theyShowYou('Maya'), W.manageTitle('Maya'), W.manageLine(true), W.manageLine(false), W.nothingShownYet('Maya'), W.theirMealsTitle('Maya'), W.removeNote('Maya'), W.addNote('Maya'));
   out.push(W.itemCaption({ portion: '1 bowl', kcal: 310, source: 'builtin' }, true), W.itemCaption({ portion: '1 bowl', kcal: 310, kcalLow: 250, source: 'ai' }, true), W.itemCaption({ portion: '1 bowl', source: 'builtin' }, false));
   out.push(W.friendSourceLabel('custom', 'Maya', 'Your food'), W.friendSourceLabel('builtin', 'Maya', 'Reference data'));
+  for (const [f, n] of [[0, 0], [1, 0], [3, 2], [12, 1]]) out.push(W.feedNewsLine(f, n));
+  for (const m of MEALS) {
+    const what = W.itemWhat('Maya', { kind: 'meal', meal: m });
+    out.push(W.showShortcutTitle(m), W.cheerCupLabel(what, false), W.cheerCupLabel(what, true), W.addCupLabel(what));
+  }
+  out.push(W.cheerCupLabel(W.itemWhat('Maya', { kind: 'workout', name: 'Running' }), false), W.cheersChipLabel(1), W.cheersChipLabel(3));
   for (const meals of [true, false]) {
     out.push(W.leaveNote(meals), W.leaveConfirm(meals), W.leftToast(meals), W.removeNote('Maya', meals), W.removeConfirm(meals), W.removedToast('Maya', meals), W.neverSharedLine(meals));
   }
@@ -56,7 +62,7 @@ describe('the Friends words', () => {
   });
 
   it('say "show" for friends, never "share", which is the picture sent through the share sheet', () => {
-    expect(strings().filter((s) => /\bshar(e|es|ing)\b/i.test(s) && !/Never shared/.test(s))).toEqual([]);
+    expect(strings().filter((s) => /\bshar(e|es|ing)\b/i.test(s) && !/Never shared/.test(s) && s !== W.SHARE_INVITE)).toEqual([]);
   });
 
   it('never name a figure that could be compared: no total, no budget left or over', () => {
@@ -79,6 +85,24 @@ describe('the Friends words', () => {
     expect(W.removeNote('Maya')).toBe(W.removeNote('Maya', true));
     expect(W.leftToast(false)).toBe('Friends turned off. Your card, friendships and cheers were removed.');
     expect(W.removedToast('Maya', false)).toBe('Maya is no longer a friend. Cheers between you were removed too.');
+  });
+
+  it('say real news in the Friends header, and a friend’s meal or workout in the cups’ names', () => {
+    expect(W.feedNewsLine(3, 2)).toBe('3 friends · 2 new today');
+    expect(W.feedNewsLine(1, 0)).toBe('1 friend');
+    expect(W.feedNewsLine(0, 0)).toBe('No friends yet');
+    expect(W.cheerCupLabel(W.itemWhat('Maya', { kind: 'meal', meal: 'snack' }), false)).toBe('Cheer Maya’s snacks');
+    expect(W.addCupLabel(W.itemWhat('Maya', { kind: 'meal', meal: 'lunch' }))).toBe('Add Maya’s lunch to my diary');
+    expect(W.cheerCupLabel(W.itemWhat('Sam', { kind: 'workout', name: 'Running' }), true)).toBe('You cheered Sam’s running');
+  });
+
+  it('word the switches for what On does, never with "Off:" or a double negative', () => {
+    for (const s of [W.seesMyMealsTitle('Jo'), W.seesMyMealsOn('Jo'), W.theirMealsTitle('Jo'), W.theirMealsOn('Jo'), W.SEE_MEALS, W.SEE_MEALS_ON]) expect(s).not.toMatch(/\bOff\b|\bnot\b|left out|\bno\b/i);
+  });
+
+  it('never offer a plausible code as the code field’s placeholder', () => {
+    expect(W.CODE_PLACEHOLDER).not.toMatch(/[A-Z0-9]{4}/);
+    expect(W.CODE_PLACEHOLDER_SHORT).not.toMatch(/[A-Z0-9]{4}/);
   });
 
   it('count days left from the clock, never below zero', () => {

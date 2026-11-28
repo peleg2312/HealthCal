@@ -58,3 +58,45 @@ export function friendsWithNew(feed: readonly FeedItem[], seenKeys: ReadonlySet<
   for (const item of feed) if (!seenKeys.has(feedKey(item))) out.add(item.userId);
   return out;
 }
+
+/** One day of the feed: its items in the server's order. */
+export interface FeedDay {
+  day: ISODate;
+  items: FeedItem[];
+}
+
+/** The feed as cards by day ("Today", "Yesterday", "Thursday"), newest day first, each day's items in the feed's order. */
+export function feedByDay(items: readonly FeedItem[]): FeedDay[] {
+  const days = new Map<ISODate, FeedItem[]>();
+  for (const item of items) {
+    const list = days.get(item.day);
+    if (list) list.push(item);
+    else days.set(item.day, [item]);
+  }
+  return [...days.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([day, list]) => ({ day, items: list }));
+}
+
+/**
+ * How many of today's items are new since the last look (`seenKeys`); before a first look, every item of
+ * today. The header's line says it ("2 new today"), so it counts things, never a figure about anyone.
+ */
+export function newTodayCount(items: readonly FeedItem[], seenKeys: ReadonlySet<string> | null, today: ISODate): number {
+  return items.filter((i) => i.day === today && (!seenKeys || !seenKeys.has(feedKey(i)))).length;
+}
+
+/**
+ * Everything one friend shows you, for their page: the meals they show (`mealsOf`) and the recent workouts of their
+ * week card, as feed items, newest day first and meals before workouts on a day (the server's own order). A workout
+ * is cheered by the reference the card carries.
+ */
+export function friendShows(meals: readonly FeedMeal[], friend: { userId: string; displayName: string; avatar: string; cheered: readonly string[] }, workouts: readonly { id: string; name: string; emoji: string; minutes: number; date: ISODate; distanceKm?: number }[]): FeedItem[] {
+  const person = { userId: friend.userId, displayName: friend.displayName, avatar: friend.avatar };
+  const ws: FeedItem[] = workouts
+    .filter((w) => w && w.id && w.date)
+    .map((w) => ({ kind: 'workout' as const, ...person, ref: w.id, day: w.date, name: w.name, emoji: w.emoji, minutes: w.minutes, ...(w.distanceKm ? { distanceKm: w.distanceKm } : null), cheered: friend.cheered.includes(w.id) }));
+  const all: FeedItem[] = [...meals, ...ws];
+  return all
+    .map((item, i) => ({ item, i }))
+    .sort((a, b) => b.item.day.localeCompare(a.item.day) || (a.item.kind === b.item.kind ? a.i - b.i : a.item.kind === 'meal' ? -1 : 1))
+    .map((x) => x.item);
+}

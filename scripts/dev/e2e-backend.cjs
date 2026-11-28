@@ -16,6 +16,11 @@
  * `mock-backend.cjs --no-meals` starts it) and runs the app as it would meet the live server before
  * supabase/migrations/20261201000000_friends_meals.sql is applied, then puts the switch back as it found it.
  * `--only=no-meals` runs that block alone (against a stand-in started with --no-meals, or with meals on).
+ *
+ * Doing things together (20261202000000_friends_together.sql): the "together" block drives circles, buddies, notes
+ * and saved meals shown on three devices; "no together" turns them off on the stand-in (POST /__together, as
+ * `mock-backend.cjs --no-together` starts it) and proves the app calm on a server without them, then puts the switch
+ * back. `--only=together` and `--only=no-together` run one of them alone.
  */
 const { chromium } = require('playwright');
 const path = require('node:path');
@@ -171,14 +176,15 @@ async function friendsWithoutMeals(browser, buildSeed) {
     // Friends: the feed shows the friend's workouts, cheered as before; no meal card, no meal words, no error.
     await K.go('/friends');
     const feedShown = await waitFor(K, 'friends-feed-workout-0');
-    const aboutYou = (await K.has('friends-about-you')) ? await K.text('friends-about-you') : '';
+    // What friends see of you is now at the top of Friends settings, not on the feed; the feed holds no meal word.
+    const aboutYou = (await K.has('friends-feed')) ? await K.text('friends-feed') : '';
     check(
       'no meals: Friends shows the friend’s workouts in the feed, no meal card or meal action, and no error',
       feedShown && !(await K.has('friends-feed-meal-0')) && !(await K.has('friends-error-banner')) && !(await K.has('friends-error')) && !/meal/i.test(aboutYou),
       aboutYou.replace(/\s+/g, ' ').slice(0, 90),
     );
     const friendsHeader = await K.text('friends-screen').then((t) => t.split('\n').slice(0, 3).join(' · '));
-    check('no meals: the Friends header says “Workouts and cheers”, never “Meals, workouts and cheers”', /Workouts and cheers/.test(friendsHeader) && !MEAL_WORD.test(friendsHeader), friendsHeader);
+    check('no meals: the Friends header’s line is news (“1 friend”), never a meal word', /\b1 friend\b/.test(friendsHeader) && !MEAL_WORD.test(friendsHeader), friendsHeader);
     await K.shot('friends-no-meals');
     await K.tap('friends-feed-workout-0-cheer');
     await K.page.waitForTimeout(1200);
@@ -186,7 +192,7 @@ async function friendsWithoutMeals(browser, buildSeed) {
     const feedRef = (await overviewOf(K))?.feed?.[0]?.ref;
     check(
       'no meals: cheering a workout from the feed shows at once and is stored, as before',
-      (await K.text('friends-feed-workout-0-cheer')) === 'Cheered' && srv.cheers.some((c) => c.from_user === kai.id && c.to_user === lea.id && c.ref === feedRef),
+      /^You cheered /.test((await K.page.getByTestId('friends-feed-workout-0-cheer').first().getAttribute('aria-label')) || '') && srv.cheers.some((c) => c.from_user === kai.id && c.to_user === lea.id && c.ref === feedRef),
     );
     await api(L, 'refreshFriends');
     const leaSees = await overviewOf(L);
@@ -194,16 +200,19 @@ async function friendsWithoutMeals(browser, buildSeed) {
 
     // A friend's page: their week and workouts, the day's cheer; no meals and no "Between you" switches.
     await K.go(`/friends/friend?id=${lea.id}`);
-    await waitFor(K, 'friend-workouts');
+    await waitFor(K, 'friend-shows');
     check(
       'no meals: a friend’s page shows their week and workouts, without meal switches or meals',
-      (await K.has('friend-workouts')) && (await K.has('friend-week')) && !(await K.has('friend-between')) && !(await K.has('friend-share-meals')) && !(await K.has('friend-meals')),
+      (await K.has('friend-shows')) && (await K.has('friend-workout-0')) && (await K.has('friend-week')) && !(await K.has('friend-between')) && !(await K.has('friend-share-meals')) && !(await K.has('friend-meals')),
     );
     await K.tap('friends-cheer-day');
     await K.page.waitForTimeout(1000);
     srv = await server();
     check('no meals: cheering the friend’s day works as before', srv.cheers.some((c) => c.from_user === kai.id && c.to_user === lea.id && /^day:/.test(c.ref)));
-    const friendPage = await K.text('friend-screen');
+    await K.tap('friend-manage');
+    await waitFor(K, 'friend-manage-sheet');
+    const friendPage = `${await K.text('friend-screen')}\n${await sheetText(K)}`;
+    check('no meals: the Manage sheet holds Remove only, no meal switch', (await K.has('friends-remove')) && !(await K.has('friend-between')), friendPage.replace(/\s+/g, ' ').slice(-120));
     await K.tap('friends-remove');
     const removeAsk = await sheetText(K);
     await K.tap('confirm-no');
@@ -329,7 +338,8 @@ async function friendsWithoutMeals(browser, buildSeed) {
 
     // Removing the friend and turning friends off through the screens: their toasts name no meal.
     await K.go(`/friends/friend?id=${lea.id}`);
-    await waitFor(K, 'friends-remove');
+    await waitFor(K, 'friend-manage');
+    await K.tap('friend-manage');
     await K.tap('friends-remove');
     await K.tap('confirm-yes');
     const removedSaid = (await waitFor(K, 'toast', 8000)) ? await K.text('toast') : '';
@@ -356,11 +366,253 @@ async function friendsWithoutMeals(browser, buildSeed) {
   }
 }
 
+// ------------------------------------------------------------- friends: doing things together
+// Circles, buddies, notes and saved meals shown (supabase/migrations/20261202000000_friends_together.sql), on three
+// devices, through the app's own friends service (`__healthcalFriendsApi`), so the checks do not depend on how the
+// screens are laid out: what each phone sends is only what the server asked for, the shared cup holds the circle's
+// total and never one person's figure, a buddy's week is counted from both phones, a muted note is never seen while
+// its sender is told nothing, a saved meal shown reaches only the friend picked, and "Save to my meals" makes a
+// saved meal on the phone with this phone's numbers.
+const friendsApi = (d, fn, ...args) => d.page.evaluate(async ([f, a]) => JSON.parse(JSON.stringify((await window.__healthcalFriendsApi[f](...a)) ?? null)), [fn, args]);
+const friendsOverview = (d) => d.page.evaluate(() => JSON.parse(JSON.stringify(window.__healthcalFriends.getState().overview)));
+async function signUpDevice(browser, buildSeed, name) {
+  const email = `${name.toLowerCase()}+${Date.now()}@example.com`;
+  const d = await device(browser, JSON.stringify(buildSeed()));
+  await d.go('/auth?mode=signup');
+  await d.fill('auth-email-input', email);
+  await d.fill('auth-password-input', PASSWORD);
+  await d.tap('auth-submit');
+  const ok = await d.untilPath('/');
+  await d.page.waitForTimeout(2500);
+  const id = (await server()).users.find((u) => u.email === email.toLowerCase())?.id;
+  const calls = [];
+  const refusals = [];
+  d.page.on('request', (r) => {
+    if (/\/rest\/v1\/rpc\//.test(r.url())) calls.push({ fn: r.url().split('/rpc/')[1].split('?')[0], body: r.postData() || '' });
+  });
+  d.page.on('response', (r) => {
+    if (/\/rest\/v1\/rpc\//.test(r.url()) && r.status() >= 400) refusals.push(`${r.status()} ${r.url().split('/rpc/')[1].split('?')[0]}`);
+  });
+  await friendsApi(d, 'setupSocial', { displayName: name, avatar: '', sharing: { workouts: true, streak: true, minutes: true } });
+  return { d, ok, id, name, calls, refusals };
+}
+async function befriendDevices(a, b) {
+  await friendsApi(a.d, 'refreshFriends');
+  const code = (await friendsOverview(a.d))?.me?.code;
+  await friendsApi(b.d, 'requestFriend', code);
+  return friendsApi(a.d, 'respondToRequest', b.id, true);
+}
+const TOGETHER_FNS = /^(social_signals_publish|together_|buddy_|send_note|note_settings_set|friend_notes_set|meal_show_saved)/;
+
+async function friendsTogether(browser, buildSeed) {
+  // The seed's profile is an adult's (born 1994): days logged together and saved meals shown need 18 and over.
+  const kai = await signUpDevice(browser, buildSeed, 'Kai');
+  const lea = await signUpDevice(browser, buildSeed, 'Lea');
+  const mo = await signUpDevice(browser, buildSeed, 'Mo');
+  await befriendDevices(kai, lea);
+  await befriendDevices(kai, mo);
+  for (const p of [kai, lea, mo]) await friendsApi(p.d, 'refreshFriends');
+  let srv = await server();
+  check('together: three people sign up and Kai becomes friends with Lea and Mo', kai.ok && lea.ok && mo.ok && srv.togetherOn === true && Object.keys(srv.social).filter((k) => [kai.id, lea.id, mo.id].includes(k)).length === 3);
+
+  // Nobody is in a circle yet: a phone sends nothing for circles.
+  kai.calls.length = 0;
+  await friendsApi(kai.d, 'publishSignals', { force: true });
+  check('together: with no circle and no buddy, a phone sends no figures', !kai.calls.some((c) => c.fn === 'social_signals_publish') && !srv.signals[kai.id]);
+
+  // Kai starts a minutes circle with Lea and Mo; Lea joins, Mo declines (silently).
+  const started = await friendsApi(kai.d, 'startTogether', { kind: 'minutes', target: 300, invite: [lea.id, mo.id] });
+  await friendsApi(lea.d, 'refreshFriends');
+  const invite = (await friendsOverview(lea.d))?.togetherInvites?.[0];
+  const joined = await friendsApi(lea.d, 'respondToTogether', started?.value?.id, true);
+  await friendsApi(mo.d, 'refreshFriends');
+  const declined = await friendsApi(mo.d, 'respondToTogether', started?.value?.id, false);
+  check(
+    'together: a circle is started, its invitation names who asked, one friend joins and one declines',
+    started?.ok && invite?.from?.displayName === 'Kai' && invite?.kind === 'minutes' && joined?.value === 'joined' && declined?.value === 'declined',
+    JSON.stringify([started, joined?.value, declined?.value]).slice(0, 160),
+  );
+
+  // Each phone sends its minutes (the seed holds workouts this week); the cup is their sum, by name only.
+  for (const p of [kai, lea]) await friendsApi(p.d, 'refreshFriends');
+  for (const p of [kai, lea]) await friendsApi(p.d, 'publishSignals', { force: true });
+  srv = await server();
+  const sent = kai.calls.filter((c) => c.fn === 'social_signals_publish').map((c) => JSON.parse(c.body).p_signals);
+  const kaiSent = sent[sent.length - 1] || {};
+  check(
+    'together: a phone in a minutes circle sends its day and active minutes only: no days logged, no food, no calories',
+    Object.keys(kaiSent).sort().join() === 'last_minutes,minutes,today' && !/kcal|food|name|weight|T\d\d:/.test(JSON.stringify(kaiSent)),
+    JSON.stringify(kaiSent),
+  );
+  await friendsApi(kai.d, 'refreshFriends');
+  const circle = (await friendsOverview(kai.d))?.together?.[0];
+  const expected = (srv.signals[kai.id]?.minutes || 0) + (srv.signals[lea.id]?.minutes || 0);
+  check(
+    'together: the cup holds the circle’s total, members by name, never a figure of one person',
+    !!circle && circle.total === expected && circle.members.map((m) => m.displayName).join() === 'Kai,Lea' && circle.members.every((m) => Object.keys(m).sort().join() === 'avatar,displayName,me,userId') && circle.asked.includes(mo.id),
+    `total ${circle?.total} of ${circle?.target}, expected ${expected}`,
+  );
+  const goal = await friendsApi(lea.d, 'setTogetherTarget', circle?.id, 240);
+  await friendsApi(kai.d, 'refreshFriends');
+  check('together: any member changes the goal and the other sees it', goal?.ok && (await friendsOverview(kai.d))?.together?.[0]?.target === 240);
+  const cheered = await friendsApi(kai.d, 'cheerTogether', circle, new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
+  srv = await server();
+  check('together: "Cheer everyone" cheers each member who is a friend once', cheered?.value?.sent === 1 && srv.cheers.some((c) => c.from_user === kai.id && c.to_user === lea.id && /^day:/.test(c.ref)));
+
+  // Buddies: Kai asks Mo; Mo accepts. Both phones then send their days logged, never what was eaten.
+  const asked = await friendsApi(kai.d, 'inviteBuddy', mo.id);
+  await friendsApi(mo.d, 'refreshFriends');
+  const buddyInvite = (await friendsOverview(mo.d))?.buddyInvites?.[0];
+  const together = await friendsApi(mo.d, 'respondToBuddy', kai.id, true);
+  for (const p of [kai, mo]) await friendsApi(p.d, 'refreshFriends');
+  for (const p of [kai, mo]) await friendsApi(p.d, 'publishSignals', { force: true });
+  await friendsApi(kai.d, 'refreshFriends');
+  const buddy = (await friendsOverview(kai.d))?.buddies?.find((b) => b.userId === mo.id);
+  const moSent = mo.calls.filter((c) => c.fn === 'social_signals_publish').map((c) => JSON.parse(c.body).p_signals).pop() || {};
+  check(
+    'together: a buddy pair is asked and accepted, and the week counts how many of the two logged each day',
+    asked?.value === 'sent' && buddyInvite?.displayName === 'Kai' && together?.value === 'together' && buddy?.status === 'together' && buddy.week.length === 7 && buddy.week.some((d) => d.count === 2),
+    JSON.stringify(buddy?.week?.map((d) => d.count)),
+  );
+  check('together: a buddy’s phone sends the days it logged food, and only that', Object.keys(moSent).sort().join() === 'logged,today' && Array.isArray(moSent.logged) && moSent.logged.length > 0 && !/kcal|name|lunch|T\d\d:/.test(JSON.stringify(moSent)), JSON.stringify(moSent).slice(0, 120));
+
+  // Notes: one a day; a muted friend's note is never seen and its sender is told "ok".
+  const n1 = await friendsApi(kai.d, 'sendNote', lea.id, 'walk_later');
+  const n2 = await friendsApi(kai.d, 'sendNote', lea.id, 'nice_week');
+  await friendsApi(lea.d, 'refreshFriends');
+  const leaNotes = (await friendsOverview(lea.d))?.notes || [];
+  await friendsApi(mo.d, 'setFriendNotes', kai.id, false);
+  const n3 = await friendsApi(kai.d, 'sendNote', mo.id, 'thinking_of_you');
+  await friendsApi(mo.d, 'setFriendNotes', kai.id, true);
+  await friendsApi(mo.d, 'refreshFriends');
+  check(
+    'together: a note arrives once a day; a friend who turned notes off never sees it, and the sender is not told',
+    n1?.ok && n2?.code === 'already_today' && leaNotes.length === 1 && leaNotes[0].kind === 'walk_later' && n3?.ok && ((await friendsOverview(mo.d))?.notes || []).length === 0,
+    JSON.stringify([n1?.ok, n2?.code, leaNotes.length, n3?.ok]),
+  );
+
+  // A saved meal shown to Lea only; Lea saves it to her meals on her phone.
+  const shownSaved = await kai.d.page.evaluate(async (leaId) => {
+    const a = window.__healthcalFriendsApi;
+    const food = { id: 'b_banana', name: 'Banana, raw', source: 'builtin', verified: true, per100g: { kcal: 89, protein: 1.1, carbs: 23, fat: 0.3 }, servings: [{ label: '1 medium', grams: 118 }] };
+    const meal = { name: 'Banana break', servings: 1, items: [{ name: 'Banana, raw', emoji: '🍌', servingLabel: '1 medium', quantity: 1, grams: 118, nutrients: { kcal: 105, protein: 1.3, carbs: 27, fat: 0.4 }, food, source: 'builtin', verified: true }] };
+    const built = a.buildSharedSavedMeal({ meal, showKcal: false });
+    return a.showSavedMeal({ savedMealId: 'saved-banana-1', name: built.name, items: built.items, servings: built.servings, showKcal: false, viewers: [leaId] });
+  }, lea.id);
+  await friendsApi(lea.d, 'refreshFriends');
+  await friendsApi(mo.d, 'refreshFriends');
+  const leaSaved = (await friendsOverview(lea.d))?.sharedSavedMeals || [];
+  const moSaved = (await friendsOverview(mo.d))?.sharedSavedMeals || [];
+  const leaFeed = (await friendsOverview(lea.d))?.feed || [];
+  check(
+    'together: a saved meal shown reaches the friend picked only, outside the feed, with no calories unless shown',
+    shownSaved?.ok && leaSaved.length === 1 && leaSaved[0].name === 'Banana break' && !('kcal' in leaSaved[0].items[0]) && moSaved.length === 0 && !leaFeed.some((i) => i.ref === shownSaved.value.ref),
+  );
+  const savedBefore = await lea.d.page.evaluate(() => Object.values(window.__healthcal.getState().savedMeals).filter((m) => !m.deleted).length);
+  const saved = await lea.d.page.evaluate(() => {
+    const o = window.__healthcalFriends.getState().overview;
+    const m = o.sharedSavedMeals[0];
+    const { draft, leftOut } = window.__healthcalFriendsApi.friendMealToSaved({ items: m.items, name: `${m.displayName}’s ${m.name}` });
+    if (draft) window.__healthcal.getState().upsert('savedMeals', draft);
+    return { name: draft?.name, items: draft?.items.length ?? 0, kcal: draft?.items[0]?.nutrients?.kcal, leftOut: leftOut.length };
+  });
+  const savedAfter = await lea.d.page.evaluate(() => Object.values(window.__healthcal.getState().savedMeals).filter((m) => !m.deleted).length);
+  check('together: "Save to my meals" makes a saved meal on the phone, with this phone’s numbers', saved.items === 1 && saved.name === 'Kai’s Banana break' && savedAfter === savedBefore + 1 && saved.kcal > 0, JSON.stringify(saved));
+
+  // Removing a friend ends the pair and the notes; turning friends off clears the rest.
+  await friendsApi(kai.d, 'removeFriend', mo.id);
+  srv = await server();
+  check('together: removing a friend ends logging together and deletes the notes between them', !srv.buddies.some((b) => [b.requester, b.addressee].includes(kai.id) && [b.requester, b.addressee].includes(mo.id)) && !srv.notes.some((n) => [n.from_user, n.to_user].includes(mo.id) && [n.from_user, n.to_user].includes(kai.id)));
+  for (const p of [kai, lea, mo]) await friendsApi(p.d, 'leaveSocial');
+  srv = await server();
+  check('together: turning friends off leaves no circle, buddy, note or figure behind', ![kai.id, lea.id, mo.id].some((id) => srv.signals[id] || srv.circleMembers.some((m) => m.user_id === id && m.status === 'joined') || srv.buddies.some((b) => [b.requester, b.addressee].includes(id))));
+  const refusals = [...kai.refusals, ...lea.refusals, ...mo.refusals];
+  const errors = [...kai.d.errors, ...lea.d.errors, ...mo.d.errors];
+  check('together: nothing was refused with an error status and no runtime errors on any device', refusals.length === 0 && errors.length === 0, [...refusals, ...errors].join(' | ').slice(0, 200));
+  for (const p of [kai, lea, mo]) await p.d.page.context().close();
+}
+
+// ------------------------------------------------------------- friends without doing things together
+// The new app on a server without 20261202000000_friends_together.sql (the update can reach phones first): the
+// stand-in answers as that server (POST /__together { on: false }, as `--no-together` starts it): no new overview
+// keys, every new function a 404 PGRST202. Friends must stay calm: no together call is made by itself (a sync round
+// included), every together call says "not available yet" without a request, the Friends screen shows no error,
+// nothing is written to the store, and a function that goes missing after all is met calmly and hides the controls.
+async function friendsWithoutTogether(browser, buildSeed) {
+  const switchTogether = (on) => fetch(`${API}/__together`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ on }) }).then((r) => r.json());
+  const wasOn = (await server()).togetherOn !== false;
+  await switchTogether(false);
+  try {
+    const kai = await signUpDevice(browser, buildSeed, 'Kai');
+    const lea = await signUpDevice(browser, buildSeed, 'Lea');
+    await befriendDevices(kai, lea);
+    await friendsApi(kai.d, 'refreshFriends');
+    const o = await friendsOverview(kai.d);
+    check(
+      'no together: the overview reads as a server without it: nothing to show, and friends and meals as before',
+      o?.togetherAvailable === false && o?.mealsAvailable === true && (o?.friends || []).length === 1 && ['together', 'togetherInvites', 'buddies', 'buddyInvites', 'notes', 'notesSent', 'sharedSavedMeals', 'mySavedMeals'].every((k) => Array.isArray(o[k]) && o[k].length === 0),
+    );
+    const snapshot = () => kai.d.page.evaluate(() => JSON.stringify(Object.keys(window.__healthcal.getState().dirty).sort().map((c) => [c, Object.keys(window.__healthcal.getState()[c]).length])));
+    const before = await snapshot();
+    kai.calls.length = 0;
+    await kai.d.go('/friends');
+    await kai.d.page.waitForTimeout(1500);
+    check('no together: Friends opens without an error on a server without it', !(await kai.d.has('friends-error')) && !(await kai.d.has('friends-error-banner')) && !(await kai.d.has('toast')));
+    await kai.d.go(`/friends/friend?id=${lea.id}`);
+    await kai.d.page.waitForTimeout(1500);
+    check('no together: a friend’s page opens without an error, and offers no buddy or note', !(await kai.d.has('friends-error')) && !(await kai.d.has('toast')));
+    // A sync round: an entry is uploaded, and nothing together is asked for.
+    await kai.d.page.evaluate(() => {
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      window.__healthcal.getState().upsert('foodEntries', { date: today, meal: 'lunch', name: 'Banana, raw', emoji: '🍌', foodId: 'b_banana', source: 'builtin', verified: true, servingLabel: '1 medium', quantity: 1, grams: 118, nutrients: { kcal: 105, protein: 1.3, carbs: 27, fat: 0.4 }, loggedAt: new Date().toISOString() });
+    });
+    await kai.d.page.waitForTimeout(7000);
+    const answers = [
+      await friendsApi(kai.d, 'startTogether', { kind: 'minutes', target: 300, invite: [lea.id] }),
+      await friendsApi(kai.d, 'inviteBuddy', lea.id),
+      await friendsApi(kai.d, 'sendNote', lea.id, 'nice_week'),
+      await friendsApi(kai.d, 'setNotesOn', false),
+      await friendsApi(kai.d, 'showSavedMeal', { savedMealId: 's1', name: 'Oats', items: [{ name: 'Oats', portion: '1 cup', source: 'builtin' }], servings: null, showKcal: false, viewers: [lea.id] }),
+    ];
+    await friendsApi(kai.d, 'publishSignals', { force: true });
+    const togetherCalls = kai.calls.filter((c) => TOGETHER_FNS.test(c.fn));
+    check(
+      'no together: every together call says "not available yet" in plain words and nothing is sent, a sync round included',
+      answers.every((a) => a?.ok === false && a.code === 'not_yet' && /not available yet/i.test(a.message) && !/function|schema|PGRST/i.test(a.message)) && togetherCalls.length === 0 && kai.refusals.length === 0,
+      `${answers.map((a) => a?.code).join(',')} ${togetherCalls.map((c) => c.fn).join(',')} ${kai.refusals.join(',')}`,
+    );
+    // The overview claims it but the function is missing (PostgREST reloading): met calmly, the controls hide.
+    await kai.d.page.evaluate(() => {
+      const f = window.__healthcalFriends;
+      f.setState({ overview: { ...f.getState().overview, togetherAvailable: true, signals: { minutes: true, logged: true, today: null } } });
+    });
+    const missing = await friendsApi(kai.d, 'inviteBuddy', lea.id);
+    await friendsApi(kai.d, 'publishSignals', { force: true });
+    const after = await friendsOverview(kai.d);
+    check(
+      'no together: a 404 for a missing together function says "not available yet", hides the controls and is asked once',
+      missing?.code === 'not_yet' && after?.togetherAvailable === false && kai.refusals.join() === '404 buddy_invite' && !(await kai.d.has('toast')),
+      `${kai.refusals.join()} ${missing?.message}`,
+    );
+    check('no together: the tour wrote nothing to the store but the entry it added', JSON.parse(await snapshot()).find(([c]) => c === 'foodEntries')[1] === JSON.parse(before).find(([c]) => c === 'foodEntries')[1] + 1 && JSON.parse(await snapshot()).filter(([c]) => c !== 'foodEntries').join() === JSON.parse(before).filter(([c]) => c !== 'foodEntries').join());
+    check('no together: no runtime errors on either device', kai.d.errors.length === 0 && lea.d.errors.length === 0, [...kai.d.errors, ...lea.d.errors].join(' | ').slice(0, 200));
+    await friendsApi(kai.d, 'leaveSocial');
+    await friendsApi(lea.d, 'leaveSocial');
+    await kai.d.page.context().close();
+    await lea.d.page.context().close();
+  } finally {
+    await switchTogether(wasOn);
+  }
+}
+
 (async () => {
   const { buildSeed } = await import('./seed.mjs');
   const browser = await chromium.launch();
-  if (flags.only === 'no-meals') {
-    await friendsWithoutMeals(browser, buildSeed);
+  if (flags.only === 'no-meals' || flags.only === 'together' || flags.only === 'no-together') {
+    if (flags.only === 'no-meals') await friendsWithoutMeals(browser, buildSeed);
+    if (flags.only === 'together') await friendsTogether(browser, buildSeed);
+    if (flags.only === 'no-together') await friendsWithoutTogether(browser, buildSeed);
     await browser.close();
     const failed = results.filter((r) => !r.ok).length;
     console.log(`\n${results.length - failed} of ${results.length} checks passed`);
@@ -767,6 +1019,8 @@ async function friendsWithoutMeals(browser, buildSeed) {
 
   // The same app against the server before meals (the block above this IIFE).
   await friendsWithoutMeals(browser, buildSeed);
+  await friendsTogether(browser, buildSeed);
+  await friendsWithoutTogether(browser, buildSeed);
 
   // ------------------------------------------------------------- friends
   // A second person (Sam) on another device. Both turn friends on, Sam adds Alex by code, Alex accepts.
@@ -878,7 +1132,7 @@ async function friendsWithoutMeals(browser, buildSeed) {
   await A.tap(`friends-cheer-${latest?.id}`);
   await A.page.waitForTimeout(1200);
   srv = await server();
-  check('cheering shows at once and is stored', (await A.text(`friends-cheer-${latest?.id}`)) === 'Cheered' && srv.cheers.some((c) => c.from_user === user.id && c.to_user === user2.id && c.ref === latest?.id));
+  check('cheering shows at once and is stored', /^You cheered /.test((await A.page.getByTestId(`friends-cheer-${latest?.id}`).first().getAttribute('aria-label')) || '') && srv.cheers.some((c) => c.from_user === user.id && c.to_user === user2.id && c.ref === latest?.id));
   // One line on the Friends screen ("1 cheer for you"); its list opens in a sheet.
   await D.go('/friends');
   await waitFor(D, 'friends-cheers');
@@ -890,7 +1144,8 @@ async function friendsWithoutMeals(browser, buildSeed) {
 
   // Removing the friend clears both sides.
   await A.go(`/friends/friend?id=${user2.id}`);
-  await waitFor(A, 'friends-remove');
+  await waitFor(A, 'friend-manage');
+  await A.tap('friend-manage');
   await A.tap('friends-remove');
   await A.tap('confirm-yes');
   await A.page.waitForTimeout(1500);

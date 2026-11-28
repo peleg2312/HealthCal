@@ -1203,16 +1203,15 @@ src/features/food/visitAdds.ts	refocusAfterAdd	function
 src/features/food/visitAdds.ts	undoAddLabel	function
 src/features/food/visitAdds.ts	visitAddCaption	function
 src/features/food/visitAdds.ts	visitAdds	function
-src/features/friends/FeedParts.tsx	AboutYouCard	component
-src/features/friends/FeedParts.tsx	CheersLine	component
-src/features/friends/FeedParts.tsx	FeedWorkoutCard	component
+src/features/friends/FeedParts.tsx	FeedDayCard	component
+src/features/friends/FeedParts.tsx	FeedRow	component
 src/features/friends/FeedParts.tsx	PeopleRow	component
+src/features/friends/FeedParts.tsx	RecentTitle	component
 src/features/friends/FeedParts.tsx	itemRole	const
 src/features/friends/FeedParts.tsx	listRole	const
 src/features/friends/FriendMealSheet.tsx	FriendMealSheet	component
 src/features/friends/FriendMealSheet.tsx	OpenMeal	interface
 src/features/friends/FriendsEntry.tsx	FriendsEntry	component
-src/features/friends/MealCard.tsx	FeedMealCard	component
 src/features/friends/MealCard.tsx	MealCardBody	component
 src/features/friends/MealCard.tsx	MealPreviewCard	component
 src/features/friends/MealCard.tsx	SharedFoodRow	component
@@ -1220,6 +1219,7 @@ src/features/friends/MealCard.tsx	mealFoodsLine	function
 src/features/friends/MealCard.tsx	mealSpoken	function
 src/features/friends/MealCard.tsx	sharedName	function
 src/features/friends/MealCard.tsx	sharedSourceWords	function
+src/features/friends/QrCode.tsx	QrCode	component
 src/features/friends/SetupForm.tsx	SetupForm	component
 src/features/friends/ShowMeal.tsx	MealShownCaption	component
 src/features/friends/ShowMeal.tsx	ShowToFriendsRow	component
@@ -1231,7 +1231,13 @@ src/features/friends/attention.ts	friendsAttention	function
 src/features/friends/attention.ts	loadFriendsSeen	function
 src/features/friends/attention.ts	markFriendsSeen	function
 src/features/friends/attention.ts	useFriendsSeen	const
+src/features/friends/avatar.ts	AVATAR_TINTS	const
+src/features/friends/avatar.ts	AvatarTint	type
+src/features/friends/avatar.ts	avatarTintKey	function
+src/features/friends/avatar.ts	stableHash	function
+src/features/friends/components.tsx	AddCup	component
 src/features/friends/components.tsx	CheerButton	component
+src/features/friends/components.tsx	CheerCup	component
 src/features/friends/components.tsx	CheersList	component
 src/features/friends/components.tsx	IncomingRequests	component
 src/features/friends/components.tsx	InviteCard	component
@@ -1243,10 +1249,8 @@ src/features/friends/components.tsx	PersonMark	component
 src/features/friends/components.tsx	SharingRow	component
 src/features/friends/components.tsx	SharingSwitches	component
 src/features/friends/components.tsx	WeekCups	component
-src/features/friends/components.tsx	WorkoutRow	component
 src/features/friends/components.tsx	idFor	const
 src/features/friends/components.tsx	useNarrow	function
-src/features/friends/components.tsx	workoutMeta	function
 src/features/friends/components.tsx	workoutTitle	function
 src/features/friends/contract.ts	DEFAULT_MEAL_SETTINGS	re-export	src/services/friendsWire.ts:DEFAULT_MEAL_SETTINGS
 src/features/friends/contract.ts	FeedItem	re-export	src/types/index.ts:FeedItem
@@ -1269,11 +1273,15 @@ src/features/friends/copyMeal.ts	findHref	function
 src/features/friends/copyMeal.ts	firstTicked	function
 src/features/friends/copyMeal.ts	shownName	function
 src/features/friends/feed.ts	FEED_DAYS	const
+src/features/friends/feed.ts	FeedDay	interface
+src/features/friends/feed.ts	feedByDay	function
 src/features/friends/feed.ts	feedKey	function
+src/features/friends/feed.ts	friendShows	function
 src/features/friends/feed.ts	friendsWithNew	function
 src/features/friends/feed.ts	inFeedSpan	function
 src/features/friends/feed.ts	localFeed	function
 src/features/friends/feed.ts	mealsOf	function
+src/features/friends/feed.ts	newTodayCount	function
 src/features/friends/feedSeen.ts	FEED_SEEN_KEY	const
 src/features/friends/feedSeen.ts	readFeedSeen	function
 src/features/friends/feedSeen.ts	writeFeedSeen	function
@@ -1304,11 +1312,34 @@ src/features/friends/pendingInvite.ts	resetPendingInviteForTests	function
 src/features/friends/pendingInvite.ts	savePendingInvite	function
 src/features/friends/pendingInvite.ts	shouldOpenPendingInvite	function
 src/features/friends/pendingInvite.ts	usePendingInviteStore	const
+src/features/friends/qr.ts	QR_MAX_VERSION	const
+src/features/friends/qr.ts	QrCode	interface
+src/features/friends/qr.ts	byteCapacity	function
+src/features/friends/qr.ts	dataCodewords	function
+src/features/friends/qr.ts	dataStream	function
+src/features/friends/qr.ts	encodeQr	function
+src/features/friends/qr.ts	formatBits	function
+src/features/friends/qr.ts	interleaved	function
+src/features/friends/qr.ts	penalty	function
+src/features/friends/qr.ts	qrPath	function
+src/features/friends/qr.ts	readFormatMask	function
+src/features/friends/qr.ts	rsDivisor	function
+src/features/friends/qr.ts	rsRemainder	function
+src/features/friends/qr.ts	totalCodewords	function
+src/features/friends/qr.ts	utf8Bytes	function
+src/features/friends/qr.ts	versionFor	function
+src/features/friends/saveFriendMeal.ts	friendMealToSaved	function
+src/features/friends/savedShare.ts	buildSharedSavedMeal	function
 src/features/friends/share.ts	copyText	function
 src/features/friends/share.ts	inviteLink	function
 src/features/friends/share.ts	inviteMessage	function
 src/features/friends/share.ts	pasteText	function
 src/features/friends/share.ts	shareInvite	function
+src/features/friends/showNow.ts	showShortcutMeal	function
+src/features/friends/signals.ts	FriendSignals	interface
+src/features/friends/signals.ts	LOGGED_DAYS	const
+src/features/friends/signals.ts	buildFriendSignals	function
+src/features/friends/signals.ts	signalsSignature	function
 src/features/friends/summary.ts	DEFAULT_SHARING	const
 src/features/friends/summary.ts	FriendSummary	interface
 src/features/friends/summary.ts	FriendWorkout	interface
@@ -1324,6 +1355,13 @@ src/features/friends/summary.ts	normalizeCode	function
 src/features/friends/summary.ts	ownWorkoutsByRef	function
 src/features/friends/summary.ts	shareRef	function
 src/features/friends/summary.ts	summarySignature	function
+src/features/friends/together.ts	NOTE_KINDS	re-export	src/services/friendsWire.ts:NOTE_KINDS
+src/features/friends/together.ts	TOGETHER_RULES	const
+src/features/friends/together.ts	buddyCup	function
+src/features/friends/together.ts	buddyDaysTogether	function
+src/features/friends/together.ts	daysLeftInWeek	function
+src/features/friends/together.ts	togetherGoalChoices	function
+src/features/friends/together.ts	togetherProgress	function
 src/features/friends/usePendingInvite.ts	usePendingInvite	function
 src/features/friends/week.ts	CUP_FULL_MINUTES	const
 src/features/friends/week.ts	FriendDay	interface
@@ -1345,10 +1383,12 @@ src/features/friends/week.ts	sharingSentence	function
 src/features/friends/words.ts	ABOUT_YOU	const
 src/features/friends/words.ts	ADD	const
 src/features/friends/words.ts	ADD_FRIEND	const
+src/features/friends/words.ts	ADD_SUBTITLE	const
 src/features/friends/words.ts	ADD_TITLE	const
 src/features/friends/words.ts	ADD_TO_DIARY	const
 src/features/friends/words.ts	ADD_TO_DIARY_SHORT	const
 src/features/friends/words.ts	ALWAYS_SHOW	const
+src/features/friends/words.ts	ALWAYS_SHOW_HINT	const
 src/features/friends/words.ts	AUDIENCE_NOTE	const
 src/features/friends/words.ts	AUDIENCE_SAVE	const
 src/features/friends/words.ts	AUDIENCE_TITLE	const
@@ -1356,15 +1396,30 @@ src/features/friends/words.ts	BETWEEN_YOU	const
 src/features/friends/words.ts	CHEER	const
 src/features/friends/words.ts	CHEERED	const
 src/features/friends/words.ts	CHEERS_TITLE	const
+src/features/friends/words.ts	CODE_LABEL	const
+src/features/friends/words.ts	CODE_PLACEHOLDER	const
+src/features/friends/words.ts	CODE_PLACEHOLDER_SHORT	const
+src/features/friends/words.ts	COPY	const
+src/features/friends/words.ts	DECLINED_NOTE	const
+src/features/friends/words.ts	ENTER_THEIR_CODE	const
 src/features/friends/words.ts	FEED_EMPTY	const
 src/features/friends/words.ts	FEED_EMPTY_TITLE	const
 src/features/friends/words.ts	FEED_EMPTY_WORKOUTS	const
 src/features/friends/words.ts	FIND	const
+src/features/friends/words.ts	GROUP_MEALS	const
+src/features/friends/words.ts	GROUP_YOU	const
+src/features/friends/words.ts	HELP	const
+src/features/friends/words.ts	INVITE	const
+src/features/friends/words.ts	INVITE_LINE	const
+src/features/friends/words.ts	INVITE_NOTE	const
+src/features/friends/words.ts	INVITE_OPEN	const
+src/features/friends/words.ts	INVITE_TITLE	const
 src/features/friends/words.ts	KCAL_HIDDEN	const
 src/features/friends/words.ts	KCAL_WITH_MEALS	const
 src/features/friends/words.ts	LEAVE_CONFIRM	const
 src/features/friends/words.ts	LEAVE_NOTE	const
 src/features/friends/words.ts	LEAVE_TITLE	const
+src/features/friends/words.ts	MANAGE	const
 src/features/friends/words.ts	MEALS_INTRO	const
 src/features/friends/words.ts	MEALS_NOT_YET	const
 src/features/friends/words.ts	MENU_SHOW	const
@@ -1372,11 +1427,15 @@ src/features/friends/words.ts	MENU_SHOW_LINE	const
 src/features/friends/words.ts	MENU_SHOW_NONE	const
 src/features/friends/words.ts	NEVER_SHARED	const
 src/features/friends/words.ts	NEVER_SHOWN	const
+src/features/friends/words.ts	NOBODY_SEARCHES	const
 src/features/friends/words.ts	NOBODY_TO_PICK	const
 src/features/friends/words.ts	NOTHING_SHOWN	const
 src/features/friends/words.ts	NOT_IN_LIST	const
+src/features/friends/words.ts	OR_THEIR_CODE	const
+src/features/friends/words.ts	PASTE	const
 src/features/friends/words.ts	PICK_FIRST	const
 src/features/friends/words.ts	PRIVACY	const
+src/features/friends/words.ts	QR_LABEL	const
 src/features/friends/words.ts	RECENT	const
 src/features/friends/words.ts	RECENT_SPAN	const
 src/features/friends/words.ts	RECENT_WORKOUTS	const
@@ -1385,10 +1444,11 @@ src/features/friends/words.ts	SCREEN_SUBTITLE	const
 src/features/friends/words.ts	SCREEN_SUBTITLE_WORKOUTS	const
 src/features/friends/words.ts	SCREEN_TITLE	const
 src/features/friends/words.ts	SEE_MEALS	const
-src/features/friends/words.ts	SEE_MEALS_OFF	const
+src/features/friends/words.ts	SEE_MEALS_ON	const
 src/features/friends/words.ts	SETTINGS_OPEN	const
 src/features/friends/words.ts	SETTINGS_SUBTITLE	const
 src/features/friends/words.ts	SETTINGS_TITLE	const
+src/features/friends/words.ts	SHARE_INVITE	const
 src/features/friends/words.ts	SHOWING_NOW	const
 src/features/friends/words.ts	SHOW_FAILED	const
 src/features/friends/words.ts	SHOW_KCAL	const
@@ -1399,7 +1459,6 @@ src/features/friends/words.ts	STOP	const
 src/features/friends/words.ts	STOPPED_ALL	const
 src/features/friends/words.ts	STOP_ALL	const
 src/features/friends/words.ts	STOP_SHOWING	const
-src/features/friends/words.ts	THEIR_MEALS_OFF	const
 src/features/friends/words.ts	UNDER_18	const
 src/features/friends/words.ts	UPDATE_SHOWN	const
 src/features/friends/words.ts	WHAT_THEY_SEE	const
@@ -1407,27 +1466,35 @@ src/features/friends/words.ts	WHAT_YOU_SEE	const
 src/features/friends/words.ts	WHO_NOTE	const
 src/features/friends/words.ts	WHO_SEES	const
 src/features/friends/words.ts	WHO_SEES_MEALS	const
+src/features/friends/words.ts	YOUR_INVITE	const
 src/features/friends/words.ts	YOUR_MEALS	const
 src/features/friends/words.ts	YOUR_WEEK	const
 src/features/friends/words.ts	YOU_CHEERED	const
 src/features/friends/words.ts	aboutYouLine	function
 src/features/friends/words.ts	addButton	function
+src/features/friends/words.ts	addCupLabel	const
 src/features/friends/words.ts	addFrom	const
 src/features/friends/words.ts	addNote	const
 src/features/friends/words.ts	audienceLine	const
 src/features/friends/words.ts	autoLine	function
+src/features/friends/words.ts	cheerCupLabel	const
 src/features/friends/words.ts	cheerWhat	function
+src/features/friends/words.ts	cheersChipLabel	const
 src/features/friends/words.ts	cheersSummary	function
 src/features/friends/words.ts	cheersTitle	const
 src/features/friends/words.ts	daysLeft	function
+src/features/friends/words.ts	feedNewsLine	function
 src/features/friends/words.ts	foodsCount	const
 src/features/friends/words.ts	friendMealTitle	const
 src/features/friends/words.ts	friendSourceLabel	function
 src/features/friends/words.ts	friendsSince	const
 src/features/friends/words.ts	itemCaption	function
+src/features/friends/words.ts	itemWhat	function
 src/features/friends/words.ts	leaveConfirm	const
 src/features/friends/words.ts	leaveNote	const
 src/features/friends/words.ts	leftToast	const
+src/features/friends/words.ts	manageLine	const
+src/features/friends/words.ts	manageTitle	const
 src/features/friends/words.ts	mealCheerTarget	function
 src/features/friends/words.ts	mealChip	const
 src/features/friends/words.ts	mealMeta	function
@@ -1436,18 +1503,23 @@ src/features/friends/words.ts	myMealLine	function
 src/features/friends/words.ts	myMealTitle	const
 src/features/friends/words.ts	namesLine	function
 src/features/friends/words.ts	neverSharedLine	const
+src/features/friends/words.ts	nothingShownYet	const
 src/features/friends/words.ts	removeConfirm	const
 src/features/friends/words.ts	removeNote	const
 src/features/friends/words.ts	removedToast	const
-src/features/friends/words.ts	seesMyMealsLine	const
+src/features/friends/words.ts	seesMyMealsOn	const
 src/features/friends/words.ts	seesMyMealsTitle	const
 src/features/friends/words.ts	showButton	function
 src/features/friends/words.ts	showLine	const
+src/features/friends/words.ts	showShortcutTitle	const
 src/features/friends/words.ts	showTitle	const
 src/features/friends/words.ts	shownTo	const
 src/features/friends/words.ts	shownToast	const
 src/features/friends/words.ts	stoppedToast	const
+src/features/friends/words.ts	theirMealsOn	const
 src/features/friends/words.ts	theirMealsTitle	const
+src/features/friends/words.ts	theyShowYou	const
+src/features/friends/words.ts	weekOf	const
 src/features/health-sync/adapter.android.ts	adapter	const
 src/features/health-sync/adapter.ios.ts	adapter	const
 src/features/health-sync/adapter.ts	adapter	re-export	src/features/health-sync/unsupported.ts:unsupportedAdapter
@@ -3773,10 +3845,14 @@ src/services/foodSearch.ts	searchOnlineWithStatus	function
 src/services/foodSearch.ts	stem	function
 src/services/foodSearch.ts	tokenize	function
 src/services/foodSearch.ts	withinOneEdit	function
+src/services/friends.ts	Buddy	re-export	src/types/index.ts:Buddy
+src/services/friends.ts	BuddyDay	re-export	src/types/index.ts:BuddyDay
+src/services/friends.ts	BuddyInvite	re-export	src/types/index.ts:BuddyInvite
 src/services/friends.ts	CheerReceived	interface
 src/services/friends.ts	DEFAULT_MEAL_SETTINGS	re-export	src/services/friendsWire.ts:DEFAULT_MEAL_SETTINGS
 src/services/friends.ts	FeedItem	re-export	src/types/index.ts:FeedItem
 src/services/friends.ts	FeedMeal	re-export	src/types/index.ts:FeedMeal
+src/services/friends.ts	FeedSavedMeal	re-export	src/types/index.ts:FeedSavedMeal
 src/services/friends.ts	FeedWorkout	re-export	src/types/index.ts:FeedWorkout
 src/services/friends.ts	Friend	interface
 src/services/friends.ts	FriendPerson	re-export	src/types/index.ts:FriendPerson
@@ -3790,30 +3866,57 @@ src/services/friends.ts	FriendsStatus	type
 src/services/friends.ts	MealSettings	re-export	src/types/index.ts:MealSettings
 src/services/friends.ts	MealShowStatus	type
 src/services/friends.ts	MySharedMeal	re-export	src/types/index.ts:MySharedMeal
+src/services/friends.ts	MySharedSavedMeal	re-export	src/types/index.ts:MySharedSavedMeal
+src/services/friends.ts	NoteKind	re-export	src/types/index.ts:NoteKind
+src/services/friends.ts	NoteReceived	re-export	src/types/index.ts:NoteReceived
+src/services/friends.ts	NoteSent	re-export	src/types/index.ts:NoteSent
 src/services/friends.ts	RequestOutcome	type
 src/services/friends.ts	SharedMeal	re-export	src/types/index.ts:SharedMeal
 src/services/friends.ts	SharedMealItem	re-export	src/types/index.ts:SharedMealItem
+src/services/friends.ts	SharedSavedMeal	re-export	src/types/index.ts:SharedSavedMeal
+src/services/friends.ts	SignalsWanted	re-export	src/types/index.ts:SignalsWanted
 src/services/friends.ts	SocialMe	interface
 src/services/friends.ts	SocialSharing	re-export	src/features/friends/summary.ts:SocialSharing
+src/services/friends.ts	TOGETHER_MESSAGES	const
+src/services/friends.ts	TOGETHER_NOT_YET	const
+src/services/friends.ts	TogetherCircle	re-export	src/types/index.ts:TogetherCircle
+src/services/friends.ts	TogetherInvite	re-export	src/types/index.ts:TogetherInvite
+src/services/friends.ts	TogetherKind	re-export	src/types/index.ts:TogetherKind
+src/services/friends.ts	TogetherMember	re-export	src/types/index.ts:TogetherMember
+src/services/friends.ts	TogetherWeek	re-export	src/types/index.ts:TogetherWeek
 src/services/friends.ts	cheerFriend	function
 src/services/friends.ts	cheerMeal	function
+src/services/friends.ts	cheerTogether	function
 src/services/friends.ts	cleanSharedMealItems	re-export	src/services/friendsWire.ts:cleanSharedMealItems
+src/services/friends.ts	inviteBuddy	function
+src/services/friends.ts	inviteToTogether	function
 src/services/friends.ts	isMissingFunction	function
 src/services/friends.ts	leaveSocial	function
+src/services/friends.ts	leaveTogether	function
 src/services/friends.ts	mealItemsSignature	re-export	src/services/friendsWire.ts:mealItemsSignature
 src/services/friends.ts	publishMeals	function
+src/services/friends.ts	publishSignals	function
 src/services/friends.ts	publishSummary	function
 src/services/friends.ts	refreshFriends	function
 src/services/friends.ts	removeFriend	function
 src/services/friends.ts	requestFriend	function
+src/services/friends.ts	respondToBuddy	function
 src/services/friends.ts	respondToRequest	function
+src/services/friends.ts	respondToTogether	function
+src/services/friends.ts	sendNote	function
 src/services/friends.ts	setFriendMealPrefs	function
+src/services/friends.ts	setFriendNotes	function
 src/services/friends.ts	setMealAudience	function
 src/services/friends.ts	setMealSettings	function
+src/services/friends.ts	setNotesOn	function
+src/services/friends.ts	setTogetherTarget	function
 src/services/friends.ts	setupSocial	function
 src/services/friends.ts	showMeal	function
+src/services/friends.ts	showSavedMeal	function
 src/services/friends.ts	startFriends	function
+src/services/friends.ts	startTogether	function
 src/services/friends.ts	stopAllMeals	function
+src/services/friends.ts	stopBuddy	function
 src/services/friends.ts	stopMeal	function
 src/services/friends.ts	toOverview	function
 src/services/friends.ts	undoDecline	function
@@ -3822,6 +3925,8 @@ src/services/friends.ts	useFriends	const
 src/services/friendsWire.ts	DEFAULT_MEAL_SETTINGS	const
 src/services/friendsWire.ts	FeedFriend	interface
 src/services/friendsWire.ts	MAX_SHARED_FOODS	const
+src/services/friendsWire.ts	NOTE_KINDS	const
+src/services/friendsWire.ts	NO_SIGNALS	const
 src/services/friendsWire.ts	SHARED_MEAL_DAYS	const
 src/services/friendsWire.ts	cleanMealSettings	function
 src/services/friendsWire.ts	cleanSharedMealItems	function
@@ -3832,8 +3937,18 @@ src/services/friendsWire.ts	mealItemsSignature	function
 src/services/friendsWire.ts	mealOfCheer	function
 src/services/friendsWire.ts	mergeCheers	function
 src/services/friendsWire.ts	sharedMealRef	function
+src/services/friendsWire.ts	sharedSavedRef	function
+src/services/friendsWire.ts	toBuddies	function
+src/services/friendsWire.ts	toBuddyInvites	function
 src/services/friendsWire.ts	toFeed	function
 src/services/friendsWire.ts	toMyMeals	function
+src/services/friendsWire.ts	toMySavedMeals	function
+src/services/friendsWire.ts	toNotes	function
+src/services/friendsWire.ts	toNotesSent	function
+src/services/friendsWire.ts	toSharedSavedMeals	function
+src/services/friendsWire.ts	toSignalsWanted	function
+src/services/friendsWire.ts	toTogether	function
+src/services/friendsWire.ts	toTogetherInvites	function
 src/services/friendsWire.ts	workoutFeedOf	function
 src/services/notifications.ts	PlannedReminder	re-export	src/features/settings/reminderPlanner.ts:PlannedReminder
 src/services/notifications.ts	PlannerInput	re-export	src/features/settings/reminderPlanner.ts:PlannerInput
@@ -4071,6 +4186,9 @@ src/types/index.ts	ActivitySource	type
 src/types/index.ts	AiFoodItem	interface
 src/types/index.ts	AiFoodResult	interface
 src/types/index.ts	Beverage	type
+src/types/index.ts	Buddy	type
+src/types/index.ts	BuddyDay	interface
+src/types/index.ts	BuddyInvite	interface
 src/types/index.ts	Collection	type
 src/types/index.ts	CustomFood	interface
 src/types/index.ts	DaySnapshot	interface
@@ -4079,6 +4197,7 @@ src/types/index.ts	FastingSession	interface
 src/types/index.ts	FavoriteFood	interface
 src/types/index.ts	FeedItem	type
 src/types/index.ts	FeedMeal	interface
+src/types/index.ts	FeedSavedMeal	interface
 src/types/index.ts	FeedWorkout	interface
 src/types/index.ts	Food	interface
 src/types/index.ts	FoodEntry	interface
@@ -4092,6 +4211,10 @@ src/types/index.ts	MacroSplit	interface
 src/types/index.ts	MealSettings	interface
 src/types/index.ts	MealType	type
 src/types/index.ts	MySharedMeal	interface
+src/types/index.ts	MySharedSavedMeal	interface
+src/types/index.ts	NoteKind	type
+src/types/index.ts	NoteReceived	interface
+src/types/index.ts	NoteSent	interface
 src/types/index.ts	Nutrients	interface
 src/types/index.ts	Profile	interface
 src/types/index.ts	ReminderSettings	interface
@@ -4104,6 +4227,8 @@ src/types/index.ts	Sex	type
 src/types/index.ts	SharedFoodSource	type
 src/types/index.ts	SharedMeal	interface
 src/types/index.ts	SharedMealItem	interface
+src/types/index.ts	SharedSavedMeal	interface
+src/types/index.ts	SignalsWanted	interface
 src/types/index.ts	SleepEntry	interface
 src/types/index.ts	SleepQuality	type
 src/types/index.ts	SleepStages	interface
@@ -4113,6 +4238,11 @@ src/types/index.ts	StrengthSet	interface
 src/types/index.ts	SyncedRecord	interface
 src/types/index.ts	ThemeLook	type
 src/types/index.ts	ThemePreference	type
+src/types/index.ts	TogetherCircle	interface
+src/types/index.ts	TogetherInvite	interface
+src/types/index.ts	TogetherKind	type
+src/types/index.ts	TogetherMember	interface
+src/types/index.ts	TogetherWeek	interface
 src/types/index.ts	UnitSystem	type
 src/types/index.ts	WaterEntry	interface
 src/types/index.ts	WeightEntry	interface

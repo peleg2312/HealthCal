@@ -309,6 +309,8 @@ function leaveSocial(uid) {
 }
 /** Deleting the account removes everything, declines and limits included. */
 function forgetSocial(uid) {
+  leaveTogetherAll(uid);
+  for (const id of [...state.circles.keys()]) state.circleMembers = state.circleMembers.filter((m) => !(m.goal_id === id && m.user_id === uid));
   leaveSocial(uid);
   state.declines = state.declines.filter((d) => d.decliner !== uid && d.asker !== uid);
   state.socialLimits.delete(uid);
@@ -351,11 +353,452 @@ function overviewWithoutMeals(o) {
   return { me, friends, incoming: o.incoming, outgoing: o.outgoing, cheers: o.cheers };
 }
 
+// ------------------------------------------------------------- doing things together
+// The same rules as supabase/migrations/20261202000000_friends_together.sql (tested by
+// supabase/tests/friends_together.sql; src/services/friendsTogetherMock.test.ts walks the same cases here):
+// circles ("Together this week"), logging buddies, kind notes and saved meals shown. --no-together, or
+// POST /__together { on: false }, answers as the server before that migration (and so does --no-meals, which
+// is the server before both): its functions answer 404 PGRST202 and the overview has none of its keys.
+state.togetherOn = !('no-together' in flags) && !('no-meals' in flags);
+Object.assign(state, { signals: new Map(), circles: new Map(), circleMembers: [], buddies: [], notes: [], noteSeq: 0 });
+const TOGETHER_FUNCTIONS = [
+  'social_signals_publish',
+  'together_start',
+  'together_invite',
+  'together_respond',
+  'together_leave',
+  'together_set_target',
+  'buddy_invite',
+  'buddy_respond',
+  'buddy_stop',
+  'send_note',
+  'note_settings_set',
+  'friend_notes_set',
+  'meal_show_saved',
+];
+const NOTE_KINDS = ['thinking_of_you', 'walk_later', 'nice_week'];
+const TARGETS = { minutes: [30, 6000], days: [2, 42] };
+const addDay = (day, n) => new Date(Date.parse(`${day}T00:00:00Z`) + n * MEAL_DAY_MS).toISOString().slice(0, 10);
+/** social_week_of: the Monday of a day's week. */
+const weekOf = (day) => addDay(day, -((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7));
+/** social_today: the day the phone last sent, when it is a day either side of the server's, else the server's. */
+const socialToday = (uid) => {
+  const t = state.signals.get(uid)?.today;
+  return t && t >= mealDay(-1) && t <= mealDay(1) ? t : mealDay(0);
+};
+/** social_take: one daily counter; false (counting nothing) at the limit. */
+function take(uid, what, max) {
+  const lim = limitsOf(uid);
+  const w = `${what}_window`;
+  if (!lim[w] || nowMs() - lim[w] > MEAL_DAY_MS) Object.assign(lim, { [what]: 0, [w]: nowMs() });
+  if ((lim[what] || 0) >= max) return false;
+  lim[what] = (lim[what] || 0) + 1;
+  return true;
+}
+const joinedIn = (uid) => state.circleMembers.filter((m) => m.user_id === uid && m.status === 'joined');
+const pairOf = (a, b) => state.buddies.find((x) => (x.requester === a && x.addressee === b) || (x.requester === b && x.addressee === a));
+/** social_signals_wanted. */
+function signalsWanted(uid) {
+  const kinds = joinedIn(uid).map((m) => state.circles.get(m.goal_id)?.kind);
+  return { minutes: kinds.includes('minutes'), logged: kinds.includes('days') || state.buddies.some((b) => b.status === 'accepted' && (b.requester === uid || b.addressee === uid)) };
+}
+/** social_trim_signals: keep only what is still wanted; drop a row nothing wants. */
+function trimSignals(uids) {
+  for (const uid of uids) {
+    const row = state.signals.get(uid);
+    if (!row) continue;
+    const w = signalsWanted(uid);
+    if (!w.minutes && !w.logged) state.signals.delete(uid);
+    else {
+      if (!w.minutes) Object.assign(row, { minutes: null, last_minutes: null });
+      if (!w.logged) row.logged = null;
+    }
+  }
+}
+const targetFor = (g, week) => (week >= g.target_week ? g.target : (g.prev_target ?? g.target));
+/** social_together_total: the joined members' minutes or days logged, summed; never per person. */
+function togetherTotal(goalId, week) {
+  const g = state.circles.get(goalId);
+  let sum = 0;
+  for (const m of state.circleMembers) {
+    if (m.goal_id !== goalId || m.status !== 'joined' || !state.social.get(m.user_id)) continue;
+    const s = state.signals.get(m.user_id);
+    if (!s) continue;
+    if (g.kind === 'minutes') sum += s.week === week ? s.minutes || 0 : s.week === addDay(week, 7) ? s.last_minutes || 0 : 0;
+    else sum += (s.logged || []).filter((d) => d >= week && d <= addDay(week, 6)).length;
+  }
+  return sum;
+}
+function dropEmptyCircles() {
+  for (const id of [...state.circles.keys()]) {
+    if (!state.circleMembers.some((m) => m.goal_id === id && m.status === 'joined')) {
+      state.circles.delete(id);
+      state.circleMembers = state.circleMembers.filter((m) => m.goal_id !== id);
+    }
+  }
+}
+/** social_buddy_run: days both logged in a row; the first missed day of a week is kept, a second ends the run. */
+function buddyRun(a, b, from, to, base, open) {
+  let run = base || 0;
+  let missed = 0;
+  for (let d = from; d && d <= to; d = addDay(d, 1)) {
+    if (new Date(`${d}T00:00:00Z`).getUTCDay() === 1) missed = 0;
+    if ((a || []).includes(d) && (b || []).includes(d)) run += 1;
+    else if (!(open && d === to)) {
+      missed += 1;
+      if (missed > 1) {
+        run = 0;
+        missed = 0;
+      }
+    }
+  }
+  return { run, kept: missed === 1 && run > 0 };
+}
+function settleBuddy(pair, today) {
+  const back = addDay(today, -21);
+  const to = addDay(back, -(new Date(`${back}T00:00:00Z`).getUTCDay() % 7));
+  const from = pair.run_base_day ? addDay(pair.run_base_day, 1) : pair.start_day;
+  if (!from || to < from) return;
+  const r = buddyRun(state.signals.get(pair.requester)?.logged, state.signals.get(pair.addressee)?.logged, from, to, pair.run_base, false);
+  Object.assign(pair, { run_base: r.run, run_base_day: to });
+}
+const notesFrom = (owner, friend) => state.friendPrefs.get(pairKey(owner, friend))?.notes !== false;
+/** Everything together holds between two people, as friend_remove removes it; the remover leaves a shared circle. */
+function forgetTogetherBetween(me, other) {
+  state.buddies = state.buddies.filter((b) => !((b.requester === me && b.addressee === other) || (b.requester === other && b.addressee === me)));
+  state.notes = state.notes.filter((n) => !((n.from_user === me && n.to_user === other) || (n.from_user === other && n.to_user === me)));
+  state.circleMembers = state.circleMembers.filter((m) => !(m.status === 'invited' && ((m.user_id === me && m.invited_by === other) || (m.user_id === other && m.invited_by === me))));
+  for (const m of state.circleMembers) {
+    if (m.user_id === me && m.status === 'joined' && state.circleMembers.some((o) => o.goal_id === m.goal_id && o.user_id === other && o.status === 'joined')) {
+      m.status = 'declined';
+      state.circleMembers = state.circleMembers.filter((x) => !(x.goal_id === m.goal_id && x.invited_by === me && x.status === 'invited'));
+    }
+  }
+  dropEmptyCircles();
+  trimSignals([me, other]);
+}
+/** social_leave's part: circles left, invitations to and from, buddies, notes and signals. */
+function leaveTogetherAll(uid) {
+  const others = state.buddies.filter((b) => b.requester === uid || b.addressee === uid).map((b) => (b.requester === uid ? b.addressee : b.requester));
+  state.buddies = state.buddies.filter((b) => b.requester !== uid && b.addressee !== uid);
+  state.notes = state.notes.filter((n) => n.from_user !== uid && n.to_user !== uid);
+  state.circleMembers = state.circleMembers.filter((m) => !((m.invited_by === uid && m.status === 'invited') || (m.user_id === uid && m.status !== 'declined')));
+  state.signals.delete(uid);
+  dropEmptyCircles();
+  trimSignals(others);
+}
+const savedRefOf = (shareKey, id) => crypto.createHash('sha256').update(`${shareKey}:saved:${id}`).digest('hex').slice(0, 32);
+
+/** The overview's new keys (friends_overview in 20261202000000_friends_together.sql). */
+function togetherOverview(me) {
+  state.notes = state.notes.filter((n) => nowMs() - Date.parse(n.created_at) <= 14 * MEAL_DAY_MS);
+  dropEmptyCircles();
+  trimSignals([me]);
+  const today = socialToday(me);
+  const week = weekOf(today);
+  const person = (id) => state.social.get(id);
+  const card = (p) => ({ user_id: p.user_id, display_name: p.display_name, avatar: p.avatar });
+  const byName = (a, b) => a.display_name.toLowerCase().localeCompare(b.display_name.toLowerCase()) || a.user_id.localeCompare(b.user_id);
+  const membersOf = (id) =>
+    state.circleMembers
+      .filter((m) => m.goal_id === id && m.status === 'joined' && person(m.user_id))
+      .map((m) => card(person(m.user_id)))
+      .sort(byName);
+  for (const b of state.buddies) if (b.status === 'accepted' && (b.requester === me || b.addressee === me)) settleBuddy(b, today);
+  const mine = person(me);
+  const live = visibleMeals(me).filter((m) => m.kind === 'saved' && person(m.owner));
+  return {
+    signals: { ...signalsWanted(me), today },
+    notes_on: mine ? mine.notes_on !== false : true,
+    together: joinedIn(me)
+      .map((m) => state.circles.get(m.goal_id))
+      .filter(Boolean)
+      .map((g) => ({
+        id: g.id,
+        kind: g.kind,
+        week,
+        target: targetFor(g, week),
+        total: togetherTotal(g.id, week),
+        last_week: addDay(week, -7) >= g.first_week ? { week: addDay(week, -7), target: targetFor(g, addDay(week, -7)), total: togetherTotal(g.id, addDay(week, -7)) } : null,
+        members: membersOf(g.id).map((p) => ({ ...p, me: p.user_id === me })),
+        asked: state.circleMembers
+          .filter((x) => x.goal_id === g.id && x.invited_by === me && x.user_id !== me && (x.status === 'invited' || (x.status === 'declined' && !x.joined_at)) && areFriends(me, x.user_id))
+          .map((x) => x.user_id)
+          .sort(),
+      })),
+    together_invites: state.circleMembers
+      .filter((m) => m.user_id === me && m.status === 'invited' && person(m.invited_by) && areFriends(me, m.invited_by))
+      .map((m) => ({ m, g: state.circles.get(m.goal_id) }))
+      .filter(({ g }) => g && (g.kind === 'minutes' || isAdult(me)))
+      .sort((a, b) => b.m.created_at.localeCompare(a.m.created_at))
+      .map(({ m, g }) => ({ id: g.id, kind: g.kind, target: targetFor(g, week), from: card(person(m.invited_by)), members: membersOf(g.id), created_at: m.created_at })),
+    buddies: state.buddies
+      .filter((b) => (b.requester === me || b.addressee === me) && (b.status === 'accepted' || b.requester === me))
+      .map((b) => ({ b, p: person(b.requester === me ? b.addressee : b.requester) }))
+      .filter(({ p }) => p && areFriends(me, p.user_id))
+      .sort((x, y) => byName(x.p, y.p))
+      .map(({ b, p }) => {
+        if (b.status !== 'accepted') return { ...card(p), status: 'asked' };
+        const la = state.signals.get(me)?.logged || [];
+        const lb = state.signals.get(p.user_id)?.logged || [];
+        const r = buddyRun(la, lb, b.run_base_day ? addDay(b.run_base_day, 1) : b.start_day, today, b.run_base, true);
+        return {
+          ...card(p),
+          status: 'together',
+          since: b.start_day,
+          week: Array.from({ length: 7 }, (_, k) => {
+            const day = addDay(week, k);
+            return { day, count: day < b.start_day || day > today ? null : (la.includes(day) ? 1 : 0) + (lb.includes(day) ? 1 : 0) };
+          }),
+          run: r.run,
+          kept: r.kept,
+        };
+      }),
+    buddy_invites: state.buddies
+      .filter((b) => b.addressee === me && b.status === 'pending' && person(b.requester) && areFriends(me, b.requester))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .map((b) => ({ ...card(person(b.requester)), created_at: b.created_at })),
+    notes: state.notes
+      .filter((n) => n.to_user === me && !n.hidden && mine && mine.notes_on !== false && areFriends(me, n.from_user) && notesFrom(me, n.from_user) && person(n.from_user))
+      .slice()
+      .reverse()
+      .map((n) => ({ id: String(n.id), from_user: n.from_user, display_name: person(n.from_user).display_name, avatar: person(n.from_user).avatar, kind: n.kind, created_at: n.created_at })),
+    notes_sent: state.notes
+      .filter((n) => n.from_user === me && n.sent_on === mealDay(0) && areFriends(me, n.to_user))
+      .slice()
+      .reverse()
+      .map((n) => ({ to_user: n.to_user, kind: n.kind, created_at: n.created_at })),
+    shared_saved_meals: live
+      .sort((a, b) => Date.parse(b.shown_at) - Date.parse(a.shown_at) || a.ref.localeCompare(b.ref))
+      .slice(0, 50)
+      .map((m) => {
+        const item = { kind: 'saved_meal', ref: m.ref, user_id: m.owner, display_name: person(m.owner).display_name, avatar: person(m.owner).avatar, name: m.name, items: m.items, show_kcal: m.show_kcal, cheered: state.cheers.some((c) => c.from_user === me && c.to_user === m.owner && c.ref === `meal:${m.ref}`) };
+        if (m.servings != null) item.servings = m.servings;
+        return item;
+      }),
+    my_saved_meals: [...state.meals.values()]
+      .filter((m) => m.owner === me && m.kind === 'saved' && liveMeal(m))
+      .sort((a, b) => Date.parse(b.shown_at) - Date.parse(a.shown_at) || a.ref.localeCompare(b.ref))
+      .map((m) => {
+        const row = {
+          ref: m.ref,
+          name: m.name,
+          items: m.items,
+          show_kcal: m.show_kcal,
+          shown_at: m.shown_at,
+          expires_at: m.expires_at,
+          viewers: [...m.viewers].filter((v) => areFriends(me, v) && person(v)).map((v) => card(person(v))).sort(byName),
+          cheers: state.cheers.filter((c) => c.to_user === me && c.ref === `meal:${m.ref}` && areFriends(me, c.from_user)).length,
+        };
+        if (m.servings != null) row.servings = m.servings;
+        return row;
+      }),
+  };
+}
+
+/** The together functions; undefined when the route is not one of them. */
+function togetherRpc(route, me, body) {
+  const now = () => new Date(nowMs()).toISOString();
+  const hasCard = () => !!state.social.get(me);
+  const ids = (v, max = 50) => [...new Set((Array.isArray(v) ? v.slice(0, max) : []).filter((x) => typeof x === 'string' && x && x !== me))];
+  const member = (goal) => state.circleMembers.find((m) => m.goal_id === goal && m.user_id === me);
+  switch (route) {
+    case 'POST /rest/v1/rpc/social_signals_publish': {
+      if (!hasCard()) {
+        state.signals.delete(me);
+        return 'no_card';
+      }
+      const p = body.p_signals;
+      if (!p || typeof p !== 'object' || Array.isArray(p) || JSON.stringify(p).length > 4096 || !isDay(p.today)) return 'invalid';
+      if (p.today < mealDay(-1) || p.today > mealDay(1)) return 'invalid';
+      const w = signalsWanted(me);
+      if (!w.minutes && !w.logged) {
+        state.signals.delete(me);
+        return 'not_needed';
+      }
+      if (!take(me, 'signal_writes', 500)) return 'limit';
+      const row = { today: p.today, week: weekOf(p.today), minutes: null, last_minutes: null, logged: null };
+      if (w.minutes) Object.assign(row, { minutes: bounded(p.minutes, 100000) ?? 0, last_minutes: bounded(p.last_minutes, 100000) ?? 0 });
+      if (w.logged) {
+        const since = addDay(p.today, -34);
+        row.logged = [...new Set((Array.isArray(p.logged) ? p.logged.slice(0, 100) : []).filter((d) => isDay(d) && d >= since && d <= p.today))].sort();
+      }
+      state.signals.set(me, row);
+      return 'ok';
+    }
+    case 'POST /rest/v1/rpc/together_start': {
+      if (!hasCard()) return { status: 'no_card' };
+      const kind = String(body.p_kind ?? '').trim().toLowerCase();
+      const target = body.p_target;
+      if (!TARGETS[kind] || !Number.isInteger(target) || target < TARGETS[kind][0] || target > TARGETS[kind][1]) return { status: 'invalid' };
+      if (kind === 'days' && !isAdult(me)) return { status: 'under_18' };
+      const invite = ids(body.p_invite);
+      if (invite.length > 5) return { status: 'too_many' };
+      if (invite.some((x) => !areFriends(me, x))) return { status: 'not_friends' };
+      if (joinedIn(me).length) return { status: 'in_circle' };
+      if (!take(me, 'together_starts', 5)) return { status: 'limit' };
+      const id = crypto.randomUUID();
+      const week = weekOf(socialToday(me));
+      state.circles.set(id, { id, kind, target, first_week: week, target_week: week, prev_target: null });
+      state.circleMembers.push({ goal_id: id, user_id: me, status: 'joined', invited_by: me, created_at: now(), joined_at: now() });
+      for (const x of invite) state.circleMembers.push({ goal_id: id, user_id: x, status: 'invited', invited_by: me, created_at: now(), joined_at: null });
+      return { status: 'ok', id };
+    }
+    case 'POST /rest/v1/rpc/together_invite': {
+      const goal = body.p_goal;
+      if (member(goal)?.status !== 'joined' || !hasCard()) return 'not_member';
+      let users = ids(body.p_users);
+      if (users.some((x) => !areFriends(me, x))) return 'not_friends';
+      users = users.filter((x) => !state.circleMembers.some((m) => m.goal_id === goal && m.user_id === x));
+      if (!users.length) return 'ok';
+      if (state.circleMembers.filter((m) => m.goal_id === goal && (m.status === 'invited' || m.status === 'joined')).length + users.length > 6) return 'too_many';
+      if (!take(me, 'together_writes', 60)) return 'limit';
+      for (const x of users) state.circleMembers.push({ goal_id: goal, user_id: x, status: 'invited', invited_by: me, created_at: now(), joined_at: null });
+      return 'ok';
+    }
+    case 'POST /rest/v1/rpc/together_respond': {
+      if (!hasCard()) return 'not_found';
+      const m = member(body.p_goal);
+      const g = state.circles.get(body.p_goal);
+      if (!m || m.status !== 'invited' || !g || (g.kind === 'days' && !isAdult(me))) return 'not_found';
+      if (!body.p_accept) {
+        m.status = 'declined';
+        return 'declined';
+      }
+      if (joinedIn(me).length) return 'in_circle';
+      Object.assign(m, { status: 'joined', joined_at: now() });
+      return 'joined';
+    }
+    case 'POST /rest/v1/rpc/together_leave': {
+      const m = member(body.p_goal);
+      if (!m || m.status !== 'joined') return 'not_found';
+      m.status = 'declined';
+      state.circleMembers = state.circleMembers.filter((x) => !(x.goal_id === body.p_goal && x.invited_by === me && x.status === 'invited'));
+      dropEmptyCircles();
+      trimSignals([me]);
+      return 'left';
+    }
+    case 'POST /rest/v1/rpc/together_set_target': {
+      const g = state.circles.get(body.p_goal);
+      if (member(body.p_goal)?.status !== 'joined' || !g) return 'not_member';
+      const t = body.p_target;
+      if (!Number.isInteger(t) || t < TARGETS[g.kind][0] || t > TARGETS[g.kind][1]) return 'invalid';
+      if (!take(me, 'together_writes', 60)) return 'limit';
+      const week = weekOf(socialToday(me));
+      if (week > g.target_week) Object.assign(g, { prev_target: g.target, target_week: week });
+      g.target = t;
+      return 'ok';
+    }
+    case 'POST /rest/v1/rpc/buddy_invite': {
+      if (!hasCard()) return 'no_card';
+      const other = body.p_user;
+      if (!other || other === me || !areFriends(me, other)) return 'not_friends';
+      const accepted = () => state.buddies.filter((b) => (b.requester === me || b.addressee === me) && b.status === 'accepted').length;
+      const v = pairOf(me, other);
+      if (v) {
+        if (v.status === 'accepted' || v.requester === me) return v.status === 'declined' ? 'sent' : 'already';
+        if (accepted() >= 3) return 'too_many';
+        Object.assign(v, { status: 'accepted', accepted_at: now(), start_day: socialToday(me) });
+        return 'accepted';
+      }
+      if (state.buddies.filter((b) => ((b.requester === me || b.addressee === me) && b.status === 'accepted') || (b.requester === me && b.status !== 'accepted')).length >= 3) return 'too_many';
+      if (!take(me, 'buddy_writes', 20)) return 'limit';
+      state.buddies.push({ requester: me, addressee: other, status: 'pending', created_at: now(), accepted_at: null, start_day: null, run_base: 0, run_base_day: null });
+      return 'sent';
+    }
+    case 'POST /rest/v1/rpc/buddy_respond': {
+      const other = body.p_user;
+      if (!other || !areFriends(me, other)) return 'not_found';
+      const v = state.buddies.find((b) => b.requester === other && b.addressee === me && b.status === 'pending');
+      if (!v) return 'not_found';
+      if (!body.p_accept) {
+        v.status = 'declined';
+        return 'declined';
+      }
+      if (state.buddies.filter((b) => (b.requester === me || b.addressee === me) && b.status === 'accepted').length >= 3) return 'too_many';
+      Object.assign(v, { status: 'accepted', accepted_at: now(), start_day: socialToday(me) });
+      return 'together';
+    }
+    case 'POST /rest/v1/rpc/buddy_stop': {
+      const other = body.p_user;
+      const before = state.buddies.length;
+      state.buddies = state.buddies.filter((b) => !((b.requester === me && b.addressee === other) || (b.requester === other && b.addressee === me && b.status === 'accepted')));
+      if (state.buddies.length === before) return 'not_found';
+      trimSignals([me, other]);
+      return 'stopped';
+    }
+    case 'POST /rest/v1/rpc/send_note': {
+      if (!hasCard()) return 'no_card';
+      const kind = String(body.p_kind ?? '').trim();
+      if (!NOTE_KINDS.includes(kind)) return 'invalid';
+      const to = body.p_to;
+      if (!to || !areFriends(me, to)) return 'not_friends';
+      if (state.notes.some((n) => n.from_user === me && n.to_user === to && n.sent_on === mealDay(0))) return 'already_today';
+      if (!take(me, 'notes_sent', 5)) return 'limit';
+      const hidden = state.social.get(to)?.notes_on === false || !notesFrom(to, me);
+      state.notes.push({ id: ++state.noteSeq, from_user: me, to_user: to, kind, sent_on: mealDay(0), hidden, created_at: now() });
+      return 'ok';
+    }
+    case 'POST /rest/v1/rpc/note_settings_set': {
+      const mine = state.social.get(me);
+      if (!mine) return null;
+      mine.notes_on = body.p_on !== false;
+      return mine.notes_on;
+    }
+    case 'POST /rest/v1/rpc/friend_notes_set': {
+      const other = body.p_friend;
+      if (!other || other === me || !areFriends(me, other)) return 'not_friends';
+      const cur = state.friendPrefs.get(pairKey(me, other)) || { share_meals: true, see_meals: true };
+      cur.notes = body.p_on !== false;
+      state.friendPrefs.set(pairKey(me, other), cur);
+      return 'ok';
+    }
+    case 'POST /rest/v1/rpc/meal_show_saved': {
+      const mine = state.social.get(me);
+      if (!mine) return { status: 'no_card' };
+      if (!isAdult(me)) return { status: 'under_18' };
+      const id = String(body.p_saved_id ?? '').trim();
+      const name = cleanText(body.p_name, 60);
+      const servings = body.p_servings;
+      if (!/^[A-Za-z0-9_-]{1,80}$/.test(id) || !name || !mealItemsValid(body.p_items) || (servings != null && (!finite(servings) || servings < 1 || servings > 100))) return { status: 'invalid' };
+      const showKcal = body.p_show_kcal === true;
+      const items = cleanMeal(body.p_items, showKcal);
+      if (!items.length) return { status: 'empty' };
+      const viewers = [...new Set((Array.isArray(body.p_viewers) ? body.p_viewers : []).filter((v) => typeof v === 'string' && v && v !== me))];
+      if (!viewers.length) return { status: 'no_viewers' };
+      if (viewers.length > 200) return { status: 'invalid' };
+      if (viewers.some((v) => !areFriends(me, v) || !sharesMealsWith(me, v))) return { status: 'not_friends' };
+      purgeMeals();
+      const ref = savedRefOf(mine.share_key, id);
+      let row = state.meals.get(mealKey(me, ref));
+      const fresh = !liveMeal(row);
+      if (fresh && liveMealCount(me) >= 40) return { status: 'limit' };
+      if (!countMealWrite(me, fresh)) return { status: 'limit' };
+      const kept = servings == null || roundTo(servings, 2) === 1 ? null : roundTo(servings, 2);
+      if (fresh) row = insertMeal(me, ref, mealDay(0), null, items, showKcal);
+      else Object.assign(row, { items, show_kcal: showKcal, updated_at: new Date(nowMs()).toISOString() });
+      Object.assign(row, { kind: 'saved', name, servings: kept });
+      row.viewers = new Set(viewers);
+      state.mealAudience.set(me, new Set(viewers));
+      return { status: 'ok', ref, expires_at: row.expires_at };
+    }
+    default:
+      return undefined;
+  }
+}
+
 /** Returns the function's JSON answer, or undefined when the route is not a friends function. */
 function friendsRpc(route, me, body) {
   if (!state.mealsOn) {
     const fn = route.startsWith('POST /rest/v1/rpc/') ? route.slice('POST /rest/v1/rpc/'.length) : '';
     if (MEAL_FUNCTIONS.includes(fn)) return missingFunction(fn, body);
+  }
+  if (!state.togetherOn || !state.mealsOn) {
+    const fn = route.startsWith('POST /rest/v1/rpc/') ? route.slice('POST /rest/v1/rpc/'.length) : '';
+    if (TOGETHER_FUNCTIONS.includes(fn)) return missingFunction(fn, body);
+  } else {
+    const answer = togetherRpc(route, me, body);
+    if (answer !== undefined) return answer;
   }
   const now = () => new Date().toISOString();
   const card = (p) => ({ user_id: p.user_id, display_name: p.display_name, avatar: p.avatar });
@@ -453,6 +896,7 @@ function friendsRpc(route, me, body) {
       state.cheers = state.cheers.filter((c) => !((c.from_user === me && c.to_user === other) || (c.from_user === other && c.to_user === me)));
       // From this moment neither sees the other's meals.
       if (other && other !== me && state.mealsOn) forgetMealsBetween(me, other);
+      if (other && other !== me && state.mealsOn && state.togetherOn) forgetTogetherBetween(me, other);
       return null;
     }
     case 'POST /rest/v1/rpc/send_cheer': {
@@ -482,7 +926,7 @@ function friendsRpc(route, me, body) {
       const cheeredByMe = (owner, ref) => state.cheers.some((c) => c.from_user === me && c.to_user === owner && c.ref === ref);
       const friendIds = state.friendships.filter((f) => f.status === 'accepted' && (f.requester === me || f.addressee === me)).map((f) => (f.requester === me ? f.addressee : f.requester));
       const mealItems = visibleMeals(me)
-        .filter((m) => person(m.owner))
+        .filter((m) => person(m.owner) && m.kind !== 'saved')
         .map((m) => ({ day: m.day, rank: 0, shown: Date.parse(m.shown_at), seq: 0, name: person(m.owner).display_name.toLowerCase(), ref: m.ref, item: { kind: 'meal', ref: m.ref, user_id: m.owner, display_name: person(m.owner).display_name, avatar: person(m.owner).avatar, day: m.day, meal: m.meal, items: m.items, show_kcal: m.show_kcal, cheered: cheeredByMe(m.owner, `meal:${m.ref}`) } }));
       const workoutItems = friendIds
         .map((id) => person(id))
@@ -502,7 +946,7 @@ function friendsRpc(route, me, body) {
         .slice(0, 100)
         .map((x) => x.item);
       const myMeals = [...state.meals.values()]
-        .filter((m) => m.owner === me && liveMeal(m))
+        .filter((m) => m.owner === me && liveMeal(m) && m.kind !== 'saved')
         .sort((a, b) => Date.parse(b.shown_at) - Date.parse(a.shown_at) || a.ref.localeCompare(b.ref))
         .map((m) => ({
           ref: m.ref,
@@ -546,6 +990,7 @@ function friendsRpc(route, me, body) {
             cheered: state.cheers.filter((c) => c.from_user === me && c.to_user === p.user_id).map((c) => c.ref),
             share_meals: sharesMealsWith(me, p.user_id),
             see_meals: seesMealsOf(me, p.user_id),
+            ...(state.togetherOn && state.mealsOn ? { notes: notesFrom(me, p.user_id) } : null),
           }))
           .sort((a, b) => a.display_name.toLowerCase().localeCompare(b.display_name.toLowerCase())),
         incoming: state.friendships
@@ -558,9 +1003,11 @@ function friendsRpc(route, me, body) {
         // A shown meal's cheers, in the same shape, under a key such an app leaves alone.
         meal_cheers: received(me).filter((c) => c.ref.startsWith('meal:')),
       };
+      if (state.mealsOn && state.togetherOn) Object.assign(answer, togetherOverview(me));
       return state.mealsOn ? answer : overviewWithoutMeals(answer);
     }
     case 'POST /rest/v1/rpc/social_leave':
+      if (state.mealsOn && state.togetherOn) leaveTogetherAll(me);
       if (state.mealsOn) leaveSocial(me);
       else {
         // As before meals: the card, every friendship and every cheer; nothing else.
@@ -1028,6 +1475,13 @@ const api = http.createServer(async (req, res) => {
       clockOffsetMs: state.clockOffsetMs,
       // False while the stand-in answers as the server before meals (--no-meals, POST /__meals).
       mealsOn: state.mealsOn,
+      // Together (circles, buddies, notes): false while it answers as the server before 20261202000000_friends_together.sql.
+      togetherOn: state.togetherOn && state.mealsOn,
+      circles: [...state.circles.values()],
+      circleMembers: state.circleMembers,
+      buddies: state.buddies,
+      notes: state.notes,
+      signals: Object.fromEntries(state.signals),
       // Plans: the switches, each account's entitlement row (by email), the webhooks received, and the AI reports.
       billing: {
         plansOn: state.billing.plansOn,
@@ -1124,6 +1578,11 @@ const api = http.createServer(async (req, res) => {
   if (route === 'POST /__meals') {
     if (typeof body.on === 'boolean') state.mealsOn = body.on;
     return send(res, 200, { on: state.mealsOn });
+  }
+  // Test hook: the server with or without circles, buddies, notes and saved meals shown ({ on }), as --no-together starts it.
+  if (route === 'POST /__together') {
+    if (typeof body.on === 'boolean') state.togetherOn = body.on;
+    return send(res, 200, { on: state.togetherOn });
   }
   // Test hook: Google on or off, and new accounts paused.
   if (route === 'POST /__google') {

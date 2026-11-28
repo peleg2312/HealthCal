@@ -1,12 +1,12 @@
 /**
- * A shown meal as friends see it: the person, "Lunch · Today · 3 foods", the foods one per line with their
+ * A shown meal as friends see it (the meal sheet and the show step's preview): the person, "Lunch · Today · 3 foods", the foods one per line with their
  * portion and the mark of where their numbers come from, and calories only when the person switched them
  * on ("~" for an estimate). The same drawing is the show sheet's preview, so the preview is exactly the card.
  * No total, no budget, no time of day: food, not a score.
  */
-import { Plus, Utensils } from 'lucide-react-native';
+import { Utensils } from 'lucide-react-native';
 import React from 'react';
-import { Platform, useWindowDimensions, View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
 import { RowEmoji } from '@/features/food/components';
@@ -16,11 +16,11 @@ import { ideaFoodsPhrase } from '@/features/today/ideas';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { fonts, useLargeText, useTheme } from '@/theme';
 import type { ISODate, MealType } from '@/types';
-import { Button, Card, decorative, Divider, PressableScale, Text } from '@/ui';
+import { Card, decorative, Text } from '@/ui';
 
-import { CheerButton, PersonMark } from './components';
+import { PersonMark } from './components';
 import type { SharedFoodSource, SharedMealItem } from './contract';
-import { ADD_TO_DIARY, ADD_TO_DIARY_SHORT, friendSourceLabel, itemCaption, mealMeta } from './words';
+import { friendSourceLabel, itemCaption, mealMeta } from './words';
 
 /** A food's name as drawn: a bundled name's database capitals in lower case, any other as written. */
 export function sharedName(item: Pick<SharedMealItem, 'name' | 'source'>): string {
@@ -69,12 +69,12 @@ export function mealSpoken(input: { name: string; meal: MealType; day: ISODate; 
 }
 
 /** The top of the card and its foods: the person, the meal's line, the fork-and-knife mark, the foods. */
-export function MealCardBody({ name, avatar, meal, day, today, items, showKcal, testID }: { name: string; avatar: string; meal: MealType; day: ISODate; today: ISODate; items: SharedMealItem[]; showKcal: boolean; testID?: string }) {
+export function MealCardBody({ name, avatar, id, meal, day, today, items, showKcal, testID }: { name: string; avatar: string; id?: string; meal: MealType; day: ISODate; today: ISODate; items: SharedMealItem[]; showKcal: boolean; testID?: string }) {
   const { colors, spacing } = useTheme();
   return (
     <View style={{ gap: spacing.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <PersonMark name={name} avatar={avatar} size={40} />
+        <PersonMark name={name} avatar={avatar} id={id} size={40} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
             {isolateRtl(name)}
@@ -91,69 +91,6 @@ export function MealCardBody({ name, avatar, meal, day, today, items, showKcal, 
         ))}
       </View>
     </View>
-  );
-}
-
-/**
- * A friend's shown meal in the feed: the body opens the meal (view, then add); under a hairline, Cheer and
- * Add to my diary side by side (siblings of the body, never inside it).
- */
-export function FeedMealCard({
-  name,
-  avatar,
-  meal,
-  day,
-  today,
-  items,
-  showKcal,
-  cheered,
-  onOpen,
-  onCheer,
-  onAdd,
-  testID,
-}: {
-  name: string;
-  avatar: string;
-  meal: MealType;
-  day: ISODate;
-  today: ISODate;
-  items: SharedMealItem[];
-  showKcal: boolean;
-  cheered: boolean;
-  onOpen: () => void;
-  onCheer: () => void;
-  onAdd: () => void;
-  testID: string;
-}) {
-  const { colors, spacing } = useTheme();
-  const large = useLargeText();
-  // Under 360 px "Add to my diary" does not fit beside Cheer: the button says "Add to diary" there.
-  const narrow = useWindowDimensions().width < 360;
-  return (
-    <Card padding={spacing.lg} testID={testID}>
-      <PressableScale testID={`${testID}-open`} onPress={onOpen} scaleTo={0.99} accessibilityLabel={`${mealSpoken({ name, meal, day, today, items, showKcal })}. Open`}>
-        <MealCardBody name={name} avatar={avatar} meal={meal} day={day} today={today} items={items} showKcal={showKcal} />
-      </PressableScale>
-      <View style={{ marginVertical: spacing.md }}>
-        <Divider />
-      </View>
-      <View style={{ flexDirection: large ? 'column' : 'row', gap: spacing.sm }}>
-        <View style={large ? undefined : { flex: 2 }}>
-          <CheerButton testID={`${testID}-cheer`} cheered={cheered} label={`${name}'s ${meal === 'snack' ? 'snacks' : meal}`} onPress={onCheer} full />
-        </View>
-        <View style={large ? undefined : { flex: 3 }}>
-          <Button
-            testID={`${testID}-add`}
-            title={narrow && !large ? ADD_TO_DIARY_SHORT : ADD_TO_DIARY}
-            variant="secondary"
-            size="sm"
-            accessibilityLabel={`${narrow && !large ? ADD_TO_DIARY_SHORT : ADD_TO_DIARY}: ${withoutMarks(name)}'s ${meal === 'snack' ? 'snacks' : meal}`}
-            icon={<Plus size={18} color={colors.text} strokeWidth={2.2} />}
-            onPress={onAdd}
-          />
-        </View>
-      </View>
-    </Card>
   );
 }
 

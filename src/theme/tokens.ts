@@ -110,6 +110,26 @@ export interface ThemeColors {
   drinkSports: string;
   drinkOther: string;
   /**
+   * A friend's initials tile (src/features/friends/PersonMark): six soft tints, one per person, chosen by a
+   * stable hash of their id (`avatarTintKey`), so the eye tells people apart in a list. Never a data colour and
+   * never text. Initials on every tint are `avatarInk`, 4.5:1 or more (contrast.test.ts, "friend avatars"); the
+   * six are at least 10 apart (CIEDE2000). `avatarInk` is its own token, not `text`, so the pair stays readable
+   * where the system's forced colours replace `text`.
+   */
+  avatar1: string;
+  avatar2: string;
+  avatar3: string;
+  avatar4: string;
+  avatar5: string;
+  avatar6: string;
+  avatarInk: string;
+  /**
+   * An invite's QR code (src/features/friends/QrCode.tsx): dark modules on a light paper in every look, since a
+   * phone camera reads a dark-on-light code most reliably. At least 7:1 (contrast.test.ts, "friend avatars").
+   */
+  qrInk: string;
+  qrPaper: string;
+  /**
    * "Continue with Google" only (src/features/auth/GoogleButton.tsx). Google's sign-in button rules fix
    * its colours, so these three are Google's own values, the one sanctioned exception to the palette:
    * its Light button (white fill, #747775 edge, #1F1F1F label) on the light papers and its Dark button
@@ -179,6 +199,15 @@ export const darkColors: ThemeColors = {
   drinkJuice: '#FF6B6B',
   drinkSports: '#A58AE6',
   drinkOther: '#E0AECF',
+  avatar1: '#4E2D33',
+  avatar2: '#4C3A24',
+  avatar3: '#2E4430',
+  avatar4: '#283C52',
+  avatar5: '#3D3154',
+  avatar6: '#47462A',
+  avatarInk: '#F6EEE3',
+  qrInk: '#121110',
+  qrPaper: '#F6EEE3',
   ...GOOGLE_DARK,
 };
 
@@ -235,6 +264,15 @@ export const lightColors: ThemeColors = {
   drinkJuice: '#C8343C',
   drinkSports: '#8A63C9',
   drinkOther: '#B96A93',
+  avatar1: '#F6D5D3',
+  avatar2: '#F6DDBE',
+  avatar3: '#D5E7CC',
+  avatar4: '#CFE2F2',
+  avatar5: '#E3D7F1',
+  avatar6: '#EFE6A4',
+  avatarInk: '#211913',
+  qrInk: '#211913',
+  qrPaper: '#FFFCF8',
   ...GOOGLE_LIGHT,
 };
 
@@ -304,6 +342,15 @@ export const blossomColors: ThemeColors = {
   drinkJuice: '#D45A2A',
   drinkSports: '#8A63C9',
   drinkOther: '#5F8A8B',
+  avatar1: '#F6D5D3',
+  avatar2: '#F6DDBE',
+  avatar3: '#D5E7CC',
+  avatar4: '#CFE2F2',
+  avatar5: '#E3D7F1',
+  avatar6: '#EFE6A4',
+  avatarInk: '#3B1427',
+  qrInk: '#3B1427',
+  qrPaper: '#FFFDFA',
   ...GOOGLE_LIGHT,
 };
 
@@ -382,6 +429,15 @@ export const butterColors: ThemeColors = {
   drinkJuice: '#D45A2A',
   drinkSports: '#8A63C9',
   drinkOther: '#B96A93',
+  avatar1: '#F6D5D3',
+  avatar2: '#F6DDBE',
+  avatar3: '#D5E7CC',
+  avatar4: '#CFE2F2',
+  avatar5: '#E3D7F1',
+  avatar6: '#EFE6A4',
+  avatarInk: ownerPalette.javaBrown,
+  qrInk: ownerPalette.javaBrown,
+  qrPaper: '#FCF9E6',
   ...GOOGLE_LIGHT,
 };
 
@@ -466,6 +522,15 @@ export const javaColors: ThemeColors = {
   drinkJuice: '#D9541E',
   drinkSports: '#8A63C9',
   drinkOther: '#B96A93',
+  avatar1: '#4E2D33',
+  avatar2: '#4C3A24',
+  avatar3: '#2E4430',
+  avatar4: '#283C52',
+  avatar5: '#3D3154',
+  avatar6: '#47462A',
+  avatarInk: ownerPalette.transparentYellow,
+  qrInk: ownerPalette.javaBrown,
+  qrPaper: ownerPalette.transparentYellow,
   ...GOOGLE_DARK,
 };
 

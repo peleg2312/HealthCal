@@ -70,7 +70,7 @@ with how many steps away it is). This one is worked out from the sources, in abo
   (`./capture.native`) is that file only. The platform files now: `src/features/health-sync/adapter.android.ts`, `src/features/health-sync/adapter.ios.ts`, `src/features/journal/files.web.ts`, `src/features/share/capture.native.ts`, `src/features/updates/platform.native.ts`, `src/features/widget/pin.android.ts`, `src/features/widget/refresh.android.ts`, `src/features/widget/register.android.ts`.
 - Packages (`react`, `expo-router`, `node:fs`, `npm:`, `jsr:`, URLs) are not in the map.
 - JSON, images and every other file that is not TypeScript are not nodes: an import of one
-  (`import data from './x.json'`) adds nothing to the map. Today no source imports one.
+  (`import data from './x.json'`) adds nothing to the map. Today 1 such file is imported.
 - Re-exports are followed to the file that defines the name: `export { a as b } from`, `export *
   from` (never for `default`, as in TypeScript), and `export { x }` of a name the file imported. A
   use is recorded once, against the defining file and its own name, never against the index file
@@ -100,8 +100,8 @@ with how many steps away it is). This one is worked out from the sources, in abo
 
 ## Counts
 
-885 files (284 of them tests), 4379 exported names (class 17, component 295, const 1131, default 49, function 2114, interface 511, type 262),
-249 re-export lines, 3545 names imported somewhere, 5188 file-to-file dependencies.
+902 files (293 of them tests), 4493 exported names (class 17, component 296, const 1171, default 49, function 2168, interface 526, type 266),
+265 re-export lines, 3640 names imported somewhere, 5239 file-to-file dependencies.
 
 ## Refreshing it
 

@@ -175,7 +175,7 @@ describe('both documents', () => {
       },
       friends: {
         // Friends are opt-in, and what they see is a training summary; a meal when the person chooses to show it.
-        says: [/Friends are off until you turn them on/, /a friend sees your workouts and streak/, /a meal when you choose to show it/],
+        says: [/Friends are off until you turn them on/, /friends see your workouts and streak/, /what you choose to show or do together/],
         held: [
           ['short', /Friends, if you turn them on, see your workouts and streak, and a meal when you choose to show it/],
           ['friends', /off until you turn them on/],
@@ -184,6 +184,12 @@ describe('both documents', () => {
           ['friends', /and the friends who see it/],
           ['friends', /kept on HealthCal’s server for 7 days from when you first showed it and is then deleted/],
           ['friends', /Friends never see your weight/],
+          ['friends', /Doing things together is each off until you start it or accept it/],
+          ['friends', /the circle’s total for the week/],
+          ['friends', /Never one person’s figure/],
+          ['friends', /whether one or both of you logged anything, never what or how much/],
+          ['friends', /your phone sends HealthCal’s server just what they need/],
+          ['friends', /a few set phrases, with no words of your own, and is kept for 14 days/],
         ],
       },
       ads: {

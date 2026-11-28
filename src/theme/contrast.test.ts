@@ -483,3 +483,36 @@ describe("the plan's allowance cups on the card", () => {
     expect(failures(rows)).toEqual([]);
   });
 });
+
+/**
+ * A friend's initials tile (src/features/friends/PersonMark): six soft tints, one per person by a hash of their id.
+ * The initials are `avatarInk` on each, 4.5:1 or more; the six stand at least 10 apart (CIEDE2000) so two people
+ * side by side are told apart, and each at least 5 from the card it sits on, so the tile reads as a tile. An invite's
+ * QR code is dark modules on a light paper in every look, at least 7:1, so a phone camera reads it.
+ */
+describe('friend avatars and the invite QR code', () => {
+  const TINTS = ['avatar1', 'avatar2', 'avatar3', 'avatar4', 'avatar5', 'avatar6'] as const;
+
+  it.each(NAMES)('%s: initials 4.5:1 on every tint', (name) => {
+    expect(failures(pairs(name, ['avatarInk'], [...TINTS], 4.5))).toEqual([]);
+  });
+
+  it.each(NAMES)('%s: the six tints at least 10 apart, and each apart from the card', (name) => {
+    const c = PALETTES[name];
+    const close: string[] = [];
+    for (let i = 0; i < TINTS.length; i++) {
+      if (deltaE(c[TINTS[i]], c.surface) < 5) close.push(`${name} ${TINTS[i]} and the card`);
+      for (let j = i + 1; j < TINTS.length; j++) {
+        const d = deltaE(c[TINTS[i]], c[TINTS[j]]);
+        if (d < 10) close.push(`${name} ${TINTS[i]} and ${TINTS[j]}: ${d.toFixed(1)}`);
+      }
+    }
+    expect(close).toEqual([]);
+  });
+
+  it.each(NAMES)('%s: the QR code is dark on light, 7:1 or more', (name) => {
+    const c = PALETTES[name];
+    expect(luminance(c.qrInk)).toBeLessThan(luminance(c.qrPaper));
+    expect(contrast(c.qrInk, c.qrPaper)).toBeGreaterThanOrEqual(7);
+  });
+});

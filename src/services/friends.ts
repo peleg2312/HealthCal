@@ -2,25 +2,92 @@
  * Friends: adding people by a code, seeing the part of their week they chose
  * to share, meals they chose to show, and cheering. Needs an account; all of it
  * goes through the database functions in supabase/migrations/20261115000000_friends.sql,
- * 20261116000000_friends_hardening.sql and 20261201000000_friends_meals.sql, which
+ * 20261116000000_friends_hardening.sql, 20261201000000_friends_meals.sql and
+ * 20261202000000_friends_together.sql (circles, buddies, notes, saved meals shown), which
  * check every call. Nothing here is stored with the synced records.
  */
 import { create } from 'zustand';
 
 import { buildSharedMeal } from '@/features/friends/meals';
+import { buildSharedSavedMeal } from '@/features/friends/savedShare';
+import { friendMealToSaved } from '@/features/friends/saveFriendMeal';
+import { buildFriendSignals, signalsSignature } from '@/features/friends/signals';
 import { MEALS_NOT_YET } from '@/features/friends/words';
 import { buildFriendSummary, cleanFriendSummary, DEFAULT_SHARING, normalizeCode, summarySignature, type FriendSummary, type SocialSharing } from '@/features/friends/summary';
+import { dayRef } from '@/features/friends/summary';
 import { today } from '@/lib/dates';
 import { useStore } from '@/store';
 import { live } from '@/store/selectors';
-import type { FeedItem, ISODate, MealSettings, MealType, MySharedMeal, SharedMealItem } from '@/types';
+import type {
+  Buddy,
+  BuddyInvite,
+  FeedItem,
+  FeedSavedMeal,
+  ISODate,
+  MealSettings,
+  MealType,
+  MySharedMeal,
+  MySharedSavedMeal,
+  NoteKind,
+  NoteReceived,
+  NoteSent,
+  SharedMealItem,
+  SignalsWanted,
+  TogetherCircle,
+  TogetherInvite,
+  TogetherKind,
+} from '@/types';
 
-import { cleanMealSettings, cleanSharedMealItems, DEFAULT_MEAL_SETTINGS, mealCheerRef, mealItemsSignature, mergeCheers, toFeed, toMyMeals, workoutFeedOf } from './friendsWire';
+import {
+  cleanMealSettings,
+  cleanSharedMealItems,
+  DEFAULT_MEAL_SETTINGS,
+  mealCheerRef,
+  mealItemsSignature,
+  mergeCheers,
+  NO_SIGNALS,
+  toBuddies,
+  toBuddyInvites,
+  toFeed,
+  toMyMeals,
+  toMySavedMeals,
+  toNotes,
+  toNotesSent,
+  toSharedSavedMeals,
+  toSignalsWanted,
+  toTogether,
+  toTogetherInvites,
+  workoutFeedOf,
+} from './friendsWire';
 import { isBackendConfigured, supabase } from './supabase';
 import { useSyncState } from './sync';
 
 export type { FriendSummary, FriendWorkout, SocialSharing } from '@/features/friends/summary';
-export type { FeedItem, FeedMeal, FeedWorkout, FriendPerson, MealSettings, MySharedMeal, SharedMeal, SharedMealItem } from '@/types';
+export type {
+  Buddy,
+  BuddyDay,
+  BuddyInvite,
+  FeedItem,
+  FeedMeal,
+  FeedSavedMeal,
+  FeedWorkout,
+  FriendPerson,
+  MealSettings,
+  MySharedMeal,
+  MySharedSavedMeal,
+  NoteKind,
+  NoteReceived,
+  NoteSent,
+  SharedMeal,
+  SharedMealItem,
+  SharedSavedMeal,
+  SignalsWanted,
+  TogetherCircle,
+  TogetherInvite,
+  TogetherKind,
+  TogetherMember,
+  TogetherWeek,
+} from '@/types';
 export { cleanSharedMealItems, DEFAULT_MEAL_SETTINGS, mealItemsSignature } from './friendsWire';
 
 export interface SocialMe {
@@ -59,6 +126,8 @@ export interface Friend {
   shareMeals: boolean;
   /** My switch "<name>'s meals in my feed" (on unless turned off). Their switches about me are never told. */
   seeMeals: boolean;
+  /** My switch "Notes from <name>" (on unless turned off; 20261202000000_friends_together.sql). Never told to them. */
+  notesOn?: boolean;
 }
 
 export interface FriendRequest {
@@ -97,6 +166,33 @@ export interface FriendsOverview {
    * workouts made on the phone, and no meal call reaches the server. Absent (a hand-built overview) reads as true.
    */
   mealsAvailable?: boolean;
+  /**
+   * False while the server has no circles, buddies, notes or saved meals shown (20261202000000_friends_together.sql
+   * not applied yet: its overview sends no `together`), or after one of their functions was missing: every control of
+   * them hides, the lists below are empty and no call of them reaches the server. Absent (a hand-built overview)
+   * reads as true. Always filled by `toOverview`, as are the fields below.
+   */
+  togetherAvailable?: boolean;
+  /** What this phone should send for circles and buddies (`publishSignals`), and the day the figures are for. */
+  signals?: SignalsWanted;
+  /** "Notes from friends", for everyone (on unless turned off). */
+  notesOn?: boolean;
+  /** "Together this week": the circle I am in (one at most). Only the circle's total, never one person's. */
+  together?: TogetherCircle[];
+  /** Invitations to a circle, newest first. */
+  togetherInvites?: TogetherInvite[];
+  /** My logging buddies: together, or asked by me (a decline looks the same), by name. */
+  buddies?: Buddy[];
+  /** Friends asking me to log together, newest first. */
+  buddyInvites?: BuddyInvite[];
+  /** Kind notes received in the last 14 days, newest first. */
+  notes?: NoteReceived[];
+  /** The notes I sent today (one a day to each friend). */
+  notesSent?: NoteSent[];
+  /** Saved meals and recipes friends show me, newest first. Never part of `feed`. */
+  sharedSavedMeals?: FeedSavedMeal[];
+  /** My saved meals showing now, newest first. */
+  mySavedMeals?: MySharedSavedMeal[];
 }
 
 /**
@@ -162,7 +258,10 @@ export function toOverview(raw: unknown): FriendsOverview {
     cheered: Array.isArray(f.cheered) ? f.cheered.filter((r): r is string => typeof r === 'string') : [],
     shareMeals: f.share_meals !== false,
     seeMeals: f.see_meals !== false,
+    notesOn: f.notes !== false,
   }));
+  // A server with circles always sends `together` (an empty list at least); one without them sends no such key.
+  const togetherAvailable = Array.isArray(o.together);
   return {
     me: me
       ? {
@@ -184,10 +283,37 @@ export function toOverview(raw: unknown): FriendsOverview {
     feed: mealsAvailable ? toFeed(o.feed) : workoutFeedOf(friends),
     myMeals: mealsAvailable ? toMyMeals(o.my_meals) : [],
     mealsAvailable,
+    togetherAvailable,
+    signals: togetherAvailable ? toSignalsWanted(o.signals) : NO_SIGNALS,
+    notesOn: !togetherAvailable || o.notes_on !== false,
+    together: togetherAvailable ? toTogether(o.together) : [],
+    togetherInvites: togetherAvailable ? toTogetherInvites(o.together_invites) : [],
+    buddies: togetherAvailable ? toBuddies(o.buddies) : [],
+    buddyInvites: togetherAvailable ? toBuddyInvites(o.buddy_invites) : [],
+    notes: togetherAvailable ? toNotes(o.notes) : [],
+    notesSent: togetherAvailable ? toNotesSent(o.notes_sent) : [],
+    sharedSavedMeals: togetherAvailable ? toSharedSavedMeals(o.shared_saved_meals) : [],
+    mySavedMeals: togetherAvailable ? toMySavedMeals(o.my_saved_meals) : [],
   };
 }
 
-const EMPTY_OVERVIEW: FriendsOverview = { me: null, friends: [], incoming: [], outgoing: [], cheers: [], feed: [], myMeals: [] };
+const EMPTY_OVERVIEW: FriendsOverview = {
+  me: null,
+  friends: [],
+  incoming: [],
+  outgoing: [],
+  cheers: [],
+  feed: [],
+  myMeals: [],
+  together: [],
+  togetherInvites: [],
+  buddies: [],
+  buddyInvites: [],
+  notes: [],
+  notesSent: [],
+  sharedSavedMeals: [],
+  mySavedMeals: [],
+};
 
 /** Load (or reload) everything the Friends screen shows. Never throws. */
 export async function refreshFriends(): Promise<void> {
@@ -569,6 +695,7 @@ export async function leaveSocial(): Promise<FriendsResult> {
   const { error } = await session.client.rpc('social_leave');
   if (error) return failure(error.message);
   lastPublished = null;
+  lastSignals = null;
   lastSentMeal.clear();
   useFriends.setState({ status: 'ready', overview: EMPTY_OVERVIEW, error: null });
   return { ok: true, value: undefined };
@@ -608,6 +735,282 @@ export async function publishSummary(options: { force?: boolean } = {}): Promise
   }
 }
 
+// ------------------------------------------------------------------ together (20261202000000_friends_together.sql)
+
+/** Said where a control of circles, buddies or notes was still on screen when the server turned out not to have them. */
+export const TOGETHER_NOT_YET = 'Doing things together with friends is not available yet. Friends work as before.';
+
+/** The words for each answer the together functions refuse with. */
+export const TOGETHER_MESSAGES: Record<string, string> = {
+  no_card: 'Friends are off. Turn them on first.',
+  invalid: 'That could not be saved. Refresh and try again.',
+  under_18: 'Days logged together is for people 18 and over. Active minutes work for everyone.',
+  in_circle: 'You are in a circle already. Leave it first to join another.',
+  not_friends: 'Someone picked is no longer a friend. Refresh and pick again.',
+  too_many: 'That is more people than this allows.',
+  not_member: 'You are no longer in this circle.',
+  not_found: 'That is no longer there.',
+  already_today: 'One note a day to each friend. You can send another tomorrow.',
+  limit: 'That is a lot for one day. Try again tomorrow.',
+  not_yet: TOGETHER_NOT_YET,
+};
+
+function togetherRefused(code: string): { ok: false; reason: FriendsFailure; message: string; code: string } {
+  return { ok: false, reason: 'failed', code, message: TOGETHER_MESSAGES[code] ?? 'That did not work. Refresh and try again.' };
+}
+
+/** The overview held says this server has no circles yet: a together call is not sent at all. */
+function togetherMissing(): boolean {
+  return useFriends.getState().overview?.togetherAvailable === false;
+}
+
+/**
+ * A together function was missing (PGRST202 before the migration, or for a moment after it while PostgREST reloads):
+ * every control of circles, buddies, notes and saved meals shown hides until the next reload says otherwise.
+ */
+function togetherNotYet(): { ok: false; reason: FriendsFailure; message: string; code: string } {
+  patchOverview((o) => ({
+    ...o,
+    togetherAvailable: false,
+    signals: NO_SIGNALS,
+    notesOn: true,
+    together: [],
+    togetherInvites: [],
+    buddies: [],
+    buddyInvites: [],
+    notes: [],
+    notesSent: [],
+    sharedSavedMeals: [],
+    mySavedMeals: [],
+  }));
+  return togetherRefused('not_yet');
+}
+
+/** One together call: the client, the not-yet rule, a missing function and the server's word in one place. */
+async function togetherCall(fn: string, args: Record<string, unknown>): Promise<{ ok: true; data: unknown } | { ok: false; reason: FriendsFailure; message: string; code?: string }> {
+  const session = await signedInClient();
+  if (!session.ok) return session;
+  if (togetherMissing()) return togetherRefused('not_yet');
+  const { data, error } = await session.client.rpc(fn, args);
+  if (error) return isMissingFunction(error) ? togetherNotYet() : failure(error.message);
+  return { ok: true, data };
+}
+
+const statusOf = (data: unknown): string => (data && typeof data === 'object' ? str((data as Json).status) : str(data));
+
+/**
+ * Start "Together this week" with the friends picked (at most 5; they each accept). `kind` 'minutes' (active
+ * minutes, target 30 to 6000) or 'days' (days with food logged, target 2 to 42, 18 and over only).
+ */
+export async function startTogether(input: { kind: TogetherKind; target: number; invite: string[] }): Promise<FriendsResult<{ id: string }>> {
+  const r = await togetherCall('together_start', { p_kind: input.kind, p_target: Math.round(input.target), p_invite: [...new Set(input.invite)] });
+  if (!r.ok) return r;
+  const o = (r.data && typeof r.data === 'object' ? r.data : {}) as Json;
+  if (o.status !== 'ok' || typeof o.id !== 'string') return togetherRefused(statusOf(r.data));
+  await refreshFriends();
+  await publishSignals({ force: true });
+  return { ok: true, value: { id: o.id } };
+}
+
+/** Invite more friends to my circle. Someone already invited, in it, or who declined is passed over silently. */
+export async function inviteToTogether(circleId: string, userIds: string[]): Promise<FriendsResult> {
+  const r = await togetherCall('together_invite', { p_goal: circleId, p_users: [...new Set(userIds)] });
+  if (!r.ok) return r;
+  if (r.data !== 'ok') return togetherRefused(statusOf(r.data));
+  await refreshFriends();
+  return { ok: true, value: undefined };
+}
+
+/** Join a circle, or decline (silently; that circle cannot ask again). */
+export async function respondToTogether(circleId: string, accept: boolean): Promise<FriendsResult<'joined' | 'declined'>> {
+  const r = await togetherCall('together_respond', { p_goal: circleId, p_accept: accept });
+  if (!r.ok) return r;
+  await refreshFriends();
+  if (r.data === 'joined' || r.data === 'declined') {
+    // Joining asks this phone for new figures: send them now rather than after the next sync.
+    if (r.data === 'joined') await publishSignals({ force: true });
+    return { ok: true, value: r.data };
+  }
+  return togetherRefused(statusOf(r.data));
+}
+
+/** Leave my circle, silently. Gone from the screen at once. */
+export async function leaveTogether(circleId: string): Promise<FriendsResult> {
+  const before = useFriends.getState().overview?.together;
+  patchOverview((o) => ({ ...o, together: (o.together ?? []).filter((c) => c.id !== circleId) }));
+  const r = await togetherCall('together_leave', { p_goal: circleId });
+  if (!r.ok) {
+    if (before && r.code !== 'not_yet') patchOverview((o) => ({ ...o, together: before }));
+    return r;
+  }
+  await refreshFriends();
+  // Already gone: what the person wanted.
+  return r.data === 'left' || r.data === 'not_found' ? { ok: true, value: undefined } : togetherRefused(statusOf(r.data));
+}
+
+/** "Change the goal": the circle's target from this week on. */
+export async function setTogetherTarget(circleId: string, target: number): Promise<FriendsResult> {
+  const r = await togetherCall('together_set_target', { p_goal: circleId, p_target: Math.round(target) });
+  if (!r.ok) return r;
+  if (r.data !== 'ok') return togetherRefused(statusOf(r.data));
+  await refreshFriends();
+  return { ok: true, value: undefined };
+}
+
+/**
+ * "Cheer everyone": a cheer for today (`day:<today>`) to each member of the circle who is my friend (members who are
+ * not are skipped: a cheer is between friends). `today` is the caller's `useToday()`. The value is how many were sent.
+ */
+export async function cheerTogether(circle: Pick<TogetherCircle, 'members'>, day: ISODate): Promise<FriendsResult<{ sent: number }>> {
+  const friends = new Set((useFriends.getState().overview?.friends ?? []).map((f) => f.userId));
+  const to = circle.members.filter((m) => !m.me && friends.has(m.userId));
+  let sent = 0;
+  let last: FriendsResult | null = null;
+  for (const m of to) {
+    last = await cheerFriend(m.userId, dayRef(day));
+    if (last.ok) sent += 1;
+  }
+  if (!sent && last && !last.ok) return last;
+  return { ok: true, value: { sent } };
+}
+
+/** Ask a friend to log together. 'accepted' when they had asked me first. */
+export async function inviteBuddy(userId: string): Promise<FriendsResult<'sent' | 'accepted' | 'already'>> {
+  const r = await togetherCall('buddy_invite', { p_user: userId });
+  if (!r.ok) return r;
+  await refreshFriends();
+  if (r.data === 'sent' || r.data === 'accepted' || r.data === 'already') {
+    if (r.data === 'accepted') await publishSignals({ force: true });
+    return { ok: true, value: r.data };
+  }
+  return togetherRefused(statusOf(r.data));
+}
+
+/** Answer a friend's ask to log together. Declining is silent. */
+export async function respondToBuddy(userId: string, accept: boolean): Promise<FriendsResult<'together' | 'declined'>> {
+  const r = await togetherCall('buddy_respond', { p_user: userId, p_accept: accept });
+  if (!r.ok) return r;
+  await refreshFriends();
+  if (r.data === 'together' || r.data === 'declined') {
+    if (r.data === 'together') await publishSignals({ force: true });
+    return { ok: true, value: r.data };
+  }
+  return togetherRefused(statusOf(r.data));
+}
+
+/** Stop logging together, or take back my ask. Silent for the other; gone from the screen at once. */
+export async function stopBuddy(userId: string): Promise<FriendsResult> {
+  const before = useFriends.getState().overview?.buddies;
+  patchOverview((o) => ({ ...o, buddies: (o.buddies ?? []).filter((b) => b.userId !== userId) }));
+  const r = await togetherCall('buddy_stop', { p_user: userId });
+  if (!r.ok) {
+    if (before && r.code !== 'not_yet') patchOverview((o) => ({ ...o, buddies: before }));
+    return r;
+  }
+  await refreshFriends();
+  return r.data === 'stopped' || r.data === 'not_found' ? { ok: true, value: undefined } : togetherRefused(statusOf(r.data));
+}
+
+/** Send a friend a kind note. Shows as sent at once; rolled back if refused. */
+export async function sendNote(userId: string, kind: NoteKind): Promise<FriendsResult> {
+  const mark: NoteSent = { toUserId: userId, kind, createdAt: new Date().toISOString() };
+  patchOverview((o) => ({ ...o, notesSent: [mark, ...(o.notesSent ?? [])] }));
+  const r = await togetherCall('send_note', { p_to: userId, p_kind: kind });
+  const undo = () => patchOverview((o) => ({ ...o, notesSent: (o.notesSent ?? []).filter((n) => n !== mark) }));
+  if (!r.ok) {
+    undo();
+    return r;
+  }
+  if (r.data !== 'ok') {
+    // Sent from another phone already today: keep it shown as sent.
+    if (r.data !== 'already_today') undo();
+    return togetherRefused(statusOf(r.data));
+  }
+  await refreshFriends();
+  return { ok: true, value: undefined };
+}
+
+/** "Notes from friends" on or off for everyone. Shows at once. */
+export async function setNotesOn(on: boolean): Promise<FriendsResult<boolean>> {
+  const before = useFriends.getState().overview?.notesOn;
+  patchOverview((o) => ({ ...o, notesOn: on }));
+  const r = await togetherCall('note_settings_set', { p_on: on });
+  if (!r.ok || typeof r.data !== 'boolean') {
+    patchOverview((o) => ({ ...o, notesOn: before ?? true }));
+    return r.ok ? togetherRefused('no_card') : r;
+  }
+  await refreshFriends();
+  return { ok: true, value: r.data };
+}
+
+/** Notes from one friend on or off; they are never told. Shows at once. */
+export async function setFriendNotes(userId: string, on: boolean): Promise<FriendsResult> {
+  const apply = (value: boolean) => patchOverview((o) => ({ ...o, friends: o.friends.map((f) => (f.userId === userId ? { ...f, notesOn: value } : f)) }));
+  const before = useFriends.getState().overview?.friends.find((f) => f.userId === userId)?.notesOn ?? true;
+  apply(on);
+  const r = await togetherCall('friend_notes_set', { p_friend: userId, p_on: on });
+  if (!r.ok || r.data !== 'ok') {
+    apply(before);
+    return r.ok ? togetherRefused(statusOf(r.data)) : r;
+  }
+  await refreshFriends();
+  return { ok: true, value: undefined };
+}
+
+/**
+ * Show a saved meal or recipe to the friends picked, for 7 days (as a day's meal). `name`, `items` and `servings`
+ * come from `buildSharedSavedMeal`; `savedMealId` is the saved meal's id, which the server turns into an opaque
+ * reference with the share key and never keeps. Showing it again changes it and keeps when it leaves.
+ */
+export async function showSavedMeal(input: { savedMealId: string; name: string; items: SharedMealItem[]; servings: number | null; showKcal: boolean; viewers: string[] }): Promise<FriendsResult<{ ref: string; expiresAt: string }>> {
+  if (mealsMissing()) return refused('not_yet');
+  const r = await togetherCall('meal_show_saved', {
+    p_saved_id: input.savedMealId,
+    p_name: input.name,
+    p_items: cleanSharedMealItems(input.items, input.showKcal),
+    p_servings: input.servings,
+    p_show_kcal: input.showKcal,
+    p_viewers: [...new Set(input.viewers)],
+  });
+  if (!r.ok) return r;
+  const o = (r.data && typeof r.data === 'object' ? r.data : {}) as Json;
+  if (o.status !== 'ok' || typeof o.ref !== 'string') {
+    if (o.status === 'not_friends' || o.status === 'no_card') await refreshFriends();
+    return refused(str(o.status));
+  }
+  await refreshFriends();
+  return { ok: true, value: { ref: o.ref, expiresAt: str(o.expires_at) } };
+}
+
+/** What was last sent for circles and buddies, by user, so unchanged figures are not sent again after every sync. */
+let lastSignals: { userId: string; signature: string } | null = null;
+
+/**
+ * Send this phone's figures for circles and buddies (`buildFriendSignals`): only what the overview says the server
+ * wants, nothing at all for someone in no circle and with no buddy, and nothing when unchanged. Run after each sync;
+ * never raises an error, and against a server without circles it asks nothing.
+ */
+export async function publishSignals(options: { force?: boolean } = {}): Promise<void> {
+  const session = await signedInClient();
+  if (!session.ok) return;
+  const overview = useFriends.getState().overview;
+  const want = overview?.signals;
+  if (!overview?.me || overview.togetherAvailable === false || !want || (!want.minutes && !want.logged)) return;
+  const s = useStore.getState();
+  if (s.ownerId !== session.userId) return;
+  const signals = buildFriendSignals({ activities: live(s.activities), foodEntries: live(s.foodEntries), today: today(), want });
+  const signature = signalsSignature(signals);
+  if (!options.force && lastSignals?.userId === session.userId && lastSignals.signature === signature) return;
+  const { data, error } = await session.client.rpc('social_signals_publish', { p_signals: signals });
+  if (error) {
+    if (isMissingFunction(error)) togetherNotYet();
+    return;
+  }
+  if (data === 'ok') lastSignals = { userId: session.userId, signature };
+  // not_needed or no_card: the overview is out of date; the next reload says what is wanted.
+  else lastSignals = null;
+}
+
 let started = false;
 
 /**
@@ -625,11 +1028,13 @@ export function startFriends(): void {
       if (useFriends.getState().status !== 'ready') await refreshFriends();
       await publishSummary();
       await publishMeals();
+      await publishSignals();
     })();
   });
   supabase.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') {
       lastPublished = null;
+      lastSignals = null;
       lastSentMeal.clear();
       useFriends.setState({ status: 'signed-out', overview: null, error: null });
     }
@@ -641,15 +1046,31 @@ export function startFriends(): void {
 if (typeof __DEV__ !== 'undefined' && (__DEV__ || process.env.EXPO_PUBLIC_E2E === '1')) {
   (globalThis as { __healthcalFriendsApi?: unknown }).__healthcalFriendsApi = {
     buildSharedMeal,
+    buildSharedSavedMeal,
     cheerMeal,
+    cheerTogether,
+    friendMealToSaved,
+    inviteBuddy,
+    inviteToTogether,
     leaveSocial,
+    leaveTogether,
     publishMeals,
+    publishSignals,
     publishSummary,
     refreshFriends,
     removeFriend,
     requestFriend,
+    respondToBuddy,
     respondToRequest,
+    respondToTogether,
+    sendNote,
     setFriendMealPrefs,
+    setFriendNotes,
+    setNotesOn,
+    setTogetherTarget,
+    showSavedMeal,
+    startTogether,
+    stopBuddy,
     setMealAudience,
     setMealSettings,
     setupSocial,
